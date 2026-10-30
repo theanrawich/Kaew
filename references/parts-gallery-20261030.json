@@ -1,0 +1,111 @@
+[
+  {
+    "id": "gateway",
+    "label": "ESP32-S3 N16R8",
+    "name": "DIYMORE บอร์ดพัฒนา ESP32-S3-DevKitC-1 N16R8-โมดูล WiFi บลูทูธ 5 ชิป Dual Core 240MHz แรม 8MB/แฟลช 16MB รองรับ AI และ IoT",
+    "image": "cn-11134207-820l4-msdsqnh6n2tc1d",
+    "price": 323,
+    "url": "https://shopee.co.th/product/166913933/53161720991",
+    "local": "part-gateway.jpg",
+    "note": "ราคาที่แสดงในผลค้นหา ยังไม่ใช่ราคา checkout"
+  },
+  {
+    "id": "node",
+    "label": "ESP32 DevKit",
+    "name": "ESP32 CH340 แบบหัว TYPE-C 30PIN DEVKIT V1 Driver CH340 WiFi Bluetooth มีของพร้อมส่งทันที!!!!",
+    "image": "th-11134207-81ztc-mn05bvvu29s391",
+    "price": 158,
+    "url": "https://shopee.co.th/product/117988183/56908734236",
+    "local": "part-node.jpg",
+    "note": "ราคาที่แสดงในผลค้นหา ยังไม่ใช่ราคา checkout"
+  },
+  {
+    "id": "pump",
+    "label": "ปั๊มที่เลือก · 10–250มล./นาที",
+    "name": "Glowerstoree-th ปั๊ม peristaltic ของเหลว 10 มล. - 250 มล./นาที ปรับปริมาณการไหลสำหรับพิพิธภัณฑ์สัตว์น้ำ Lab Analytical US Plug 110-240V",
+    "price": 504,
+    "url": "https://shopee.co.th/product/1922827977/57366647316",
+    "local": "pump-250-0.jpg",
+    "note": "ผู้ใช้เลือกแล้ว ราคา504บาทเป็นผลค้นหา ยังตรวจDCoutput/การควบคุมESP32/ขนาดจริง/วัสดุสัมผัสน้ำต่อ"
+  },
+  {
+    "id": "display",
+    "label": "จอ OLED 1.3 นิ้ว SH1106 I2C สีขาว — ลดรุ่นแล้ว",
+    "name": "จอ OLED 1.3 นิ้ว 128x64 I2C สีขาว ชิป SH1106 สำหรับ Arduino/ESP32/Raspberry Pi",
+    "image": "sg-11134201-8258w-mqzjpqbj8lxh72",
+    "price": 139,
+    "url": "https://shopee.co.th/product/132454846/7835487246",
+    "local": "part-display-oled13.jpg",
+    "note": "128×64 ขาวดำ ไม่มีสัมผัส; แสดงเวลา ปริมาณและข้อความเตือนแบบสั้น ต้องใส่ฟอนต์ไทยในโปรแกรม",
+    "previousPrice": 270,
+    "saving": 131,
+    "confirmedChoice": "User requested screen downgrade; selected OLED1.3 in this session."
+  },
+  {
+    "id": "scale",
+    "label": "Load cell + HX711",
+    "name": "Load Cell พร้อม HX711 เซ็นเซอร์ชั่งน้ำหนัก 1Kg 5Kg สินค้าพร้อมส่ง!!!",
+    "image": "86d3ea6572ab989d29b70eff1e4935e7",
+    "price": 68,
+    "url": "https://shopee.co.th/product/145695802/6622381424",
+    "local": "part-scale.jpg",
+    "note": "รายการมีหลายตัวเลือก ต้องตรวจรุ่นและราคาอีกครั้ง"
+  },
+  {
+    "id": "tds",
+    "label": "TDS sensor",
+    "name": "TDS Sensor Analog EC Sensor เซ็นเซอร์วัดค่าการนำไฟฟ้าของน้ำ ตรวจสอบคุณภาพน้ำ ใช้ได้กับ arduino esp32 esp8266 และอื่นๆ",
+    "image": "c63be5d91f2802e3e23f9cbe077cf429",
+    "price": 178,
+    "url": "https://shopee.co.th/product/117988183/10391220809",
+    "local": "part-tds.jpg",
+    "note": "ราคาที่แสดงในผลค้นหา ยังไม่ใช่ราคา checkout"
+  },
+  {
+    "id": "temperature",
+    "label": "DS18B20 probe กันน้ำ",
+    "name": "DS18B20 เซ็นเซอร์วัดอุณหภูมิในน้ำ Digital Temperature Temp Sensor Probe",
+    "price": 40,
+    "url": "https://shopee.co.th/product/459630043/10370366612",
+    "local": "part-temperature.jpg",
+    "note": "รูปและราคาจากรายการร้าน ยังต้องตรวจวัสดุprobe/ซีลสำหรับสัมผัสน้ำดื่ม"
+  },
+  {
+    "id": "level",
+    "label": "XKC-Y25",
+    "name": "เซ็นเซอร์วัดระดับน้ำ ของเหลว แบบไร้สัมผัส Non-contack liquid level Water level Sensor XKC-Y25-NPN PNP Arduino ESP8266",
+    "image": "09a971c869d24ec0ec6fd7c019eb7d85",
+    "price": 235,
+    "url": "https://shopee.co.th/product/459630043/19932827150",
+    "local": "part-level.jpg",
+    "note": "รายการมีหลายตัวเลือก ต้องตรวจรุ่นและราคาอีกครั้ง"
+  },
+  {
+    "id": "mic",
+    "label": "INMP441",
+    "name": "โมดูลไมโครโฟน INMP441 Omnidirectional Microphone module I2S สำหรับ ESP32 [ ยังไม่บัดกรีขา ]",
+    "image": "sg-11134201-81zvv-mmtxjc6t4subef",
+    "price": 69,
+    "url": "https://shopee.co.th/product/39044974/55908470443",
+    "local": "part-mic.jpg",
+    "note": "ราคาที่แสดงในผลค้นหา ยังไม่ใช่ราคา checkout"
+  },
+  {
+    "id": "cup",
+    "label": "แก้ว Ocean Nova Rock 300 มล.",
+    "name": "Ocean Nova Rock B06511",
+    "price": 145,
+    "url": "https://shopee.co.th/product/7560252/28473454243",
+    "local": "ocean-nova-reference.jpg",
+    "note": "ราคาแพ็ก6ใบ; รูปจากผู้ผลิต ขนาดปาก83 ฐาน63 สูง90มม."
+  },
+  {
+    "id": "bottle",
+    "label": "ขวดคริสตัล 1.5 ลิตร",
+    "name": "Crystal 1500 ml",
+    "price": 54,
+    "url": "https://shopee.co.th/product/1808248884/55861953546",
+    "local": "crystal-1500-reference.jpg",
+    "note": "ราคาแพ็ก6ขวด; รูปอ้างอิงจากLotus ขนาดขวดเดี่ยวยังไม่ยืนยัน"
+  }
+]

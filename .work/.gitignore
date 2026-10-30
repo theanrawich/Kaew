@@ -1,0 +1,12 @@
+*
+!.gitignore
+!build-kaew.cjs
+!check-standalone.cjs
+!stage-pages.cjs
+!kaew-template.html
+!kaew-viewer.js
+!make-parts-gallery.cjs
+!toolchain/
+toolchain/*
+!toolchain/package.json
+!toolchain/package-lock.json

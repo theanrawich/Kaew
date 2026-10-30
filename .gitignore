@@ -1,0 +1,32 @@
+node_modules/
+_site/
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+
+# Publish the website and its build inputs. Keep coursework, proposals,
+# registration snapshots, and local working documents on this computer.
+/*.md
+!/README.md
+!/KAEW_SHOPPING_LIST.md
+/docs/
+/output/*
+!/output/real-parts/
+/output/real-parts/*
+!/output/real-parts/hero.jpg
+/references/*
+!/references/parts-gallery-20261030.json
+!/references/part-gateway.jpg
+!/references/part-node.jpg
+!/references/pump-250-0.jpg
+!/references/part-display-oled13.jpg
+!/references/part-scale.jpg
+!/references/part-tds.jpg
+!/references/part-level.jpg
+!/references/part-mic.jpg
+!/references/part-temperature.jpg
+!/references/ocean-nova-reference.jpg
+!/references/crystal-1500-reference.jpg

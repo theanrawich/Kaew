@@ -1,0 +1,417 @@
+{
+  "checkedAt": "2026-10-30",
+  "currency": "THB",
+  "title": "Kaew — ชุดประหยัด ปั๊ม504บาท + OLED139บาท",
+  "rows": [
+    {
+      "id": "gateway",
+      "label": "ESP32-S3 N16R8",
+      "name": "DIYMORE บอร์ดพัฒนา ESP32-S3-DevKitC-1 N16R8-โมดูล WiFi บลูทูธ 5 ชิป Dual Core 240MHz แรม 8MB/แฟลช 16MB รองรับ AI และ IoT",
+      "shop": "Diymore Official Store",
+      "displayedPriceTHB": 323,
+      "url": "https://shopee.co.th/product/166913933/53161720991",
+      "qty": 1,
+      "unit": "บอร์ด",
+      "status": "candidate",
+      "note": "รุ่น N16R8 มี PSRAM 8 MB เป็นข้อเสนอแทน N8 ในร่างเดิม",
+      "unitBudget": 323,
+      "lineBudget": 323
+    },
+    {
+      "id": "node",
+      "label": "ESP32 DevKit 30 pin Type-C",
+      "name": "ESP32 CH340 แบบหัว TYPE-C 30PIN DEVKIT V1 Driver CH340 WiFi Bluetooth มีของพร้อมส่งทันที!!!!",
+      "shop": "AEI.th ",
+      "displayedPriceTHB": 158,
+      "url": "https://shopee.co.th/product/117988183/56908734236",
+      "qty": 1,
+      "unit": "บอร์ด",
+      "status": "candidate",
+      "note": "Sensor Node แยกจาก Gateway",
+      "unitBudget": 158,
+      "lineBudget": 158
+    },
+    {
+      "id": "display",
+      "label": "OLED 1.3 นิ้ว SH1106 I2C สีขาว",
+      "name": "จอ OLED 1.3 นิ้ว 128x64 I2C สีขาว ชิป SH1106 สำหรับ Arduino/ESP32/Raspberry Pi",
+      "shop": "ModuleMore",
+      "displayedPriceTHB": 139,
+      "url": "https://shopee.co.th/product/132454846/7835487246",
+      "qty": 1,
+      "unit": "จอ",
+      "status": "selected",
+      "note": "ผู้ใช้เลือกdowngrade;128×64ขาวดำ พื้นที่แสดงผลอ้างอิง29.42×14.70มม. รูยึดต้องเทียบบอร์ดร้าน",
+      "unitBudget": 139,
+      "lineBudget": 139,
+      "local": "part-display-oled13.jpg",
+      "userSelected": true
+    },
+    {
+      "id": "pump",
+      "label": "ปั๊มรีดสายแบบปรับ10–250มล./นาที",
+      "name": "Glowerstoree-th ปั๊ม peristaltic ของเหลว 10 มล. - 250 มล./นาที ปรับปริมาณการไหลสำหรับพิพิธภัณฑ์สัตว์น้ำ Lab Analytical US Plug 110-240V",
+      "shop": "glowerstoree.th",
+      "displayedPriceTHB": 504,
+      "url": "https://shopee.co.th/product/1922827977/57366647316",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "selected",
+      "note": "ผู้ใช้เลือกรายการนี้แล้ว;ร้านระบุสูงสุด250มล./นาที ยังไม่ยืนยันDCoutputของadapter,การควบคุมESP32,วัสดุสายหรือขนาดกล่อง",
+      "unitBudget": 504,
+      "lineBudget": 504,
+      "local": "pump-250-0.jpg",
+      "userSelected": true
+    },
+    {
+      "id": "scale",
+      "label": "Load cell 1 kg + HX711",
+      "name": "Load Cell พร้อม HX711 เซ็นเซอร์ชั่งน้ำหนัก 1Kg 5Kg สินค้าพร้อมส่ง!!!",
+      "shop": "safwit",
+      "displayedPriceTHB": 68,
+      "url": "https://shopee.co.th/product/145695802/6622381424",
+      "qty": 1,
+      "unit": "ชุด",
+      "status": "variant",
+      "note": "รายการมี1kg/5kg ต้องเลือก1kgพร้อมHX711; ฐานทำรวมในงบโครง",
+      "unitBudget": 68,
+      "lineBudget": 68
+    },
+    {
+      "id": "flow",
+      "label": "เซนเซอร์วัดการไหลต่ำ — รอเลือกรุ่น",
+      "qty": 1,
+      "unit": "ตัว",
+      "unitBudget": 300,
+      "lineBudget": 300,
+      "status": "hold",
+      "note": "งบเผื่อ300บาท ไม่ใช่ราคาสินค้าที่หาได้แล้ว ต้องอ่านได้ที่≤0.25L/minและเหมาะกับน้ำดื่ม;ไม่ใช้YF-S4010.3–6L/min",
+      "url": null
+    },
+    {
+      "id": "tds",
+      "label": "Analog TDS module + probe",
+      "name": "TDS Sensor Analog EC Sensor เซ็นเซอร์วัดค่าการนำไฟฟ้าของน้ำ ตรวจสอบคุณภาพน้ำ ใช้ได้กับ arduino esp32 esp8266 และอื่นๆ",
+      "shop": "AEI.th ",
+      "displayedPriceTHB": 178,
+      "url": "https://shopee.co.th/product/117988183/10391220809",
+      "qty": 1,
+      "unit": "ชุด",
+      "status": "candidate",
+      "note": "เป็นโมดูลทั่วไป ไม่อ้างว่าเป็น DFRobot แท้; ขนาดบอร์ดและ food-contact ของ probe ยังไม่ยืนยัน",
+      "unitBudget": 178,
+      "lineBudget": 178
+    },
+    {
+      "id": "temperature",
+      "label": "DS18B20 probe กันน้ำ",
+      "name": "DS18B20 เซ็นเซอร์วัดอุณหภูมิในน้ำ Digital Temperature Temp Sensor Probe",
+      "shop": "GusTron",
+      "displayedPriceTHB": 40,
+      "url": "https://shopee.co.th/product/459630043/10370366612",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "กันน้ำไม่เท่ากับยืนยัน food-contact ต้องตรวจวัสดุ probe/ซีล",
+      "unitBudget": 40,
+      "lineBudget": 40
+    },
+    {
+      "id": "level",
+      "label": "XKC-Y25-NPN",
+      "name": "เซ็นเซอร์วัดระดับน้ำ ของเหลว แบบไร้สัมผัส Non-contack liquid level Water level Sensor XKC-Y25-NPN PNP Arduino ESP8266",
+      "shop": "GusTron",
+      "displayedPriceTHB": 235,
+      "url": "https://shopee.co.th/product/459630043/19932827150",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "variant",
+      "note": "เลือกรุ่น NPN; 1 จุดตรวจได้เพียงมี/ไม่มีน้ำที่ระดับติดตั้ง ไม่ใช่ปริมาตรคงเหลือ 1500 มล. แบบต่อเนื่อง",
+      "unitBudget": 235,
+      "lineBudget": 235
+    },
+    {
+      "id": "microphone",
+      "label": "INMP441 I2S",
+      "name": "โมดูลไมโครโฟน INMP441 Omnidirectional Microphone module I2S สำหรับ ESP32 [ ยังไม่บัดกรีขา ]",
+      "shop": "ModuleMore",
+      "displayedPriceTHB": 69,
+      "url": "https://shopee.co.th/product/39044974/55908470443",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "ไมค์แยกจากภาคปั๊ม",
+      "unitBudget": 69,
+      "lineBudget": 69
+    },
+    {
+      "id": "amplifier",
+      "label": "MAX98357A I2S",
+      "name": "LJF 3W MAX98357 MAX98357A I2S Class D บอร์ดขยายเสียงดิจิตอลเอาต์พุตพลังงานสูงสําหรับอุปกรณ์สมาร์ท",
+      "shop": "LJF.life",
+      "displayedPriceTHB": 52,
+      "url": "https://shopee.co.th/product/1090801999/50766867871",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "งบแอมป์ mono 3W",
+      "unitBudget": 52,
+      "lineBudget": 52
+    },
+    {
+      "id": "speaker",
+      "label": "ลำโพง 4Ω 3W 40mm",
+      "name": "ดอกลำโพงฟูลเรนจ์ 40mm 4Ω 3W แม่เหล็กแรงสูง เสียงคมชัด เบสแน่น ใช้ซ่อมหรือ DIY ลำโพงบลูทูธ",
+      "shop": "ล้านไทย",
+      "displayedPriceTHB": 29,
+      "url": "https://shopee.co.th/product/284033450/41319319688",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "ตรวจขนาดจริงและตำแหน่งรูยึดอีกครั้ง",
+      "unitBudget": 29,
+      "lineBudget": 29
+    },
+    {
+      "id": "power",
+      "label": "Glink GAC12-3 12V 3A สำหรับภาคควบคุม",
+      "name": "Glink GAC12-3 Adapter 12V-3A  (5.5*2.5) อะแดปเตอร์กล้องวงจรปิด และอื่นๆ มาตรฐาน มอก.",
+      "shop": "IT_2U (ไอที ทูยู)",
+      "displayedPriceTHB": 179,
+      "url": "https://shopee.co.th/product/56003930/52202687875",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "แยกจากadapterที่ร้านแสดงในชุดปั๊ม ยังไม่ยืนยันว่าชุดปั๊มใช้12V",
+      "unitBudget": 179,
+      "lineBudget": 179
+    },
+    {
+      "id": "buck",
+      "label": "Buck 12V → 5V XY-3606",
+      "name": "XY-3606 โมดูลลดแรงดันไฟ DC-DC 9-36VDC to 5VDC 5A Step Down Module Buck convertor Fix 5VDC 5A LM2596S โมดูลปรับลดแรงดั...",
+      "shop": "โอ.อาร์. เทคโนโลยี",
+      "displayedPriceTHB": 66,
+      "url": "https://shopee.co.th/product/944231623/26113420026",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "แยกไฟ logic/audio จากปั๊ม ต้องวัดไฟและทดสอบโหลด",
+      "unitBudget": 66,
+      "lineBudget": 66
+    },
+    {
+      "id": "driver",
+      "label": "D4184 MOSFET module",
+      "name": "โมดูล D4184 MOSFET 40V 50A",
+      "shop": "NA ME Shop",
+      "displayedPriceTHB": 22,
+      "url": "https://shopee.co.th/product/604093915/22585473352",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "candidate",
+      "note": "ตรวจการขับ 3.3V, ใส่ flyback และ default-off; ไม่ใช้ค่ากระแสโฆษณาเป็นกระแสใช้งานจริง",
+      "unitBudget": 22,
+      "lineBudget": 22
+    },
+    {
+      "id": "stop",
+      "label": "LA16 ปุ่มหยุดฉุกเฉิน",
+      "name": "Emergency Stop Push Button Switch 16mm  สวิตช์ปุ่มหยุดฉุกเฉิน AC 250V 3ขา 6ขา สวิตซ์ดอกเห็ด LA16",
+      "shop": "Plus-electronics",
+      "displayedPriceTHB": 75,
+      "url": "https://shopee.co.th/product/75734101/3023961333",
+      "qty": 1,
+      "unit": "ตัว",
+      "status": "variant",
+      "note": "เลือกรุ่นล็อกและหน้าสัมผัส NC; ต่อวงจรให้ตัดการสั่งปั๊มได้จริง",
+      "unitBudget": 75,
+      "lineBudget": 75
+    },
+    {
+      "id": "tube",
+      "label": "สายซิลิโคน ขนาดใกล้เคียง ID4.8–5 OD8",
+      "name": "[Food grade - 1 เมตร] สายซิลิโคนแบบใส ทนต่ออุณหภูมิร้อน เย็น Silicone Tube Clear Flexible Water Transparent",
+      "shop": "Brewery Hub Official",
+      "displayedPriceTHB": 108,
+      "url": "https://shopee.co.th/product/104910181/25439532350",
+      "qty": 2,
+      "unit": "เมตร",
+      "status": "variant",
+      "note": "ราคาเริ่มต้นต่อเมตรจากรายการหลายขนาด ต้องเทียบID/ODกับสายปั๊มจริงก่อนซื้อ;ไม่ถือว่าสายที่แถมยืนยันfood-contactแล้ว",
+      "unitBudget": 108,
+      "lineBudget": 216
+    },
+    {
+      "id": "cup",
+      "label": "Ocean Nova Rock B06511 300ml (แพ็ก6)",
+      "name": "Ocean แก้วน้ำ 300 ml (6ใบ) Nova Rock B06511 โอเชียน",
+      "shop": "Raykitchenware",
+      "displayedPriceTHB": 145,
+      "url": "https://shopee.co.th/product/7560252/28473454243",
+      "qty": 1,
+      "unit": "แพ็ก 6 ใบ",
+      "status": "candidate",
+      "note": "คิดเงินซื้อครบแพ็ก ใช้กับเครื่อง1ใบ สำรอง5ใบ; Øปาก83 ฐาน63 สูง90มม.",
+      "unitBudget": 145,
+      "lineBudget": 145
+    },
+    {
+      "id": "bottle",
+      "label": "Crystal 1.5 L (แพ็ก6)",
+      "name": "คริสตัล น้ำดื่ม 1500 มล. แพ็ค 6 CRYSTAL WATER 1500 ML. PACK 6",
+      "shop": "Lotuss_Hypermarket_Rangsit",
+      "displayedPriceTHB": 54,
+      "url": "https://shopee.co.th/product/1808248884/55861953546",
+      "qty": 1,
+      "unit": "แพ็ก 6 ขวด",
+      "status": "candidate",
+      "note": "ร้านมีข้อจำกัดพื้นที่ส่ง; คิดครบแพ็ก ใช้ตั้งเครื่อง1ขวด",
+      "unitBudget": 54,
+      "lineBudget": 54
+    },
+    {
+      "id": "enclosure",
+      "label": "ฐาน/โครงอะคริลิกหรือPETG และขายึด",
+      "qty": 1,
+      "unit": "ชุด",
+      "unitBudget": 700,
+      "lineBudget": 700,
+      "status": "allowance",
+      "note": "ประมาณการงานต้นแบบแบบแผ่นและขายึดเล็ก ไม่ใช่ใบเสนอราคาพิมพ์ตัวถังเต็ม"
+    },
+    {
+      "id": "fittings",
+      "label": "ฝาดัดแปลง,ข้อต่อ,หัวจ่าย,ซีลและช่องอากาศ",
+      "qty": 1,
+      "unit": "ชุด",
+      "unitBudget": 200,
+      "lineBudget": 200,
+      "status": "allowance",
+      "note": "ยังต้องยืนยันเกลียวฝาคริสตัลและวัสดุสัมผัสน้ำ"
+    },
+    {
+      "id": "electrical",
+      "label": "ฟิวส์,flyback,ขั้วDC,สายไฟ,PCBและปรับสัญญาณ",
+      "qty": 1,
+      "unit": "ชุด",
+      "unitBudget": 200,
+      "lineBudget": 200,
+      "status": "allowance",
+      "note": "รวมวงจรย่อยเชื่อมปั๊มกับGateway ยังไม่ยืนยันinterfaceของปั๊ม"
+    },
+    {
+      "id": "assembly",
+      "label": "นอต,standoff,ยางรองและวัสดุประกอบ",
+      "qty": 1,
+      "unit": "ชุด",
+      "unitBudget": 100,
+      "lineBudget": 100,
+      "status": "allowance",
+      "note": "งบประมาณต้นแบบ"
+    }
+  ],
+  "totals": {
+    "parts": 2552,
+    "hold": 300,
+    "fabrication": 1200,
+    "shipping": 250,
+    "subtotal": 4302,
+    "contingency": 440,
+    "total": 4742
+  },
+  "priceMethod": "ราคาหน้าผลค้นหา30ต.ค.2026 ไม่ใช่checkout quote;รวมแพ็กแก้ว6ใบและน้ำ6ขวดจริง ไม่หักคูปองส่วนตัว",
+  "exclusions": [
+    "ค่า API/บริการรายเดือน",
+    "เครื่องมือช่างและค่าแรงประกอบ",
+    "การสอบเทียบระดับห้องปฏิบัติการ"
+  ],
+  "sources": [
+    {
+      "label": "Ocean Nova Rock — ผู้ผลิต",
+      "url": "https://www.ocean-glassware.com/products/nova-rock/"
+    },
+    {
+      "label": "Ocean collection 2026–2027 — ฐานแก้ว63มม.",
+      "url": "https://www.ocean-glassware.com/wp-content/uploads/2026/01/OCEAN-COLLECTION-2026-2027-1.pdf"
+    },
+    {
+      "label": "ขวดคริสตัล — ภาพอ้างอิง",
+      "url": "https://www.lotuss.com/en/product/72812265"
+    },
+    {
+      "label": "คริสตัลแพ็ก6 — ขนาดรวมบรรจุภัณฑ์ 171.3×250×327.5 มม.",
+      "url": "https://www.allonline.7eleven.co.th/p/น้ำดื่มคริสตัล-1500-มล-แพ็ก-6-ขวด/420462/"
+    },
+    {
+      "label": "XKC-Y25 — ผู้ผลิต",
+      "url": "https://www.sz-xkc.com/detail/1432.html"
+    },
+    {
+      "label": "TDS SEN0244 — เอกสารอ้างอิง ไม่ใช่การรับรองสินค้าทั่วไป",
+      "url": "https://wiki.dfrobot.com/sen0244"
+    },
+    {
+      "label": "OLED SH1106 — LCDWIKIขนาดอ้างอิง",
+      "url": "https://www.lcdwiki.com/res/MC130GX_VX/1.3inch_IIC_OLED_Module_MC130GX%26MC130VX_User_Manual_EN.pdf"
+    },
+    {
+      "label": "ปั๊มที่ผู้ใช้เลือก — Shopee",
+      "url": "https://shopee.co.th/product/1922827977/57366647316"
+    }
+  ],
+  "dimensions": {
+    "units": "mm",
+    "appliance": {
+      "width": 220,
+      "depth": 350,
+      "height": 450,
+      "status": "proposed"
+    },
+    "cup": {
+      "topDiameter": 83,
+      "baseDiameter": 63,
+      "height": 90,
+      "nominalVolume": 300,
+      "status": "manufacturer"
+    },
+    "display": {
+      "activeWidth": 29.42,
+      "activeHeight": 14.7,
+      "pcbWidth": 33.5,
+      "pcbHeight": 35.4,
+      "status": "reference-model"
+    },
+    "pump": {
+      "width": 80,
+      "depth": 125,
+      "bodyHeight": 40,
+      "heightWithHead": 72,
+      "status": "estimated",
+      "note": "กล่อง/หัวปั๊มจำลองตามภาพร้าน ไม่มีมิติยืนยันจากร้าน;ไม่ใช่แบบผลิต"
+    },
+    "bottle": {
+      "diameter": 85,
+      "height": 320,
+      "capDiameter": 30,
+      "status": "estimated",
+      "note": "รูปทรงอิงภาพ Crystal 1.5L; ตัวเลขเป็นสมมติฐานเพื่อจัดวาง ไม่ใช่ขนาดขวด Crystal ที่ยืนยันจากผู้ผลิต ขนาดแพ็ก6ใช้ตรวจความสมเหตุสมผลเท่านั้น; ไม่มีข้อสรุปเกลียวฝา"
+    }
+  },
+  "revision": "2026-10-30-selected-pump",
+  "status": "planning-estimate-with-open-items",
+  "openItems": [
+    "flow sensorต่ำกว่า0.25L/minยังไม่มีSKUยืนยัน งบเผื่อ300บาทอาจเปลี่ยน",
+    "ปั๊มเลือกรายการแล้ว แต่แรงดันDC,interfaceควบคุม,ขนาดและวัสดุสัมผัสน้ำยังไม่ยืนยัน",
+    "ขวดคริสตัลยังไม่มีdrawingขวดเดี่ยว/เกลียวฝา",
+    "โครงและค่าส่งเป็นประมาณการ"
+  ],
+  "selectedPump": {
+    "price": 504,
+    "url": "https://shopee.co.th/product/1922827977/57366647316",
+    "userSelected": true,
+    "nominalMaxFlowMlMin": 250,
+    "fill200mlSecondsAtNominal": 48,
+    "flowSource": "seller-claim-unverified"
+  }
+}

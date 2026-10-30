@@ -1,0 +1,14 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const buildDir = path.join(__dirname, 'toolchain');
+const esbuild = require(path.join(buildDir, 'node_modules', 'esbuild'));
+const root = path.dirname(__dirname);
+const result = esbuild.buildSync({entryPoints:[path.join(__dirname,'kaew-viewer.js')],bundle:true,minify:true,format:'iife',target:'es2020',write:false,nodePaths:[path.join(buildDir,'node_modules')],loader:{'.jpg':'dataurl'},legalComments:'inline'});
+const templatePath=path.join(__dirname,'kaew-template.html');
+if(!fs.existsSync(templatePath))fs.copyFileSync(path.join(root,'kaew-3d.html'),templatePath);
+const template=fs.readFileSync(templatePath,'utf8');
+const bundle=result.outputFiles[0].text.replace(/<\/script/gi,'<\\/script');
+const license=fs.readFileSync(path.join(buildDir,'node_modules','three','LICENSE'),'utf8');
+const html=template.replace('<!-- KAEW_BUNDLE -->',()=>'<!-- Third-party library: Three.js (MIT)\n'+license+'\n-->\n<script>'+bundle+'</script>');
+fs.writeFileSync(path.join(root,'kaew-3d.html'),html,'utf8');
+console.log(JSON.stringify({file:path.join(root,'kaew-3d.html'),bytes:Buffer.byteLength(html),externalAssets:0}));
