@@ -1,0 +1,83 @@
+{
+  "status": "CONCEPT - fit and load not physically validated",
+  "parameters": {
+    "wall_mm": 2.4,
+    "width_mm": 42.0,
+    "mast_depth_mm": 36.0,
+    "base_top_mm": 16.0,
+    "top_mm": 206.0,
+    "reach_mm": 112.0,
+    "nozzle_forward_mm": 92.0,
+    "nozzle_tip_mm": 165.0,
+    "hose_od_assumed_mm": 8.0,
+    "bend_center_radius_proposed_mm": 20.0,
+    "petg_density_assumed_g_cm3": 1.27
+  },
+  "parts": [
+    {
+      "part": "LeftShell",
+      "volume_cm3": 68.315,
+      "solid_petg_mass_g": 86.8,
+      "valid": true,
+      "solids": 1,
+      "closed_mesh": true,
+      "triangles": 6918,
+      "bbox_mm": [
+        21.0,
+        164.0,
+        190.0
+      ]
+    },
+    {
+      "part": "RightShell",
+      "volume_cm3": 68.294,
+      "solid_petg_mass_g": 86.7,
+      "valid": true,
+      "solids": 1,
+      "closed_mesh": true,
+      "triangles": 8704,
+      "bbox_mm": [
+        21.0,
+        164.0,
+        190.0
+      ]
+    }
+  ],
+  "nominal_cad_plastic_mass_g": 173.5,
+  "allowance_with_brim_support_and_slicer_variation_g": [
+    174,
+    209
+  ],
+  "hose_interference_mm3": [
+    0.0,
+    0.0
+  ],
+  "nozzle_to_cup_rim_clearance_mm": 33.5,
+  "base_mount_holes_xy_mm": [
+    [
+      -13,
+      -45
+    ],
+    [
+      -13,
+      9
+    ],
+    [
+      13,
+      -45
+    ],
+    [
+      13,
+      9
+    ]
+  ],
+  "screws": "6 x M3x40 with M3 nuts; 4 x M4 through base, length after actual base thickness",
+  "print_orientation": "Each half outer flat x-face on the build plate; open mating face up. The foot stays within the shell width. Slicer review still required.",
+  "verify_before_print": [
+    "Actual silicone tube OD and manufacturer bend radius; R20 is a proposal, not a verified minimum",
+    "Hose guide clearance, screw and nut fit using a small test coupon",
+    "Actual base and upper display mounting interfaces",
+    "Print orientation and slicer support/mass",
+    "Cantilever stiffness, sustained load/creep and splash behaviour"
+  ]
+}

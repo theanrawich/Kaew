@@ -1,0 +1,93 @@
+# Kaew — ส่งต่องาน CAD ที่ยังไม่เสร็จ
+
+อัปเดต 31 ตุลาคม 2026 · ผู้ใช้ขอ push งานที่ค้างเพื่อไปทำต่ออีกเครื่อง
+
+## เป้าหมายและคำสั่งล่าสุด
+
+ผู้ใช้ต้องการออกแบบ **ทั้งเครื่องใน CAD/FreeCAD ใส่อุปกรณ์ทุกชิ้นตาม BOM ให้ครบและจัดประกอบให้แม่นยำ** ผู้ใช้ยืนยันว่า **ยังไม่มีอุปกรณ์จริง ให้ยึดตามสเปก** อย่าถามซ้ำว่าซื้ออุปกรณ์มาหรือยัง
+
+FreeCAD 1.1.4 ถูกติดตั้งในเครื่องเดิมแล้ว อีกเครื่องต้องติดตั้งเอง เส้นทางบนเครื่องเดิมไม่ควรถูกนำไป hard-code งานอยู่ใน repo `theanrawich/Kaew` สาขา `main` เว็บไซต์เดิมมีอยู่แล้วและไม่ต้องเริ่มใหม่
+
+## เริ่มบนอีกเครื่อง
+
+```powershell
+git clone https://github.com/theanrawich/Kaew.git
+Set-Location Kaew
+Expand-Archive -LiteralPath .\cad\kaew-cad-snapshots-20261031.zip -DestinationPath .\cad -Force
+winget install --id FreeCAD.FreeCAD --exact --version 1.1.4 --source winget
+```
+
+ถ้ามี repo แล้ว ให้ `git pull --ff-only` หลังจัดการการแก้ไขในเครื่องนั้นตามปกติ ไม่ใช้ hard reset/clean ทับงานของผู้ใช้ อ่านไฟล์นี้และ `cad/full-assembly-v1/DESIGN.md` ก่อนแก้แบบ
+
+ตัวช่วยค้นหา FreeCAD และรันขั้นตอน:
+
+```powershell
+.\cad\Run-Cad.ps1 -Task BuildAssembly
+.\cad\Run-Cad.ps1 -Task CheckAssembly
+```
+
+ในระบบที่เรียก FreeCADCmd ได้จาก PATH สามารถรัน `FreeCADCmd cad/full-assembly-v1/build_assembly.py` แล้ว `FreeCADCmd cad/full-assembly-v1/check_fit.py` ได้โดยตรง
+
+## สถานะจริง ณ จุดส่งต่อ
+
+### แบบหัวจ่ายเดี่ยว — ตรวจ export แล้ว
+
+`cad/spout-v1/` มีเสาและแขน PETG สองฝาซ้าย–ขวา หนาเสนอ 2.4 มม. หน้าตัด 42 × 36 มม. สูงชิ้นงาน 190 มม. แขนยื่น 112 มม. ปลายสายจ่ายสูง 165 มม. จากโต๊ะ ห่างปากแก้วอ้างอิง 33.5 มม. มีนอต M3 ประกบและฐาน M4 สี่รู
+
+FreeCAD/STEP เป็น solid ที่ valid, STL เป็น mesh ปิด และตรวจสายยาง OD8 ในแบบแล้วไม่ชน น้ำหนักตามปริมาตร CAD ประมาณ 173.5 กรัม เผื่อ slice เป็น 175–210 กรัม งบเฉพาะหัวจ่ายเดี่ยวที่เสนอ 600–850 บาทรวมค่าพิมพ์ นอตและค่าส่ง ทั้งหมดยังเป็นแบบเสนอ ไม่เคยพิมพ์หรือทดสอบจริง
+
+### ชุดประกอบทั้งเครื่อง — ยังไม่เสร็จ
+
+`cad/full-assembly-v1/` มี builder/checker, component register, เส้นทางสาย และ CAD snapshot รอบแรก ครอบคลุม 23/23 แถว BOM ด้วย 156 CAD objects มี custom parts 32 ชิ้น ชุด snapshot ส่งออกก่อนการแก้ builder รอบล่าสุด
+
+**สำคัญ: `build_assembly.py` และ `check_fit.py` ใหม่กว่าไฟล์ FCStd/STEP/STL และรายงาน JSON ที่แนบมา** จึงต้อง rebuild ก่อนใช้รายงานใหม่ รายงานเดิมเป็นหลักฐานข้อบกพร่องของ snapshot เก่า ไม่ใช่ผลยืนยันว่า patch ล่าสุดผ่านแล้ว สรุปมวล PETG 567.3 กรัมใน `assembly-summary.json` ก็เป็นค่าของ snapshot เก่า
+
+รอบตรวจเดิมพบ rigid intersections 16 คู่ และ hose/frame intersections 3 คู่ รายการเต็มอยู่ใน `fit-diagnostic.json` หลังจากนั้นแก้โค้ดแล้ว แต่คำสั่ง rebuild/check **ไม่ได้ถูก execute** เพราะระบบอนุมัติอัตโนมัติล้มเหลวจาก usage limit ข้อความระบุว่าเป็น review failure ไม่ใช่ตัดสินว่า action ไม่ปลอดภัย ห้ามตีความว่ารันผ่านแล้วหรือพยายามข้าม approval check
+
+## การแก้โค้ดล่าสุดที่ยังไม่ได้ตรวจ
+
+- ย้ายและเจาะแผ่น bridge กล่องจอให้ไม่ฝังชนเปลือกหัวจ่าย เพิ่มรูยึดร่วมกับ case/spine
+- ย้ายซีลขึ้นผิวฝา ย้ายช่อง vent ให้ไม่ชนซีล probe และย้าย saddle เซนเซอร์ระดับน้ำหลบขวด/วงแหวน
+- ทำช่องหลบ rear rail ในวงแหวน เพิ่มหูยึดวงแหวนและนอตประกบ
+- เพิ่มรู spacer/ฐาน/แท่นชั่ง ใช้หัวนอตจมเสมอพื้นแท่นแก้ว ย้าย overload stop หลบ HX711 และเพิ่มระยะภายในฝาครอบ HX711
+- ยก fuse holder กับ clip ให้ไม่ชน protoboard และย้าย flyback provision
+- ยกท่อออกจากปั๊มให้วิ่งเหนือ base bay, ทำช่องเข้าด้านข้าง spine และเพิ่ม clearance ผ่านผนังที่ต้นแนว sweep
+- เพิ่มการตรวจ harness/frame intersections ใน checker; สายบางเส้นยังมีโอกาสชนจนกว่าจะได้รันตรวจจริง
+
+## ทำต่อเป็นลำดับ
+
+1. **Rebuild และรัน checker ล่าสุดก่อน** ตรวจ log ด้วย เพราะ FreeCADCmd อาจคืน exit code 0 แม้สคริปต์เกิด exception อย่าใช้ exit code อย่างเดียว
+2. แก้ rigid, hose/frame และ harness/frame intersections ที่ยังเหลือ ตรวจเฉพาะที่เกิดขึ้นจริง ห้ามลดสเกลอุปกรณ์เพื่อซ่อนปัญหา รอยสัมผัสตั้งใจ/ซีลต้องอธิบายเป็นรายคู่ ไม่ใช้ blanket ignore
+3. ตรวจความครบของจุดยึด: front panel, upper case-to-spine, board edge cradles, rear bottle rail/rings, pump keepers, shelf posts, washers/nuts และ cable retention บางชิ้นใน snapshot เป็น placement/provision ยังไม่ใช่ joint ที่ยืนยันแล้ว
+4. ตรวจ service envelope ของ S3 USB ทั้งสองช่อง, ESP32 node USB, XY-3606 USB/terminal และรัศมีสาย รวมการถอดหัวปั๊มเมื่อยกชั้นขวดออก และช่องยกขวดด้านบน
+5. ตรวจ load-cell load path: แท่นต้องรับแรงผ่านปลายเคลื่อนของ load cell เท่านั้น ไม่แตะ fixed rim, HX711 guard, สายหรือปลายสกรู ช่อง overload stop ที่เสนอ 1 มม. ยังต้องตั้งตามรุ่นจริง
+6. อ่านกลับ STEP/STL ทุกชิ้น ตรวจ valid solids, closed meshes, BOM coverage, รูยึดร่วม, nozzle/cup alignment และสถานะ provenance อัปเดตรายงานที่มี source hash/timestamp เพื่อกันผล stale
+7. ทำภาพ CAD ประกอบ/เปิดภายใน/แยกชิ้นของ **ทั้งเครื่อง** และบันทึกสี/visibility/ชื่อชิ้นส่วนใน FCStd ภาพที่มีอยู่ตอนนี้เป็นของหัวจ่ายเดี่ยวเท่านั้น
+8. อัปเดตปริมาตร มวล PETG และราคาประเมินหลังแบบผ่าน fit checks, ทำแพ็กไฟล์ฉบับใหม่แล้วรายงานข้อจำกัดที่เหลือแก่ผู้ใช้
+
+## กติกาสเปกและขอบเขต
+
+- ยึดสินค้าและลิงก์จาก `kaew-bom.json`; ปั๊ม 504 บาท, OLED SH1106 1.3 นิ้ว 139 บาท, ขวด Crystal 1.5L, แก้ว Ocean Nova Rock B06511
+- ขนาดแก้วปาก83/ฐาน63/สูง90 มม. มาจากผู้ผลิต ส่วนขวด Ø85×320 และกล่องปั๊ม 80×125×40/สูงรวม72 ยังเป็น estimate จากงานเดิม ไม่มี drawing ยืนยันจากร้าน ผู้ใช้อนุญาตให้ยึด spec ไม่ได้ทำให้ estimate กลายเป็นมิติผู้ผลิต
+- ESP32-S3 reference 25.4×62.74 มม. มี 22 ขาต่อแถว รุ่นภาพร้านไม่มีรูมุม ให้ใช้ edge cradle ไม่สร้างรูบน PCB โดยไม่มีหลักฐาน ESP32 30 ขาและโมดูล generic ต้องรักษาสถานะ revision unconfirmed
+- XY-3606 ใช้กรอบอ้างอิง 63×27 มม. ต้องรวมปลั๊ก/สาย ไม่ใช้ขนาดบอร์ดเล็ก 26 มม. ที่จะทำให้ประเมินพื้นที่ผิด
+- `scale` ต้องมี load cell และ HX711; `tds` ต้องมี probe/cable/module; แถว fittings/electrical/assembly ต้องแตกเป็นอุปกรณ์ย่อยครบ
+- แก้วและขวดติดตั้งอย่างละหนึ่ง ที่เหลือในแพ็กเป็นของสำรอง สายซิลิโคนซื้อ2เมตร แยก installed length กับ remainder
+- flow sensor **ยังไม่เลือกรุ่น** มีแต่ reserved envelope ไม่ถือเป็นเซนเซอร์ติดตั้งแล้ว ห้ามนำ YF-S401 0.3–6 L/min กลับมาใช้กับปั๊มสูงสุด0.25 L/min
+- ปั๊มมี adapter/accessory ที่ยังไม่ยืนยัน inclusion/แรงดัน โมเดลแยกจาก Glink12V ของภาคควบคุม อย่าอนุมานว่าปั๊ม12Vหรือ interface ESP32 ใช้งานได้แล้ว
+- ไม่มี bottle-cap thread ที่ยืนยัน: ใช้ฝาเดิมดัดแปลงและระบุ hole/seal proposal น้ำเดินในสายยางต่อเนื่อง; ไม่อ้าง food-contact หรือความปลอดภัยน้ำจาก PETG/TDS
+- เป็นงาน **mechanical CAD assembly study** ยังไม่มี hardware/firmware/AI ที่ทดสอบแล้ว การเปลี่ยนเว็บหรือวงจรให้ทำตามคำสั่งถัดไปของผู้ใช้
+
+## ไฟล์สำคัญ
+
+- `kaew-bom.json`, `KAEW_SHOPPING_LIST.md`: SKU และงบเดิม
+- `cad/spout-v1/build_spout.py`, `verify_exports.py`, `render_spout.FCMacro`: สร้าง/ตรวจ/เรนเดอร์หัวจ่ายเดี่ยว
+- `cad/full-assembly-v1/build_assembly.py`: source ชุดประกอบล่าสุด
+- `cad/full-assembly-v1/check_fit.py`: diagnostic ล่าสุด
+- `cad/full-assembly-v1/DESIGN.md`: brief และแผนตรวจ
+- `cad/full-assembly-v1/component-register.json/.csv`, `routes.json`, `fit-diagnostic.json`: ผลจาก snapshot ก่อน patch ล่าสุด
+- `cad/kaew-cad-snapshots-20261031.zip`: FCStd/STEP/STL/ภาพสำหรับเปิดต่อ
+
+## ประโยคสำหรับบอก Codex บนอีกเครื่อง
+
+> ทำงาน Kaew ต่อจาก CAD_HANDOFF.md ใช้ FreeCAD ทำ full assembly ให้ครบ BOM ยึดสเปกตามที่ผู้ใช้ยืนยัน เริ่ม rebuild จาก cad/full-assembly-v1/build_assembly.py แล้วรัน check_fit.py ก่อน เพราะ CAD snapshot และรายงานใน repo ยังเก่ากว่า patch ล่าสุด แก้จุดชน/จุดยึดและตรวจ export ก่อนทำภาพและประเมินราคาใหม่

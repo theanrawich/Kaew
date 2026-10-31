@@ -1,0 +1,25 @@
+{
+  "freecad_version": [
+    "1",
+    "1",
+    "4"
+  ],
+  "native_valid_solids": 2,
+  "step_valid_solids": 2,
+  "step_volume_difference_mm3": -0.0003623414086177945,
+  "stl": [
+    {
+      "name": "LeftShell",
+      "closed": true,
+      "triangles": 6918,
+      "volume_cm3": 68.305
+    },
+    {
+      "name": "RightShell",
+      "closed": true,
+      "triangles": 8704,
+      "volume_cm3": 68.284
+    }
+  ],
+  "checks_do_not_establish": "Physical stiffness, tube bend suitability, slicer settings or assembly fit"
+}

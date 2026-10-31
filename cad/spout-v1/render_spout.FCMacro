@@ -1,0 +1,90 @@
+import os, json, traceback
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtCore, QtWidgets
+
+OUT=os.path.dirname(os.path.abspath(__file__))
+
+state={}
+
+def finish(error=None):
+    if error:
+        open(os.path.join(OUT,"render-error.txt"),"w").write(error)
+    elif state.get("doc"):
+        open(os.path.join(OUT,"render-status.json"),"w").write(json.dumps({"rendered":["assembled.png","hose-path.png","exploded.png"],"staged":True}))
+        App.closeDocument(state["doc"].Name)
+    QtWidgets.QApplication.instance().quit()
+
+def save(name):
+    state["doc"].recompute()
+    state["view"].redraw()
+    Gui.updateGui()
+    state["view"].saveImage(os.path.join(OUT,name),1600,1200,"White")
+
+def exploded():
+    try:
+        save("exploded.png")
+        finish()
+    except Exception:
+        finish(traceback.format_exc())
+
+def interior():
+    try:
+        save("hose-path.png")
+        doc=state["doc"]
+        doc.RightShell.ViewObject.Visibility=True
+        doc.LeftShell.Placement=App.Placement(App.Vector(-40,0,0),App.Rotation())
+        doc.RightShell.Placement=App.Placement(App.Vector(40,0,0),App.Rotation())
+        state["view"].viewIsometric()
+        state["view"].fitAll()
+        state["view"].redraw()
+        QtCore.QTimer.singleShot(1200,exploded)
+    except Exception:
+        finish(traceback.format_exc())
+
+def assembled():
+    try:
+        save("assembled.png")
+        doc=state["doc"]
+        for obj in (doc.ReferenceBase,doc.ReferenceCup,doc.ReferenceDisplay,doc.RightShell):
+            obj.ViewObject.Visibility=False
+        state["view"].viewRight()
+        state["view"].fitAll()
+        state["view"].redraw()
+        QtCore.QTimer.singleShot(1200,interior)
+    except Exception:
+        finish(traceback.format_exc())
+
+def setup():
+    try:
+        doc=App.openDocument(os.path.join(OUT,"kaew-spout-v1.FCStd"))
+        state["doc"]=doc
+        Gui.activateWorkbench("PartWorkbench")
+        Gui.getMainWindow().resize(1400,1000)
+        printed=(doc.LeftShell,doc.RightShell)
+        for obj in printed:
+            obj.ViewObject.ShapeColor=(0.83,0.89,0.82)
+            obj.ViewObject.LineColor=(0.22,0.34,0.31)
+            obj.ViewObject.DisplayMode="Flat Lines"
+            obj.ViewObject.Visibility=True
+        for obj in (doc.Hose,doc.ReferenceBase,doc.ReferenceCup,doc.ReferenceDisplay):
+            obj.ViewObject.Visibility=True
+        doc.Hose.ViewObject.ShapeColor=(0.10,0.52,0.61)
+        doc.ReferenceBase.ViewObject.ShapeColor=(0.82,0.86,0.79)
+        doc.ReferenceCup.ViewObject.ShapeColor=(0.72,0.85,0.88)
+        doc.ReferenceCup.ViewObject.Transparency=75
+        doc.ReferenceDisplay.ViewObject.ShapeColor=(0.80,0.86,0.78)
+        doc.ReferenceDisplay.ViewObject.Transparency=75
+        view=Gui.activeDocument().activeView()
+        state["view"]=view
+        view.setCameraType("Orthographic")
+        view.setBackgroundColor(0.94,0.96,0.93) if hasattr(view,"setBackgroundColor") else None
+
+        view.viewIsometric()
+        view.fitAll()
+        view.redraw()
+        QtCore.QTimer.singleShot(1500,assembled)
+    except Exception:
+        finish(traceback.format_exc())
+
+QtCore.QTimer.singleShot(1500,setup)

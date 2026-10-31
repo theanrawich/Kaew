@@ -1,0 +1,158 @@
+{
+  "object_count": 156,
+  "bom_rows": 23,
+  "covered_rows": 23,
+  "custom_parts": 32,
+  "petg_print_parts": [
+    {
+      "name": "Spout_left",
+      "volume_cm3": 68.20822851143205,
+      "petg_solid_mass_g": 86.62445020951871
+    },
+    {
+      "name": "Spout_right",
+      "volume_cm3": 67.98364333945358,
+      "petg_solid_mass_g": 86.33922704110604
+    },
+    {
+      "name": "Pump_side_keeper__66",
+      "volume_cm3": 1.95,
+      "petg_solid_mass_g": 2.4765
+    },
+    {
+      "name": "Pump_side_keeper_63",
+      "volume_cm3": 1.95,
+      "petg_solid_mass_g": 2.4765
+    },
+    {
+      "name": "Bottle_rear_rail",
+      "volume_cm3": 9.456,
+      "petg_solid_mass_g": 12.00912
+    },
+    {
+      "name": "Bottle_ring_111_rear",
+      "volume_cm3": 3.548050499754463,
+      "petg_solid_mass_g": 4.506024134688168
+    },
+    {
+      "name": "Bottle_ring_111_front",
+      "volume_cm3": 3.5480504997543734,
+      "petg_solid_mass_g": 4.5060241346880545
+    },
+    {
+      "name": "Bottle_ring_250_rear",
+      "volume_cm3": 3.5480504997545084,
+      "petg_solid_mass_g": 4.506024134688226
+    },
+    {
+      "name": "Bottle_ring_250_front",
+      "volume_cm3": 3.5480504997544036,
+      "petg_solid_mass_g": 4.506024134688093
+    },
+    {
+      "name": "Level_sensor_saddle",
+      "volume_cm3": 12.859279114241252,
+      "petg_solid_mass_g": 16.33128447508639
+    },
+    {
+      "name": "Fixed_drip_surround",
+      "volume_cm3": 31.887044166691282,
+      "petg_solid_mass_g": 40.49654609169793
+    },
+    {
+      "name": "Loadcell_fixed_spacer",
+      "volume_cm3": 1.0160000000000002,
+      "petg_solid_mass_g": 1.2903200000000004
+    },
+    {
+      "name": "Loadcell_moving_spacer",
+      "volume_cm3": 0.9651999999999996,
+      "petg_solid_mass_g": 1.2258039999999994
+    },
+    {
+      "name": "HX711_guard",
+      "volume_cm3": 6.884115008234618,
+      "petg_solid_mass_g": 8.742826060457965
+    },
+    {
+      "name": "Upper_case",
+      "volume_cm3": 102.3183491000422,
+      "petg_solid_mass_g": 129.9443033570536
+    },
+    {
+      "name": "Front_panel",
+      "volume_cm3": 45.86388349579402,
+      "petg_solid_mass_g": 58.2471320396584
+    },
+    {
+      "name": "Head_mount_bridge",
+      "volume_cm3": 3.585530995059227,
+      "petg_solid_mass_g": 4.553624363725218
+    },
+    {
+      "name": "Front_boss_0",
+      "volume_cm3": 0.5453804846631877,
+      "petg_solid_mass_g": 0.6926332155222483
+    },
+    {
+      "name": "Front_boss_1",
+      "volume_cm3": 0.5453804846631877,
+      "petg_solid_mass_g": 0.6926332155222483
+    },
+    {
+      "name": "Front_boss_2",
+      "volume_cm3": 0.5453804846631887,
+      "petg_solid_mass_g": 0.6926332155222497
+    },
+    {
+      "name": "Front_boss_3",
+      "volume_cm3": 0.5453804846631887,
+      "petg_solid_mass_g": 0.6926332155222497
+    },
+    {
+      "name": "S3_edge_cradle",
+      "volume_cm3": 1.5327200000000007,
+      "petg_solid_mass_g": 1.946554400000001
+    },
+    {
+      "name": "Node_edge_cradle",
+      "volume_cm3": 1.2179999999999995,
+      "petg_solid_mass_g": 1.5468599999999995
+    },
+    {
+      "name": "TDS_edge_cradle",
+      "volume_cm3": 0.6719999999999998,
+      "petg_solid_mass_g": 0.8534399999999998
+    },
+    {
+      "name": "Amp_edge_cradle",
+      "volume_cm3": 0.2744000000000003,
+      "petg_solid_mass_g": 0.3484880000000004
+    },
+    {
+      "name": "OLED_edge_clip__20",
+      "volume_cm3": 0.4799999999999999,
+      "petg_solid_mass_g": 0.6095999999999999
+    },
+    {
+      "name": "OLED_edge_clip_18",
+      "volume_cm3": 0.4799999999999999,
+      "petg_solid_mass_g": 0.6095999999999999
+    },
+    {
+      "name": "Base_service_bay",
+      "volume_cm3": 54.14946935529228,
+      "petg_solid_mass_g": 68.7698260812212
+    },
+    {
+      "name": "Base_bay_lid",
+      "volume_cm3": 16.579858401317527,
+      "petg_solid_mass_g": 21.05642016967326
+    }
+  ],
+  "petg_nominal_mass_g": 567.2930556900402,
+  "all_actual_delivered_parts_unmeasured": true,
+  "flow_is_reservation_only": true,
+  "installed_tube_mm": 1358.2,
+  "status": "FULL ASSEMBLY STUDY - fit checks pending; not manufacturing release"
+}

@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-31",
+  "full_assembly_sources_built": false,
+  "reason": "Latest builder/checker patches were not executed after automatic approval review failed because of a usage limit.",
+  "snapshot_status": "WIP: CAD and diagnostic reports predate latest source patches",
+  "known_old_snapshot_findings": {
+    "rigid_intersections": 16,
+    "hose_frame_intersections": 3
+  },
+  "source_sha256": {
+    "cad/full-assembly-v1/build_assembly.py": "e5fc35323f3f89ac4b4fe38bacfbd3fb81f6e5b71ca31d44c80cdf39baf6fda9",
+    "cad/full-assembly-v1/check_fit.py": "bb6edbecb6f0247286931e9d94e29ab22238f186486f5b6f336b92a2a6cdd694",
+    "cad/spout-v1/build_spout.py": "cb1ebf970adbb854f9d8cab117bb8a07c15bcf9b40c664b3276c9acdc7f17e79",
+    "cad/spout-v1/check_clearance.py": "0d76c606efa1eebb0ecea4d59f0c2aa98c9238dae3aa7a86a95da85e176aa671",
+    "cad/spout-v1/verify_exports.py": "bfa3407652ecc232bf4a0d4ea2e1e6fc08d3796c0380a9b6466ea86c1a86c9b1"
+  },
+  "snapshot_sha256": {
+    "cad/spout-v1/kaew-spout-v1.FCStd": "3aee1d059530422f06db561baa9bf6e77e8111fe35fd8bae3ce86c0aa666e7c9",
+    "cad/full-assembly-v1/kaew-full-assembly-v1.FCStd": "c4c474c0a46ac45269f3e39961087fa7ab709323150abe65e841851a347a11c6",
+    "cad/full-assembly-v1/kaew-full-assembly-v1.step": "5bb74ced62f1d3558a7b12f8dad7e9136c53ceb8960124b5bf1da984019d644c"
+  },
+  "archive_sha256": "f8013277d160cb3bd3bd43c6fbc44d1d2f2b092868381641300ebd5bc173bc40",
+  "instructions": "Read CAD_HANDOFF.md; extract archive into cad; rebuild and inspect fresh logs before treating geometry as current."
+}

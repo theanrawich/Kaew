@@ -1,0 +1,86 @@
+[
+  {
+    "name": "Silicone_pickup_to_pump",
+    "length_mm": 866.09,
+    "radius_mm": 4,
+    "minimum_center_bend_mm": 20.0
+  },
+  {
+    "name": "Silicone_pump_to_spine",
+    "length_mm": 492.14,
+    "radius_mm": 4,
+    "minimum_center_bend_mm": 20.0
+  },
+  {
+    "name": "TDS_probe_cable",
+    "length_mm": 562.97,
+    "radius_mm": 1.3,
+    "minimum_center_bend_mm": 10.51
+  },
+  {
+    "name": "DS18B20_cable",
+    "length_mm": 486.49,
+    "radius_mm": 1.5,
+    "minimum_center_bend_mm": 8.4
+  },
+  {
+    "name": "Level_sensor_cable",
+    "length_mm": 189.5,
+    "radius_mm": 1.5,
+    "minimum_center_bend_mm": 3.37
+  },
+  {
+    "name": "Main_electrical_trunk",
+    "length_mm": 330.84,
+    "radius_mm": 2.5,
+    "minimum_center_bend_mm": 6.24
+  },
+  {
+    "name": "HX711_loadcell_lead",
+    "length_mm": 61.74,
+    "radius_mm": 1,
+    "minimum_center_bend_mm": 4.52
+  },
+  {
+    "name": "HX711_to_gateway",
+    "length_mm": 399.22,
+    "radius_mm": 1.2,
+    "minimum_center_bend_mm": 4.05
+  },
+  {
+    "name": "OLED_harness",
+    "length_mm": 51.6,
+    "radius_mm": 1.2,
+    "minimum_center_bend_mm": 4.5
+  },
+  {
+    "name": "Speaker_pair",
+    "length_mm": 55.8,
+    "radius_mm": 1,
+    "minimum_center_bend_mm": 6.2
+  },
+  {
+    "name": "Mic_harness",
+    "length_mm": 87.07,
+    "radius_mm": 1,
+    "minimum_center_bend_mm": 6.0
+  },
+  {
+    "name": "Stop_harness",
+    "length_mm": 45.87,
+    "radius_mm": 1.4,
+    "minimum_center_bend_mm": 10.94
+  },
+  {
+    "name": "Control_DC_cable",
+    "length_mm": 47.69,
+    "radius_mm": 1.7,
+    "minimum_center_bend_mm": 6.0
+  },
+  {
+    "name": "Pump_DC_cable",
+    "length_mm": 80.93,
+    "radius_mm": 1.7,
+    "minimum_center_bend_mm": 4.95
+  }
+]

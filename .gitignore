@@ -12,6 +12,7 @@ Thumbs.db
 /*.md
 !/README.md
 !/KAEW_SHOPPING_LIST.md
+!/CAD_HANDOFF.md
 /docs/
 /output/*
 !/output/real-parts/

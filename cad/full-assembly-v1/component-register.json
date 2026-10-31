@@ -1,0 +1,538 @@
+{
+  "gateway": {
+    "id": "gateway",
+    "label": "ESP32-S3 N16R8",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/166913933/53161720991",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "ESP32_S3_N16R8",
+      "S3_USB_insertion"
+    ],
+    "notes": "รุ่น N16R8 มี PSRAM 8 MB เป็นข้อเสนอแทน N8 ในร่างเดิม",
+    "nominal_dimensions_mm": [
+      25.4,
+      62.74,
+      12
+    ],
+    "reference_source": "https://documentation.espressif.com/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/user_guide_v1.1.html",
+    "actual_delivered_part_measured": false
+  },
+  "node": {
+    "id": "node",
+    "label": "ESP32 DevKit 30 pin Type-C",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/117988183/56908734236",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "ESP32_30pin_TypeC",
+      "Node_USB_insertion"
+    ],
+    "notes": "Sensor Node แยกจาก Gateway",
+    "nominal_dimensions_mm": [
+      28,
+      51.5,
+      12
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "display": {
+    "id": "display",
+    "label": "OLED 1.3 นิ้ว SH1106 I2C สีขาว",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/132454846/7835487246",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "OLED_SH1106_1p3"
+    ],
+    "notes": "ผู้ใช้เลือกdowngrade;128×64ขาวดำ พื้นที่แสดงผลอ้างอิง29.42×14.70มม. รูยึดต้องเทียบบอร์ดร้าน",
+    "nominal_dimensions_mm": [
+      33.5,
+      35.4,
+      9
+    ],
+    "reference_source": "https://www.lcdwiki.com/1.3inch_IIC_OLED_Module_SKU:MC130GX",
+    "actual_delivered_part_measured": false
+  },
+  "pump": {
+    "id": "pump",
+    "label": "ปั๊มรีดสายแบบปรับ10–250มล./นาที",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/1922827977/57366647316",
+    "status": "estimated_vendor_has_no_dimensioned_drawing",
+    "objects": [
+      "Pump_10_250ml",
+      "Pump_knob",
+      "Pump_hose_port_1",
+      "Pump_hose_port_2",
+      "Pump_lift_with_shelf_removed",
+      "Pump_OEM_adapter_assumed"
+    ],
+    "notes": "ผู้ใช้เลือกรายการนี้แล้ว;ร้านระบุสูงสุด250มล./นาที ยังไม่ยืนยันDCoutputของadapter,การควบคุมESP32,วัสดุสายหรือขนาดกล่อง",
+    "nominal_dimensions_mm": [
+      125,
+      80,
+      72
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "scale": {
+    "id": "scale",
+    "label": "Load cell 1 kg + HX711",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/145695802/6622381424",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "Load_cell_1kg",
+      "HX711",
+      "HX711_loadcell_lead"
+    ],
+    "notes": "รายการมี1kg/5kg ต้องเลือก1kgพร้อมHX711; ฐานทำรวมในงบโครง",
+    "nominal_dimensions_mm": [
+      80,
+      12.7,
+      12.7
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "flow": {
+    "id": "flow",
+    "label": "เซนเซอร์วัดการไหลต่ำ — รอเลือกรุ่น",
+    "purchase_quantity": 1,
+    "source": "Kaew mechanical design",
+    "status": "reserved_no_sensor_selected",
+    "objects": [
+      "Flow_sensor_reserve"
+    ],
+    "notes": "งบเผื่อ300บาท ไม่ใช่ราคาสินค้าที่หาได้แล้ว ต้องอ่านได้ที่≤0.25L/minและเหมาะกับน้ำดื่ม;ไม่ใช้YF-S4010.3–6L/min",
+    "nominal_dimensions_mm": [
+      30,
+      36,
+      30
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false,
+    "installed_quantity": 0
+  },
+  "tds": {
+    "id": "tds",
+    "label": "Analog TDS module + probe",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/117988183/10391220809",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "TDS_probe",
+      "TDS_electrode_A",
+      "TDS_electrode_B",
+      "TDS_interface",
+      "TDS_probe_cable"
+    ],
+    "notes": "เป็นโมดูลทั่วไป ไม่อ้างว่าเป็น DFRobot แท้; ขนาดบอร์ดและ food-contact ของ probe ยังไม่ยืนยัน",
+    "nominal_dimensions_mm": [
+      42,
+      32,
+      12
+    ],
+    "reference_source": "https://wiki.dfrobot.com/sen0244",
+    "actual_delivered_part_measured": false
+  },
+  "temperature": {
+    "id": "temperature",
+    "label": "DS18B20 probe กันน้ำ",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/459630043/10370366612",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "DS18B20_probe",
+      "DS18B20_cable"
+    ],
+    "notes": "กันน้ำไม่เท่ากับยืนยัน food-contact ต้องตรวจวัสดุ probe/ซีล",
+    "nominal_dimensions_mm": [
+      6,
+      50
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "level": {
+    "id": "level",
+    "label": "XKC-Y25-NPN",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/459630043/19932827150",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "XKC_Y25_NPN",
+      "Level_sensor_cable"
+    ],
+    "notes": "เลือกรุ่น NPN; 1 จุดตรวจได้เพียงมี/ไม่มีน้ำที่ระดับติดตั้ง ไม่ใช่ปริมาตรคงเหลือ 1500 มล. แบบต่อเนื่อง",
+    "nominal_dimensions_mm": [
+      28,
+      17
+    ],
+    "reference_source": "https://www.sz-xkc.com/detail/1432.html",
+    "actual_delivered_part_measured": false
+  },
+  "microphone": {
+    "id": "microphone",
+    "label": "INMP441 I2S",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/39044974/55908470443",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "INMP441"
+    ],
+    "notes": "ไมค์แยกจากภาคปั๊ม",
+    "nominal_dimensions_mm": [
+      16,
+      14,
+      5
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "amplifier": {
+    "id": "amplifier",
+    "label": "MAX98357A I2S",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/1090801999/50766867871",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "MAX98357A"
+    ],
+    "notes": "งบแอมป์ mono 3W",
+    "nominal_dimensions_mm": [
+      19.4,
+      17.8,
+      10
+    ],
+    "reference_source": "https://www.adafruit.com/product/3006",
+    "actual_delivered_part_measured": false
+  },
+  "speaker": {
+    "id": "speaker",
+    "label": "ลำโพง 4Ω 3W 40mm",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/284033450/41319319688",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "Speaker_40mm",
+      "Speaker_cone"
+    ],
+    "notes": "ตรวจขนาดจริงและตำแหน่งรูยึดอีกครั้ง",
+    "nominal_dimensions_mm": [
+      40,
+      15
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "power": {
+    "id": "power",
+    "label": "Glink GAC12-3 12V 3A สำหรับภาคควบคุม",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/56003930/52202687875",
+    "status": "estimated_vendor_has_no_dimensioned_drawing",
+    "objects": [
+      "Glink_12V3A_external"
+    ],
+    "notes": "แยกจากadapterที่ร้านแสดงในชุดปั๊ม ยังไม่ยืนยันว่าชุดปั๊มใช้12V",
+    "nominal_dimensions_mm": [
+      80,
+      42,
+      32
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "buck": {
+    "id": "buck",
+    "label": "Buck 12V → 5V XY-3606",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/944231623/26113420026",
+    "status": "reference_model_not_verified_selected_revision",
+    "objects": [
+      "XY3606_63x27",
+      "Buck_USB_bend"
+    ],
+    "notes": "แยกไฟ logic/audio จากปั๊ม ต้องวัดไฟและทดสอบโหลด",
+    "nominal_dimensions_mm": [
+      27,
+      63,
+      12
+    ],
+    "reference_source": "https://www.gotronik.pl/przetwornica-napiecia-ladowarka-usb-5v-p-6422.html",
+    "actual_delivered_part_measured": false
+  },
+  "driver": {
+    "id": "driver",
+    "label": "D4184 MOSFET module",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/604093915/22585473352",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "D4184_module"
+    ],
+    "notes": "ตรวจการขับ 3.3V, ใส่ flyback และ default-off; ไม่ใช้ค่ากระแสโฆษณาเป็นกระแสใช้งานจริง",
+    "nominal_dimensions_mm": [
+      17,
+      17,
+      12
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "stop": {
+    "id": "stop",
+    "label": "LA16 ปุ่มหยุดฉุกเฉิน",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/75734101/3023961333",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "LA16_emergency_stop",
+      "Stop_red_head"
+    ],
+    "notes": "เลือกรุ่นล็อกและหน้าสัมผัส NC; ต่อวงจรให้ตัดการสั่งปั๊มได้จริง",
+    "nominal_dimensions_mm": [
+      24,
+      16,
+      38
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "tube": {
+    "id": "tube",
+    "label": "สายซิลิโคน ขนาดใกล้เคียง ID4.8–5 OD8",
+    "purchase_quantity": 2,
+    "source": "https://shopee.co.th/product/104910181/25439532350",
+    "status": "supplier_variant_unconfirmed",
+    "objects": [
+      "Silicone_pickup_to_pump",
+      "Silicone_pump_to_spine"
+    ],
+    "notes": "ราคาเริ่มต้นต่อเมตรจากรายการหลายขนาด ต้องเทียบID/ODกับสายปั๊มจริงก่อนซื้อ;ไม่ถือว่าสายที่แถมยืนยันfood-contactแล้ว",
+    "nominal_dimensions_mm": [
+      8,
+      5,
+      2000
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false,
+    "installed_route_length_mm": 1358.2,
+    "purchased_length_mm": 2000,
+    "remainder_mm": 641.8
+  },
+  "cup": {
+    "id": "cup",
+    "label": "Ocean Nova Rock B06511 300ml (แพ็ก6)",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/7560252/28473454243",
+    "status": "manufacturer_external_dimensions_internal_shape_simplified",
+    "objects": [
+      "Ocean_Nova_Rock_B06511"
+    ],
+    "notes": "คิดเงินซื้อครบแพ็ก ใช้กับเครื่อง1ใบ สำรอง5ใบ; Øปาก83 ฐาน63 สูง90มม.",
+    "nominal_dimensions_mm": [
+      83,
+      63,
+      90
+    ],
+    "reference_source": "https://www.ocean-glassware.com/products/nova-rock/",
+    "actual_delivered_part_measured": false,
+    "installed_quantity": 1,
+    "spares_quantity": 5
+  },
+  "bottle": {
+    "id": "bottle",
+    "label": "Crystal 1.5 L (แพ็ก6)",
+    "purchase_quantity": 1,
+    "source": "https://shopee.co.th/product/1808248884/55861953546",
+    "status": "estimated_vendor_has_no_dimensioned_drawing",
+    "objects": [
+      "Crystal_bottle_1p5L",
+      "Bottle_lift_clearance"
+    ],
+    "notes": "ร้านมีข้อจำกัดพื้นที่ส่ง; คิดครบแพ็ก ใช้ตั้งเครื่อง1ขวด",
+    "nominal_dimensions_mm": [
+      85,
+      320,
+      30
+    ],
+    "reference_source": "",
+    "actual_delivered_part_measured": false,
+    "installed_quantity": 1,
+    "spares_quantity": 5
+  },
+  "enclosure": {
+    "id": "enclosure",
+    "label": "ฐาน/โครงอะคริลิกหรือPETG และขายึด",
+    "purchase_quantity": 1,
+    "source": "Kaew mechanical design",
+    "status": "design_proposal",
+    "objects": [
+      "Base_plate",
+      "Bottle_shelf",
+      "Spout_left",
+      "Spout_right",
+      "Pump_side_keeper_-66",
+      "Pump_side_keeper_63",
+      "Bottle_rear_rail",
+      "Bottle_ring_111_rear",
+      "Bottle_ring_111_front",
+      "Bottle_ring_250_rear",
+      "Bottle_ring_250_front",
+      "Level_sensor_saddle",
+      "Fixed_drip_surround",
+      "Loadcell_fixed_spacer",
+      "Loadcell_moving_spacer",
+      "Floating_cup_platform",
+      "HX711_guard",
+      "Upper_case",
+      "Front_panel",
+      "Head_mount_bridge",
+      "Front_boss_0",
+      "Front_boss_1",
+      "Front_boss_2",
+      "Front_boss_3",
+      "S3_edge_cradle",
+      "Node_edge_cradle",
+      "TDS_edge_cradle",
+      "Amp_edge_cradle",
+      "OLED_edge_clip_-20",
+      "OLED_edge_clip_18",
+      "Base_service_bay",
+      "Base_bay_lid"
+    ],
+    "notes": "ประมาณการงานต้นแบบแบบแผ่นและขายึดเล็ก ไม่ใช่ใบเสนอราคาพิมพ์ตัวถังเต็ม",
+    "nominal_dimensions_mm": [],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "fittings": {
+    "id": "fittings",
+    "label": "ฝาดัดแปลง,ข้อต่อ,หัวจ่าย,ซีลและช่องอากาศ",
+    "purchase_quantity": 1,
+    "source": "Kaew mechanical design",
+    "status": "design_proposal",
+    "objects": [
+      "Original_cap_modified",
+      "Cap_seal_1",
+      "Cap_seal_2",
+      "Cap_seal_3",
+      "Cap_seal_4",
+      "Vent_tube"
+    ],
+    "notes": "ยังต้องยืนยันเกลียวฝาคริสตัลและวัสดุสัมผัสน้ำ",
+    "nominal_dimensions_mm": [],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "electrical": {
+    "id": "electrical",
+    "label": "ฟิวส์,flyback,ขั้วDC,สายไฟ,PCBและปรับสัญญาณ",
+    "purchase_quantity": 1,
+    "source": "Kaew mechanical design",
+    "status": "design_proposal",
+    "objects": [
+      "Interface_protoboard",
+      "Inline_fuse_holder",
+      "Flyback_provision",
+      "Pullup_4k7",
+      "DC_input_1",
+      "DC_input_2",
+      "Main_electrical_trunk",
+      "HX711_to_gateway",
+      "OLED_harness",
+      "Speaker_pair",
+      "Mic_harness",
+      "Stop_harness",
+      "Control_DC_cable",
+      "Pump_DC_cable"
+    ],
+    "notes": "รวมวงจรย่อยเชื่อมปั๊มกับGateway ยังไม่ยืนยันinterfaceของปั๊ม",
+    "nominal_dimensions_mm": [],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  },
+  "assembly": {
+    "id": "assembly",
+    "label": "นอต,standoff,ยางรองและวัสดุประกอบ",
+    "purchase_quantity": 1,
+    "source": "Kaew mechanical design",
+    "status": "design_proposal",
+    "objects": [
+      "Foot_1",
+      "Foot_2",
+      "Foot_3",
+      "Foot_4",
+      "Shelf_post_1",
+      "Shelf_lower_bolt_1",
+      "Shelf_upper_bolt_1",
+      "Shelf_post_2",
+      "Shelf_lower_bolt_2",
+      "Shelf_upper_bolt_2",
+      "Shelf_post_3",
+      "Shelf_lower_bolt_3",
+      "Shelf_upper_bolt_3",
+      "Shelf_post_4",
+      "Shelf_lower_bolt_4",
+      "Shelf_upper_bolt_4",
+      "Spout_M3_1",
+      "Spout_M3_2",
+      "Spout_M3_3",
+      "Spout_M3_4",
+      "Spout_M3_5",
+      "Spout_M3_6",
+      "Spout_base_M4_1",
+      "Spout_base_M4_2",
+      "Spout_base_M4_3",
+      "Spout_base_M4_4",
+      "Pump_pad_-55_-144",
+      "Pump_pad_-55_-78",
+      "Pump_pad_55_-144",
+      "Pump_pad_55_-78",
+      "Ring_M3_111_0",
+      "Ring_M3_111_1",
+      "Ring_M3_250_0",
+      "Ring_M3_250_1",
+      "Loadcell_fixed_M3_0",
+      "Loadcell_fixed_M3_1",
+      "Loadcell_moving_M3_0",
+      "Loadcell_moving_M3_1",
+      "Overload_stop_1",
+      "Overload_stop_2",
+      "Overload_stop_3",
+      "Overload_stop_4",
+      "Head_bridge_M3_0",
+      "Head_bridge_M3_1",
+      "Front_M3_0",
+      "Front_M3_1",
+      "Front_M3_2",
+      "Front_M3_3",
+      "Mic_port_gasket",
+      "Standoff_1",
+      "Standoff_screw_1",
+      "Standoff_2",
+      "Standoff_screw_2",
+      "Standoff_3",
+      "Standoff_screw_3",
+      "Standoff_4",
+      "Standoff_screw_4",
+      "Base_washer_1",
+      "Base_washer_2",
+      "Base_washer_3",
+      "Base_washer_4",
+      "Base_washer_5",
+      "Base_washer_6",
+      "Base_washer_7",
+      "Base_washer_8"
+    ],
+    "notes": "งบประมาณต้นแบบ",
+    "nominal_dimensions_mm": [],
+    "reference_source": "",
+    "actual_delivered_part_measured": false
+  }
+}

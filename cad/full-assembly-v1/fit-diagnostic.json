@@ -1,0 +1,104 @@
+{
+  "valid_objects": 156,
+  "object_count": 156,
+  "rigid_intersections": [
+    {
+      "a": "Spout_left",
+      "b": "Head_mount_bridge",
+      "volume_mm3": 991.304
+    },
+    {
+      "a": "Spout_right",
+      "b": "Head_mount_bridge",
+      "volume_mm3": 838.623
+    },
+    {
+      "a": "Crystal_bottle_1p5L",
+      "b": "Level_sensor_saddle",
+      "volume_mm3": 5.975
+    },
+    {
+      "a": "Original_cap_modified",
+      "b": "Cap_seal_1",
+      "volume_mm3": 88.216
+    },
+    {
+      "a": "Original_cap_modified",
+      "b": "Cap_seal_2",
+      "volume_mm3": 51.459
+    },
+    {
+      "a": "Original_cap_modified",
+      "b": "Cap_seal_3",
+      "volume_mm3": 51.459
+    },
+    {
+      "a": "Original_cap_modified",
+      "b": "Cap_seal_4",
+      "volume_mm3": 36.757
+    },
+    {
+      "a": "Cap_seal_3",
+      "b": "Cap_seal_4",
+      "volume_mm3": 3.835
+    },
+    {
+      "a": "Bottle_rear_rail",
+      "b": "Bottle_ring_111_rear",
+      "volume_mm3": 62.786
+    },
+    {
+      "a": "Bottle_rear_rail",
+      "b": "Bottle_ring_250_rear",
+      "volume_mm3": 62.786
+    },
+    {
+      "a": "Bottle_ring_111_rear",
+      "b": "Level_sensor_saddle",
+      "volume_mm3": 86.686
+    },
+    {
+      "a": "Bottle_ring_111_front",
+      "b": "Level_sensor_saddle",
+      "volume_mm3": 86.686
+    },
+    {
+      "a": "Overload_stop_1",
+      "b": "HX711_guard",
+      "volume_mm3": 132.541
+    },
+    {
+      "a": "HX711",
+      "b": "HX711_guard",
+      "volume_mm3": 93.0
+    },
+    {
+      "a": "Interface_protoboard",
+      "b": "Inline_fuse_holder",
+      "volume_mm3": 17.84
+    },
+    {
+      "a": "Interface_protoboard",
+      "b": "Flyback_provision",
+      "volume_mm3": 12.533
+    }
+  ],
+  "hose_frame_intersections": [
+    {
+      "hose": "Silicone_pump_to_spine",
+      "frame": "Spout_left",
+      "volume_mm3": 50.265
+    },
+    {
+      "hose": "Silicone_pump_to_spine",
+      "frame": "Base_service_bay",
+      "volume_mm3": 259.488
+    },
+    {
+      "hose": "Silicone_pump_to_spine",
+      "frame": "Base_bay_lid",
+      "volume_mm3": 9.781
+    }
+  ],
+  "status": "DIAGNOSTIC - contacts reviewed individually before release"
+}
