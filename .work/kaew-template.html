@@ -17,6 +17,83 @@
 .app{height:100svh;grid-template-rows:90px minmax(0,1fr) 40px}.scene-area{min-height:0}.scene-note{background:#edf3f1bd;padding:4px 7px;border-radius:4px;backdrop-filter:blur(4px)}
 @media(max-width:680px){.app{height:auto}.scene-area{min-height:460px}}
 .header-actions .quiet{border:1px solid #b9cec3;border-radius:5px;padding:8px 10px}.scene-note{max-width:300px}.part-photo{width:100%;height:130px;object-fit:contain;background:white;border-radius:4px;margin-top:10px}.part-photo[hidden]{display:none}.dimension-note{margin-top:14px!important;font-size:11px!important;color:#80663c!important}.dialog{width:min(930px,94vw);max-height:88svh;border:1px solid #bfcfc3;border-radius:10px;padding:0;background:#f8faf6;color:var(--ink);font-size:13px}.dialog::backdrop{background:#17373580;backdrop-filter:blur(3px)}.dialog-header{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:17px 22px;background:#f8faf6;z-index:2;border-bottom:1px solid #d3dfd4;gap:14px}.dialog-header h2{margin:0;font-size:21px;font-weight:500}.dialog-close{border:1px solid #c3d1c6;border-radius:4px;padding:7px 11px;background:transparent}.dialog-content{padding:20px 22px}.budget-lead{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}.budget-lead strong{font-size:35px;font-weight:500;letter-spacing:-1px}.budget-lead span{color:#617b70}.budget-note{max-width:72ch;font-size:12px;line-height:1.75;color:#6c785f}.bom-table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}.bom-table th{text-align:left;font-weight:500;color:#617e73;padding:10px 6px;border-bottom:1px solid #a8c3b4}.bom-table th:nth-child(2){width:95px}.bom-table th:last-child{width:85px;text-align:right}.bom-table td{vertical-align:top;padding:11px 6px;border-bottom:1px solid #dbe4d9}.bom-table td:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.bom-table td p{font-size:11px;color:#748175;line-height:1.65;margin:5px 0 0;max-width:66ch}.bom-table a{color:#215f51;text-underline-offset:3px}.price-status{display:inline-block;margin-left:8px;font-size:9px;color:#6a7c70}.price-status.selected{color:#246d55}.price-status.hold,.price-status.variant,.price-status.allowance{color:#9b6d2f}.budget-breakdown{margin:20px 0 16px;padding:14px 0;border-top:1px solid #c8d7c8;display:grid;gap:9px}.budget-breakdown>div{display:flex;justify-content:space-between;font-size:12px}.budget-breakdown strong{font-weight:500}.source-links{display:flex;flex-direction:column;gap:7px;margin-top:12px}.source-links a{color:#477366;font-size:11px}.budget-checks{padding:13px;background:#f0eee3;border-left:2px solid #b49560;font-size:11px;line-height:1.75;color:#806a42;margin:15px 0}.scale-specs{padding:11px 12px;border:1px solid #d4dfd2;border-radius:5px;margin-top:15px;font-size:11px;line-height:1.9}.scale-specs strong{font-weight:500}.scale-specs small{display:block;color:#8b754f;font-size:10px}@media(max-width:680px){.header-actions .quiet{font-size:10px;max-width:170px}.draft{display:none}.dialog-content{padding:14px}.dialog-header{padding:13px 14px}.bom-table th:nth-child(2){width:60px}.bom-table th:last-child{width:60px}.price-status{display:block;margin:3px 0}.dialog-header h2{font-size:17px}.scene-note{max-width:260px}.panel-section:last-child{display:block}.part-photo{height:120px}}
+.wiring-launch{width:100%;margin:0 0 9px;padding:12px 10px;border:1px solid #7ba794;border-radius:5px;background:#dfede3;color:#174f48;text-align:left;font-size:12px}.wiring-launch strong{display:block;font-size:13px;margin-bottom:3px}.wiring-launch span{color:#527569;font-size:11px}
+#wiring-dialog{width:min(1600px,97vw);height:min(940px,95svh);max-height:95svh;overflow:hidden;padding:0;border:1px solid #b5cbbb;border-radius:10px;background:#f8faf6;color:var(--ink)}#wiring-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto}#wiring-dialog::backdrop{background:#14352caa}.wiring-header{display:flex;justify-content:space-between;gap:20px;padding:17px 22px;border-bottom:1px solid var(--line);align-items:center}.wiring-header h2{margin:0 0 4px;font-size:23px;font-weight:500}.wiring-header p{margin:0;color:#657c6e;font-size:11px;line-height:1.6}.wiring-header-actions{display:flex;align-items:center;gap:7px;flex:none}.wiring-header-actions button,.wiring-tools button,.wiring-tabs button{border:1px solid #bfd2c5;border-radius:5px;background:transparent;padding:8px 11px;font-size:12px;color:var(--ink)}.wiring-header-actions #close-wiring{background:var(--ink);color:white;border-color:var(--ink)}.wiring-workspace{display:grid;grid-template-columns:minmax(0,1fr) 330px;min-height:0}.wiring-view{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;min-height:0;background:#e8f0eb}.wiring-tabs{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid #d4e1d7}.wiring-tabs button[aria-pressed=true]{color:#fff;background:#245e52;border-color:#245e52}.wiring-stage{min-width:0;min-height:0;position:relative;overflow:hidden;touch-action:none}.wiring-stage canvas{display:block;width:100%;height:100%;cursor:grab}.wiring-stage canvas:active{cursor:grabbing}.wiring-tools{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding:9px 13px;border-top:1px solid #d1ded4;background:#edf4ee}.wiring-tools span{margin-left:auto;font-size:10px;color:#597467}.wiring-inspector{padding:17px 18px;overflow-y:auto;border-left:1px solid var(--line);min-height:0}.wiring-inspector h3{font-size:15px;font-weight:600;margin:0 0 6px}.wiring-board-note{font-size:11px;color:#667f6f;line-height:1.7;margin:0 0 14px}.wiring-devices{display:flex;flex-wrap:wrap;gap:5px;padding-bottom:15px;border-bottom:1px solid var(--line)}.wiring-devices button{border:1px solid #c7d9cc;background:transparent;border-radius:4px;padding:6px 8px;font-size:11px;color:var(--ink)}.wiring-devices button[aria-pressed=true]{background:#d6e9d9;border-color:#71a38a;color:#1a5641}.wiring-part{padding:16px 0 8px}.wiring-part-title{display:flex;align-items:center;gap:8px;justify-content:space-between}.wiring-part-title small{font-size:9px;color:#87682d;border:1px solid #d4c7a9;padding:3px 5px;border-radius:3px;white-space:nowrap}#wiring-part-note{font-size:11px;color:#6a7c6d;line-height:1.8;margin:5px 0 8px}.wire-row{display:flex;align-items:flex-start;gap:8px;width:100%;padding:10px 7px;border:0;border-bottom:1px solid #dce6dc;background:transparent;color:var(--ink);text-align:left;border-radius:3px}.wire-row:hover{background:#edf3ea}.wire-row[aria-pressed=true]{background:#dcebdd;box-shadow:inset 3px 0 #2b7c63}.wire-row>span{min-width:0}.wire-row strong{display:block;font-size:11px;font-weight:600;overflow-wrap:anywhere}.wire-to{display:block;font-size:11px;margin:4px 0;overflow-wrap:anywhere}.wire-row small{display:block;color:#6e7d6b;font-size:10px;line-height:1.7}.wire-dot{display:block;width:6px;height:24px;border-radius:4px;background:var(--wire-color);flex:none;margin-top:2px}.wire-dot.pending{background:repeating-linear-gradient(to bottom,var(--wire-color) 0 4px,transparent 4px 7px)}.wiring-foot{padding:10px 17px;border-top:1px solid var(--line);font-size:11px;line-height:1.65;background:#f2f6ef}.wiring-foot p{margin:0 0 3px}.wiring-foot small{display:block;color:#7c7257;font-size:10px}.wiring-legend{display:flex;flex-wrap:wrap;gap:10px;color:#58705e;font-size:10px;margin-top:5px}.wiring-legend span{display:inline-flex;gap:5px;align-items:center}.wiring-legend i{width:17px;height:3px;background:var(--c);display:inline-block}.wiring-inspector details{font-size:11px;margin-top:18px;color:#566c5a}.wiring-inspector details a{display:block;color:#326b55;font-size:10px;line-height:1.6;margin-top:7px;overflow-wrap:anywhere}#wiring-selection{font-size:11px;color:#2d604b;overflow-wrap:anywhere}
+@media(max-width:900px){.wiring-workspace{grid-template-columns:minmax(0,1fr) 290px}.wiring-inspector{padding:13px}.wiring-tools span{display:none}.wiring-header h2{font-size:19px}.wiring-header{padding:13px 15px}.wiring-header-actions button{font-size:11px}}
+@media(max-width:680px){#wiring-dialog{width:100vw;max-width:100vw;height:100svh;max-height:100svh;border:0;border-radius:0}.wiring-header{gap:9px;padding:10px 12px}.wiring-header h2{font-size:17px}.wiring-header p{font-size:10px}.wiring-header-actions{gap:4px}.wiring-header-actions button{padding:7px 8px;font-size:10px}.wiring-workspace{display:flex;flex-direction:column;overflow-y:auto}.wiring-view{flex:0 0 56svh;min-height:410px}.wiring-inspector{overflow:visible;flex:none;border-left:0;border-top:1px solid var(--line);padding:17px}.wiring-tools{padding:7px 10px}.wiring-tools button{font-size:10px;padding:8px}.wiring-tabs{padding:9px 10px}.wiring-tabs button{font-size:11px;padding:7px 9px}.wiring-foot{padding:8px 12px}.wiring-foot small{font-size:9px;line-height:1.5}.wiring-legend{gap:8px;font-size:9px}}
+/* Control panel: readable secondary text and direct access to exploration. */
+[hidden]{display:none!important}
+.panel{--muted:#536d6d;display:block;padding:0;scrollbar-gutter:stable;overscroll-behavior:contain}
+.panel-tabs{position:sticky;top:0;z-index:6;display:flex;gap:6px;padding:12px 18px;background:#f8faf5;border-bottom:1px solid var(--line)}
+.panel-tabs [role=tab]{flex:1;min-height:44px;padding:9px 12px;border:1px solid #b8cfc1;border-radius:5px;background:transparent;color:#355c54;font-size:14px}
+.panel-tabs [aria-selected=true]{background:var(--ink);border-color:var(--ink);color:#fff}
+.panel-tabs [role=tab]:focus-visible{outline:3px solid #279d8b;outline-offset:2px}
+.panel-pane{padding:20px 22px 25px;min-width:0}
+.panel-pane>.panel-section+.panel-section{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.panel h2{font-size:17px;margin-bottom:7px}
+.panel p{font-size:14px;line-height:1.7;color:var(--muted)}
+.panel .panel-intro{font-size:13px}
+.panel .tiny-note{font-size:12px!important;line-height:1.75!important;color:var(--muted)}
+.panel .sample-tag{font-size:11px;color:#526b61;padding:3px 6px}
+.panel .section-label{font-size:14px}
+.panel .primary,.panel .secondary,.panel .segments button{min-height:44px;font-size:13px;padding:10px 8px}
+.panel .primary{font-size:14px}
+.panel .stop-button{flex:0 0 90px}
+.panel button:disabled{opacity:.55}
+.panel .wiring-launch{min-height:76px;margin:16px 0 12px;padding:13px 12px;line-height:1.6}
+.panel .wiring-launch strong{font-size:14px;margin-bottom:3px}
+.panel .wiring-launch span{font-size:12px;color:#46695b}
+.panel-options{padding:2px 0 8px;border-bottom:1px solid var(--line)}
+.panel .switch-line{min-height:44px;margin:2px 0;font-size:14px;line-height:1.55;cursor:pointer}
+.panel .switch{width:44px;height:44px;align-items:center;justify-content:center}
+.panel .switch input{width:44px;height:44px;z-index:1}
+.panel .switch span{position:relative;width:40px;height:24px;flex:none}
+.panel .switch span:before{width:18px;height:18px;left:3px;top:3px}
+.panel .switch input:checked+span:before{transform:translateX(16px)}
+.panel .range-label{font-size:13px;gap:8px;margin-top:15px}
+.panel input[type=range]{height:44px;margin:0;width:100%}
+.panel .range-ends{font-size:12px;color:var(--muted)}
+.panel .finishes{margin-top:12px;gap:10px}
+.panel .finishes>span{font-size:13px;color:var(--muted)}
+.panel .swatch{width:44px;height:44px;flex:none;border-width:9px}
+.panel .panel-disclosure{border-top:1px solid var(--line);margin-top:12px}
+.panel .panel-disclosure summary{min-height:44px;padding:13px 0 10px;font-size:13px;line-height:1.6;cursor:pointer;overflow-wrap:anywhere}
+.panel .panel-disclosure summary strong{font-weight:500}
+.panel summary:focus-visible{outline:3px solid #279d8b;outline-offset:3px}
+.panel .part-detail{margin:0 0 8px;padding:12px}
+.panel .part-detail p{font-size:13px;line-height:1.8}
+.panel .scale-specs{margin-top:0;border:0;padding:4px 0 10px;font-size:13px;line-height:1.85}
+.panel .scale-specs small{font-size:12px;line-height:1.75;color:#78623f;margin-top:8px}
+.panel .live-data{gap:5px;margin:16px 0 12px;flex-wrap:wrap}
+.panel .unit,.panel .target{font-size:12px;color:var(--muted)}
+.panel .target strong{font-size:15px}
+.panel .bottle-readout{font-size:13px;margin-bottom:15px}
+.panel .status-text{font-size:13px;line-height:1.7;color:#425f58;min-height:0;padding:10px 12px;border-left:3px solid #7ba794;background:#eaf1e7;margin-top:12px}
+.panel .ai-readout{font-size:13px;gap:8px;flex-wrap:wrap}
+.panel .dimensions{position:static;margin:12px 0;padding:11px 12px;max-width:none;font-size:12px;line-height:1.8;pointer-events:auto;background:#eaf1e7;color:#446457}
+@media(max-width:900px){.panel-pane{padding:18px}.panel-tabs{padding:11px 14px}}
+@media(max-width:680px){.panel{padding:0;overflow:visible;scrollbar-gutter:auto}.panel-tabs{position:relative;top:auto;padding:14px 20px}.panel-pane{padding:22px}.panel-pane>.panel-section+.panel-section{margin-top:23px;padding-top:20px}.panel .panel-disclosure summary{font-size:14px}}
+/* Model callouts use screen-space rails and real, moving 3D anchors. */
+.scene-title{z-index:5}.live-pill{z-index:5}.viewbar{z-index:6}.scene-note{z-index:5;font-size:11px;color:#4e6a61}
+.scene-label-tools{position:absolute;top:92px;left:30px;display:flex;align-items:center;gap:6px;z-index:6}
+.scene-label-tools button{min-height:34px;border:1px solid #b7cdc0;border-radius:5px;background:#f8fbf5;padding:7px 10px;color:#28594c;font-size:12px}
+.scene-label-tools button[aria-pressed=false]{background:#e1e9e2;color:#526b61}
+.scene-label-tools output{font-size:11px;color:#526b61;background:#edf3f1e6;padding:4px 6px;border-radius:4px}
+.model-leaders,.model-callouts{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.model-leaders{z-index:3;overflow:hidden}.model-leaders path{fill:none;stroke-width:1.1;stroke-linejoin:round;opacity:.8}
+.model-callouts{z-index:4}
+.model-hotspot{pointer-events:auto;transform:none;min-width:0;margin:0;gap:6px;padding:2px 7px;border:1px solid #d1dfd4;border-radius:5px;background:#fbfdf8f2;font-size:12px;text-align:left;box-shadow:none;justify-content:flex-start;line-height:1.2}
+.model-hotspot:before{display:none}.model-hotspot .part-number{font-size:11px;flex:none;min-width:18px;color:#216e60;font-weight:650;text-align:center}
+.model-hotspot .part-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-hotspot.selected{border-color:#204d51}.model-hotspot.selected .part-number{color:#c0e6d3}
+.model-hotspot.back-facing{border-style:dashed}.model-hotspot.pending{border-color:#b59a65}
+.compact-labels .model-hotspot{padding:0;justify-content:center;border-radius:50%;min-width:0}
+.compact-labels .model-hotspot .part-label{display:none}.compact-labels .model-hotspot .part-number{font-size:11px;min-width:0}
+.part-index-list{display:grid;gap:5px;margin:2px 0 12px}
+.panel .part-index-button{display:flex;align-items:center;gap:8px;width:100%;min-height:44px;background:transparent;border:1px solid #d3dfd4;border-radius:4px;text-align:left;color:#285548;padding:8px;font-size:13px;line-height:1.5}
+.part-index-button b{flex:none;width:23px;font-size:12px;color:#36765b}.part-index-button span{flex:1}.part-index-button small{font-size:10px;color:#6d7157;white-space:nowrap}.panel .part-index-button.selected{background:#dfecdf;border-color:#8eb59b}
+@media(max-width:900px){.scene-label-tools{left:20px}.scene-label-tools button{font-size:11px}.model-hotspot{font-size:11px}}
+@media(max-width:680px){.scene-label-tools{top:88px;left:18px;gap:4px}.scene-label-tools button{font-size:11px;padding:6px 8px;min-height:32px}.scene-label-tools output{display:none}.scene-note{font-size:10px;max-width:250px;bottom:75px}.scene-title{max-width:76%}.scene-title p{max-width:250px}.live-pill{top:80px;right:12px;font-size:10px;padding:7px 9px}}
 </style>
 </head>
 <body>
@@ -31,52 +108,88 @@
       <div class="scene-title"><h1>Kaew รุ่นประหยัด</h1><p>Crystal 1.5 L · Ocean Nova 300 มล. · OLED 1.3 นิ้ว</p></div>
       <div class="live-pill" id="live-pill"><i></i><span id="scene-status">พร้อมใช้งาน</span></div>
       <div class="loader" id="loader">กำลังเตรียมแบบจำลอง 3D…</div>
-      <button class="hotspot" id="tag-base" data-part="base">ฐานวางบนโต๊ะ</button>
-      <button class="hotspot" id="tag-tank" data-part="tank">ขวดน้ำ 1.5 ลิตร</button>
-      <button class="hotspot" id="tag-display" data-part="display">OLED 1.3 นิ้ว</button>
-      <button class="hotspot" id="tag-pump" data-part="pump">ปั๊มที่เลือก · 504 บาท</button>
-      <button class="hotspot" id="tag-tray" data-part="tray">แท่นชั่งแก้ว</button>
-      <div class="dimensions" id="dimensions">ฐานเสนอ 220 × 350 มม.<br>สูงรวมท่อเสนอ 450 มม.<br>แก้วอิงผู้ผลิต Ø83 / ฐาน63 / สูง90 มม.<br><span>ขวดและกล่องปั๊มยังเป็นมิติประมาณ</span></div>
-      <div class="scene-note" id="scene-note">หมุนดูปั๊มที่เลือกและขวดคริสตัลได้รอบตัว<br>มิติขวดและกล่องปั๊มยังประมาณจากภาพ</div>
+      <div class="scene-label-tools" role="group" aria-label="ป้ายกำกับโมเดล"><button id="toggle-labels" type="button" aria-pressed="true">ป้ายกำกับ</button><button id="model-parts-button" type="button">ชิ้นส่วน 24 จุด</button><output id="model-label-count" aria-label="จำนวนป้ายที่เห็นในมุมนี้">0/24</output></div>
+      <div class="scene-note" id="scene-note">เส้นชี้ตามชิ้นส่วน · เส้นประคือด้านหลัง/รอยืนยัน<br>ดูป้ายภายในด้วยโหมดดูภายในหรือแยกชิ้นส่วน</div>
       <nav class="viewbar" aria-label="มุมมองแบบจำลอง">
         <button data-camera="hero" aria-pressed="true">มุมใช้งาน</button><button data-camera="front" aria-pressed="false">หน้า</button><button data-camera="rear" aria-pressed="false">หลัง</button><button data-camera="base" aria-pressed="false">ฐาน</button><button id="reset-view" title="คืนมุมมองและสถานะเริ่มต้น">รีเซ็ต</button>
       </nav>
       <div class="orbit-hint">ลากเพื่อหมุน · เลื่อนเพื่อซูม · คลิกป้ายดูชิ้นส่วน</div>
     </section>
     <aside class="panel" aria-label="ตัวเลือกแบบและการจำลอง">
-      <section class="panel-section">
-        <div class="status-title"><h2>ลองใช้งาน</h2><span class="sample-tag">การจำลอง</span></div>
-        <p>ยกแก้วเพื่อรีเซ็ตเวลา วางกลับเพื่อเติมส่วนที่ขาดถึงเป้าหมาย</p><p class="tiny-note">ความเร็วจำลอง250มล./นาที ตามค่าสูงสุดที่ร้านแจ้ง ยังไม่ใช่ผลทดสอบเครื่องจริง</p>
-        <div class="live-data"><span class="volume" id="cup-volume">160</span><span class="unit">มล. ในแก้ว</span><span class="target">เป้าหมายตัวอย่าง<strong id="target-volume">220 มล.</strong></span></div>
-        <p style="margin:-4px 0 13px;font-size:11px">น้ำในขวดจำลอง <strong id="bottle-volume">1500</strong> / 1500 มล.</p>
-        <button class="primary" id="cup-action">ยกแก้วไปดื่ม</button>
-        <div class="button-pair"><button class="secondary" id="sip" disabled>จำลองจิบ 60 มล.</button><button class="secondary stop-button" id="stop" disabled>หยุดจ่าย</button></div>
-        <div class="button-pair"><button class="secondary" id="remind">ข้ามไปถึงเวลาเตือน</button></div>
-        <div class="status-text" id="status-text" role="status" aria-live="polite">แก้วอยู่บนแท่น รอรอบเตือนหรือยกแก้วไปดื่ม</div>
-      </section>
-      <section class="panel-section">
-        <div class="section-label">Adaptive preview <span class="sample-tag">ค่าตัวอย่าง</span></div>
-        <div class="segments" aria-label="พฤติกรรมการดื่มจำลอง"><button data-profile="small" aria-pressed="false">จิบทีละน้อย</button><button data-profile="normal" aria-pressed="true">ปกติ</button><button data-profile="late" aria-pressed="false">เว้นช่วงนาน</button></div>
-        <div class="ai-readout"><span>เติมถึง <strong id="ai-volume">220 มล.</strong></span><span>เตือนใน <strong id="ai-interval">25 นาที</strong></span></div>
-        <p class="tiny-note">แนวทางที่เลือกคือให้ AI ปรับทั้งเวลาเตือนและปริมาณผ่าน API ค่าบนหน้านี้เป็นตัวอย่างสาธิต ยังไม่ได้เชื่อมโมเดลจริง</p>
-      </section>
-      <section class="panel-section">
-        <div class="section-label">สำรวจตัวเครื่อง</div>
-        <label class="switch-line" for="exploded">แยกชิ้นส่วน<span class="switch"><input id="exploded" type="checkbox"><span></span></span></label>
-        <label class="switch-line" for="inside">ดูชุดปั๊มและทางเดินน้ำ<span class="switch"><input id="inside" type="checkbox"><span></span></span></label>
-        <label class="switch-line" for="show-dimensions">เส้นบอกขนาด (มม.)<span class="switch"><input id="show-dimensions" type="checkbox"><span></span></span></label>
-        <label class="switch-line" for="desk-scene">ดูเมื่อวางข้างคอม<span class="switch"><input id="desk-scene" type="checkbox"><span></span></span></label>
-        <label class="range-label" for="desk-placement">ระยะจากขอบโต๊ะ<output id="placement-value">40 มม.</output></label>
-        <input id="desk-placement" type="range" min="20" max="100" value="40" step="1"><div class="range-ends"><span>20 มม.</span><span>100 มม.</span></div>
-        <div class="finishes"><span>สีตัวเครื่อง</span><button class="swatch" data-finish="porcelain" aria-label="สีขาวพอร์ซเลน" aria-pressed="true" style="--swatch:#e8eee6"></button><button class="swatch" data-finish="graphite" aria-label="สีกราไฟต์" aria-pressed="false" style="--swatch:#34515a"></button></div>
-        <div class="part-detail"><strong id="part-name">ปั๊มที่เลือก</strong><p id="part-description"></p><img id="part-photo" class="part-photo" alt="รูปสินค้าจริง" hidden></div>
-        <div class="scale-specs"><strong>สเกลของโมเดล</strong><br>แก้ว: ปาก83 / ฐาน63 / สูง90มม.<br>OLED: พื้นที่แสดงผล29.42×14.70มม.<br>ฐานเสนอ:220×350มม. สูงรวม450มม.<small>ขวดประมาณØ85×320มม.; กล่องปั๊มประมาณ80×125×40มม. ยังไม่มีมิติยืนยัน หน้าจอแสดงผลปรับซูมได้ จึงไม่ใช่1:1บนจอคอม</small></div>
-      </section>
+      <nav class="panel-tabs" role="tablist" aria-label="เลือกการใช้งานแผงควบคุม">
+        <button id="explore-tab" role="tab" aria-selected="true" aria-controls="panel-explore" type="button">สำรวจ</button>
+        <button id="simulate-tab" role="tab" aria-selected="false" aria-controls="panel-simulate" tabindex="-1" type="button">ลองใช้งาน</button>
+      </nav>
+      <div id="panel-explore" class="panel-pane" role="tabpanel" aria-labelledby="explore-tab">
+        <section class="panel-section">
+          <h2>สำรวจตัวเครื่อง</h2><p class="panel-intro">ดูชิ้นส่วน ขนาด และการต่อสาย</p>
+          <button class="wiring-launch" id="wiring-button"><strong>ดูสายไฟและขาบอร์ด 3D</strong><span>ซูมชื่อขาและเลือกดูสายแต่ละเส้น</span></button>
+          <div class="panel-options">
+            <label class="switch-line" for="show-water-path">แสดงเส้นทางน้ำ<span class="switch"><input id="show-water-path" type="checkbox" checked><span></span></span></label>
+            <label class="switch-line" for="exploded">แยกชิ้นส่วน<span class="switch"><input id="exploded" type="checkbox"><span></span></span></label>
+            <label class="switch-line" for="inside">ดูภายในและทางเดินน้ำ<span class="switch"><input id="inside" type="checkbox"><span></span></span></label>
+            <label class="switch-line" for="show-dimensions">เส้นบอกขนาด (มม.)<span class="switch"><input id="show-dimensions" type="checkbox"><span></span></span></label>
+            <label class="switch-line" for="desk-scene">ดูเมื่อวางข้างคอม<span class="switch"><input id="desk-scene" type="checkbox"><span></span></span></label>
+          </div>
+          <div class="dimensions" id="dimensions">ฐานเสนอ 220 × 350 มม.<br>สูงรวมท่อเสนอ 450 มม.<br>แก้วอิงผู้ผลิต Ø83 / ฐาน 63 / สูง 90 มม.<br><span>ขวดและกล่องปั๊มยังเป็นมิติประมาณ</span></div>
+          <div id="desk-placement-controls" hidden>
+            <label class="range-label" for="desk-placement">ระยะจากขอบโต๊ะ<output id="placement-value">40 มม.</output></label>
+            <input id="desk-placement" type="range" min="20" max="100" value="40" step="1" disabled><div class="range-ends"><span>20 มม.</span><span>100 มม.</span></div>
+          </div>
+          <div class="finishes"><span>สีตัวเครื่อง</span><button class="swatch" data-finish="porcelain" aria-label="สีขาวพอร์ซเลน" aria-pressed="true" style="--swatch:#e8eee6"></button><button class="swatch" data-finish="graphite" aria-label="สีกราไฟต์" aria-pressed="false" style="--swatch:#34515a"></button></div>
+          <details id="model-parts-index" class="panel-disclosure"><summary>รายการชิ้นส่วนทั้งหมด 24 จุด</summary><p class="tiny-note">หมายเลขตรงกับป้ายบนโมเดล เลือกชิ้นส่วนภายในเพื่อเปิดดูภายในอัตโนมัติ กรอบและป้ายสีอำพันเป็นส่วนที่ยังรอยืนยัน</p><div class="part-index-list" id="model-parts-list"></div></details>
+          <details id="part-detail" class="panel-disclosure"><summary>ชิ้นส่วน: <strong id="part-name">ปั๊มที่เลือก</strong></summary><div class="part-detail"><p id="part-description"></p><img id="part-photo" class="part-photo" alt="รูปสินค้าจริง" hidden></div></details>
+          <details class="panel-disclosure"><summary>ขนาดและข้อจำกัดของโมเดล</summary><div class="scale-specs"><strong>สเกลของโมเดล</strong><br>แก้ว: ปาก 83 / ฐาน 63 / สูง 90 มม.<br>OLED: พื้นที่แสดงผล 29.42 × 14.70 มม.<br>ฐานเสนอ: 220 × 350 มม. สูงรวม 450 มม.<small>ขวดประมาณ Ø85 × 320 มม. และกล่องปั๊มประมาณ 80 × 125 × 40 มม. ยังไม่มีมิติยืนยัน หน้าจอซูมได้ จึงไม่ใช่ขนาด 1:1 บนจอคอม</small></div></details>
+        </section>
+      </div>
+      <div id="panel-simulate" class="panel-pane" role="tabpanel" aria-labelledby="simulate-tab" hidden>
+        <section class="panel-section">
+          <div class="status-title"><h2>ลองใช้งาน</h2><span class="sample-tag">การจำลอง</span></div>
+          <p id="simulation-help">ยกแก้ว → จำลองจิบ → วางแก้วกลับ เครื่องจะเติมน้ำส่วนที่ขาด</p>
+          <div class="live-data"><span class="volume" id="cup-volume">160</span><span class="unit">มล. ในแก้ว</span><span class="target">เป้าหมายตัวอย่าง<strong id="target-volume">220 มล.</strong></span></div>
+          <p class="bottle-readout">น้ำในขวดจำลอง <strong id="bottle-volume">1500</strong> / 1500 มล.</p>
+          <button class="primary" id="cup-action" aria-describedby="simulation-help">ยกแก้วไปดื่ม</button>
+          <div class="button-pair"><button class="secondary" id="sip" aria-describedby="simulation-help" disabled>จำลองจิบ 60 มล.</button><button class="secondary stop-button" id="stop" disabled>หยุดจ่าย</button></div>
+          <div class="button-pair"><button class="secondary" id="remind">ข้ามไปถึงเวลาเตือน</button></div>
+          <div class="status-text" id="status-text" role="status" aria-live="polite">แก้วอยู่บนแท่น รอรอบเตือนหรือยกแก้วไปดื่ม</div>
+        </section>
+        <section class="panel-section">
+          <div class="section-label">รูปแบบการดื่ม <span class="sample-tag">ค่าตัวอย่าง</span></div>
+          <div class="segments" role="group" aria-label="พฤติกรรมการดื่มจำลอง"><button data-profile="small" aria-pressed="false">จิบทีละน้อย</button><button data-profile="normal" aria-pressed="true">ปกติ</button><button data-profile="late" aria-pressed="false">เว้นช่วงนาน</button></div>
+          <div class="ai-readout"><span>เติมถึง <strong id="ai-volume">220 มล.</strong></span><span>เตือนใน <strong id="ai-interval">25 นาที</strong></span></div>
+          <p class="tiny-note">ปริมาณและเวลาเป็นค่าตัวอย่าง ยังไม่ได้เชื่อม AI จริง ความเร็วจำลอง 250 มล./นาที อิงค่าสูงสุดที่ร้านแจ้ง ยังไม่ใช่ผลทดสอบเครื่อง</p>
+        </section>
+      </div>
     </aside>
   </main>
   <footer class="footer"><span>Kaew · แบบศึกษาชุดประหยัด · 30 ต.ค. 2026</span><span>อิงสเปกบางชิ้น · ขวด/ปั๊มยังประมาณ · ยังไม่ใช่แบบผลิต</span></footer>
 </div>
 <dialog class="dialog" id="budget-dialog" aria-labelledby="budget-title"><header class="dialog-header"><h2 id="budget-title">รายการซื้อและงบตั้งต้น</h2><button class="dialog-close" id="close-budget">ปิด</button></header><div class="dialog-content"><div class="budget-lead"><strong id="budget-total"></strong><span>บาท รวมเผื่อแล้ว</span></div><p class="budget-note">ปั๊ม504บาทตามที่เลือก และOLED1.3นิ้ว139บาท ราคาสินค้าจากผลค้นหาShopeeวันที่30ต.ค.2026 ยังไม่ใช่ราคาcheckout คิดแพ็กแก้ว6ใบและน้ำ6ขวดเต็มแพ็ก ไม่หักคูปองส่วนบุคคล</p><div class="budget-checks">flow sensorยังรอเลือกรุ่น: กันงบ300บาท และไม่ใช้YF-S4010.3–6L/minกับปั๊มสูงสุด0.25L/min · โครงและค่าส่งเป็นประมาณการ · แรงดันDC/การควบคุมปั๊มและวัสดุสัมผัสน้ำยังต้องตรวจ · ไม่รวมค่าAPIรายเดือนหรือเครื่องมือช่าง</div><table class="bom-table"><thead><tr><th>อุปกรณ์ / ลิงก์Shopee</th><th>ซื้อ</th><th>รวมบาท</th></tr></thead><tbody id="bom-body"></tbody></table><div class="budget-breakdown" id="budget-breakdown"></div><details><summary>แหล่งอ้างอิงขนาดและสเปก</summary><div class="source-links" id="source-links"></div></details></div></dialog>
+<dialog id="wiring-dialog" aria-labelledby="wiring-title" aria-describedby="wiring-disclaimer">
+  <header class="wiring-header">
+    <div><h2 id="wiring-title">สายนี้ ต่อขาไหน</h2><p>เลือกอุปกรณ์หรือสายเพื่อไล่ดูจุดต่อทั้งสองด้าน</p></div>
+    <div class="wiring-header-actions"><button id="wiring-export" type="button">บันทึกผัง PNG</button><button id="close-wiring" type="button" autofocus>กลับตัวเครื่อง</button></div>
+  </header>
+  <div class="wiring-workspace">
+    <section class="wiring-view" aria-label="ผังการต่อสายสามมิติ">
+      <nav class="wiring-tabs" aria-label="เลือกบอร์ด"><button data-wiring-board="gateway" aria-pressed="true" type="button">บอร์ดหลัก ESP32-S3</button><button data-wiring-board="node" aria-pressed="false" type="button">บอร์ดเซนเซอร์ ESP32</button></nav>
+      <div class="wiring-stage" id="wiring-stage"></div>
+      <div class="wiring-tools" role="group" aria-label="ควบคุมมุมมองสาย"><button id="wiring-top" type="button">ภาพรวมตรง</button><button id="wiring-angle" type="button">มุมเอียง 3D</button><button id="wiring-board-zoom" type="button">ซูมขาบอร์ด</button><button id="wiring-zoom-in" type="button" aria-label="ซูมเข้า">+</button><button id="wiring-zoom-out" type="button" aria-label="ซูมออก">−</button><span>ลากหมุน · เลื่อนซูม · คลิกสาย</span></div>
+    </section>
+    <aside class="wiring-inspector" aria-label="อุปกรณ์และขาที่ต่อ">
+      <h3 id="wiring-board-name"></h3><p class="wiring-board-note" id="wiring-board-note"></p>
+      <nav class="wiring-devices" id="wiring-devices" aria-label="เลือกอุปกรณ์"></nav>
+      <div class="wiring-part"><div class="wiring-part-title"><h3 id="wiring-part-name"></h3><small id="wiring-part-status"></small></div><p id="wiring-part-note"></p></div>
+      <div id="wiring-connections" aria-label="สายแต่ละเส้น"></div>
+      <details><summary>แหล่งอ้างอิงผังขา</summary><div id="wiring-sources"></div></details>
+    </aside>
+  </div>
+  <footer class="wiring-foot">
+    <p id="wiring-selection" role="status" aria-live="polite">กำลังเตรียมผังสาย</p>
+    <small id="wiring-disclaimer">ผังเสนอ 31 ต.ค. 2026 · หัวต่ออุปกรณ์จัดเรียงเพื่ออ่านง่าย ต้องเทียบชื่อขาบนของจริง · เส้นประ = รอยืนยันรุ่น/วงจร · สีสายใช้แยกเส้นในภาพ · ปั๊ม/ไฟกำลังยังไม่มีผังพร้อมต่อ</small>
+    <div class="wiring-legend"><span><i style="--c:#d4484f"></i>3.3V</span><span><i style="--c:#bc6b16"></i>5V</span><span><i style="--c:#37474f"></i>GND</span><span><i style="--c:#147cbb"></i>ข้อมูล / clock / เสียง: อ่านชื่อปลายสาย</span></div>
+  </footer>
+</dialog>
 <!-- KAEW_BUNDLE -->
 </body>
 </html>

@@ -34,7 +34,11 @@ jobs:
           node .work/build-kaew.cjs
           node .work/make-parts-gallery.cjs
       - name: Verify model and budget
-        run: node .work/check-standalone.cjs
+        run: |
+          node .work/check-standalone.cjs
+          node .work/check-wiring.cjs
+          node .work/check-model-labels.cjs
+          node .work/check-water-path.cjs
       - name: Stage public files
         run: node .work/stage-pages.cjs
       - name: Configure GitHub Pages

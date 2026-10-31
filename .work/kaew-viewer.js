@@ -6,6 +6,11 @@ import bottlePhoto from '../references/crystal-1500-reference.jpg';
 import pumpPhoto from '../references/pump-250-0.jpg';
 import oledPhoto from '../references/part-display-oled13.jpg';
 import bom from '../kaew-bom.json';
+import { mountWiringViewer } from './kaew-wiring.js';
+import { mountControlPanel } from './kaew-panel.js';
+import modelParts from './kaew-model-parts.cjs';
+import { createModelLabels } from './kaew-model-labels.js';
+import { createWaterCircuit } from './kaew-water-circuit.cjs';
 
 const $=id=>document.getElementById(id);
 const stage=$('stage');
@@ -185,8 +190,6 @@ const neckRing=torus(1.55,.09,tankGlass,reservoir,bottleX,bottleBottom+30.5,bott
 cylinder(.28,.28,.85,steel,reservoir,bottleX-.58,bottleBottom+32.30,bottleZ);
 cylinder(.16,.16,.55,steel,reservoir,bottleX+.60,bottleBottom+32.25,bottleZ);
 cylinder(.34,.34,.24,shell,reservoir,bottleX+.60,bottleBottom+32.65,bottleZ);
-const pickupMaterial=new THREE.MeshPhysicalMaterial({color:'#e5f1e9',transparent:true,opacity:.65,roughness:.16,transmission:.25,depthWrite:false});
-cylinder(.18,.18,30.5,pickupMaterial,reservoir,bottleX-.58,bottleBottom+16.6,bottleZ);
 for(const h of [1.1,16.8]){const holder=torus(4.66,.15,teal,base,bottleX,bottleBottom+h,bottleZ);holder.rotation.x=Math.PI/2;}
 box(.6,18,.6,soft,base,bottleX,bottleBottom+8.4,bottleZ-4.7,.12);
 const levelBody=cylinder(1.40,1.40,1.7,material('#eee9dd',.53),base,bottleX+4.8,bottleBottom+4.1,bottleZ);levelBody.rotation.z=Math.PI/2;
@@ -224,6 +227,9 @@ const drops=[];for(let i=0;i<5;i++){const drop=mesh(new THREE.SphereGeometry(.10
 box(17.4,1.7,17.5,shell,tray,11.5,-8.75,7.0,.48);
 box(14.4,.30,14.4,soft,tray,11.5,-7.40,7.3,.22);
 box(8.0,1.27,1.27,steel,internals,11.5,-8.50,7.3,.08);
+// Fixed-end and moving-end spacers meet the load cell and platform surfaces.
+box(2.0,.315,1.27,dark,internals,8.7,-9.2925,7.3,.025);
+box(2.0,.315,1.27,dark,internals,14.1,-7.7075,7.3,.025);
 for(const x of [8.6,9.4,13.6,14.4]){cylinder(.18,.18,.14,steel,internals,x,-7.81,7.3);}
 const dockRing=torus(4.6,.065,teal,tray,11.5,-7.21,7.3);dockRing.rotation.x=Math.PI/2;
 for(let r=0;r<3;r++)for(let c=0;c<8;c++)box(.7,.025,.1,dark,tray,6.6+c*1.4,-7.51,1.4+r*.55,.025);
@@ -245,11 +251,24 @@ function pcb(w,h,x,y,z,label){
  return board;
 }
 pcb(2.8,6.25,9.0,14,-2.6,'ESP32-S3');pcb(2.8,5.2,14.2,14.2,-2.6,'ESP32');
-pcb(2.0,3.2,11.5,-8.3,1.0,'HX711');
+// Keep the HX711 outside the moving platform's swept volume.
+pcb(2.0,3.2,6.5,-7.5,-7.0,'HX711');
 box(4.2,3.2,.16,material('#267552',.55),internals,14.3,8.6,-2.6,.06);
-tube([[14.62,31.55,-10.5],[14.62,33.6,-10.5],[4.1,33.6,-11],[3.4,20,-11],[3.4,-3.8,-12.75],[8.45,-3.8,-12.75]],.18,pickupMaterial,reservoir);
-tube([[8.45,-3.8,-11.3],[4.3,-3.8,-10],[4.5,4,-1.0],[9.7,7.0,3.0],[11.5,6.4,7.3],[11.5,5.14,7.3]],.18,pickupMaterial,internals);
-for(const [dx,color] of [[0,'#b47f5d'],[.25,'#8aa59c'],[.5,'#4c6366']])tube([[8.3+dx,13.0,-2.5],[7.0+dx,9.0,-2],[7.0+dx,-6,0],[10.5+dx,-8,6.3]],.035,material(color,.7),internals);
+pcb(.9,1.2,11.5,8.5,-.8,'INMP441');
+pcb(2.8,3.0,4.5,-7.6,-4.0,'Buck');
+pcb(2.8,3.0,17.8,-7.6,-4.0,'Driver');
+const speakerFrame=cylinder(2,2,.8,black,internals,8.2,8.7,-1.3);speakerFrame.rotation.x=Math.PI/2;
+const speakerCone=cylinder(1.65,.65,.25,dark,internals,8.2,8.7,-.85);speakerCone.rotation.x=Math.PI/2;
+// A dashed volume marks an unselected part; this is not a real flow sensor.
+const flowEnvelope=box(2.2,2.2,2.6,new THREE.MeshBasicMaterial({color:'#a77a37',wireframe:true,transparent:true,opacity:.7}),internals,6,4,.1,.04);
+flowEnvelope.userData.pending=true;
+// Control-power adapter envelope; its dimensions and cable entry are proposals.
+box(6,3.4,8,black,appliance,31,-9.6,-9,.45);
+for(let i=0;i<5;i++)box(4,.035,.08,dark,appliance,31,-7.88,-11+i*.8,.02);
+tube([[28,-9.6,-9],[25,-10,-8],[23.4,-9.8,-6],[22.4,-9.4,-5]],.10,rubber,appliance);
+const waterCircuit=createWaterCircuit({Group:THREE.Group,MeshPhysicalMaterial:THREE.MeshPhysicalMaterial,MeshBasicMaterial:THREE.MeshBasicMaterial,LineDashedMaterial:THREE.LineDashedMaterial,Mesh:THREE.Mesh,BufferGeometry:THREE.BufferGeometry,Line:THREE.Line,ArrowHelper:THREE.ArrowHelper,Vector3:THREE.Vector3,CatmullRomCurve3:THREE.CatmullRomCurve3,TubeGeometry:THREE.TubeGeometry},{parent:appliance,parts:{reservoir,pumpModule,spout}});
+for(const [dx,color] of [[0,'#b47f5d'],[.25,'#8aa59c'],[.5,'#4c6366']])tube([[8.3+dx,13,-2.5],[7+dx,9,-3],[6.5+dx,-6,-5],[6.5+dx,-7.5,-6.8]],.035,material(color,.7),internals);
+tube([[6.5,-7.5,-6.8],[5.4,-8,-2],[6,-8.5,5],[8,-8.5,7.3]],.06,rubber,internals);
 internals.visible=false;
 
 const floor=mesh(new THREE.PlaneGeometry(400,400),material('#e7eeea',.87),scene,0,-.12,0);floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;
@@ -286,29 +305,19 @@ const parts=[
  {object:internals,offset:new THREE.Vector3(3,5,9)},
  {object:pumpModule,offset:new THREE.Vector3(-9,8,-7)}
 ];
-const descriptions={
- base:['ฐานเสนอ 220 × 350 มม.','ฐานแผ่นและขายึดแยกชิ้น รองรับขวด จอ และแท่นชั่ง มีชั้นรับน้ำหนักขวดแยกจากกล่องปั๊ม งบโครง700บาทเป็นประมาณการ ยังไม่มีใบเสนอราคา'],
- tank:['Crystal 1.5 L','รูปทรงและฉลากอิงภาพสินค้า Crystal จาก Lotus ขนาดในโมเดลประมาณ Ø85×320มม. ฝาประมาณØ30มม. ยังไม่มีdrawingขวดเดี่ยวหรือเกลียวฝาที่ผู้ผลิตยืนยัน'],
- display:['OLED 1.3 นิ้ว · 139 บาท','SH1106 I2C 128×64 ขาวดำ พื้นที่แสดงผลอ้างอิง29.42×14.70มม. ขนาดPCBอ้างอิง33.5×35.4มม. ต้องเทียบrevisionร้านก่อนกำหนดรูยึด'],
- tray:['Ocean Nova Rock 300 มล.','รุ่นB06511 ปาก83 ฐาน63 สูง90มม. ตามcatalogueผู้ผลิต ไม่มีหูจับ แท่นชั่งเว้นจากโครงคงที่เพื่อไม่ให้ขัดแรงชั่ง รูปด้านในและความหนาแก้วเป็นการจำลอง'],
- pump:['ปั๊มที่เลือก · 504 บาท','ปั๊มรีดสายแบบมีกล่องและปุ่มปรับ ร้านระบุ10–250มล./นาที จำลองกล่อง80×125×40มม. สูงรวมหัว72มม. จากภาพเพื่อจัดวาง ยังไม่ใช่มิติที่ร้านยืนยัน;DCoutput,การควบคุมจากESP32และวัสดุสัมผัสน้ำยังต้องตรวจ']
-};
-
-const anchors=[
- {id:'tag-base',part:'base',parent:base,p:new THREE.Vector3(1.0,-10.1,13),side:-1},
- {id:'tag-pump',part:'pump',parent:pumpModule,p:new THREE.Vector3(8,-5,-6),side:-1},
- {id:'tag-tank',part:'tank',parent:reservoir,p:new THREE.Vector3(19,28,-10.5),side:1},
- {id:'tag-display',part:'display',parent:body,p:new THREE.Vector3(5.8,17.5,.4),side:-1},
- {id:'tag-tray',part:'tray',parent:tray,p:new THREE.Vector3(19.5,-8.5,10),side:1}
-];
-const projected=new THREE.Vector3();
+const descriptions=Object.fromEntries(modelParts.map(p=>[p.id,[p.title,p.description]]));
+const modelLabels=createModelLabels({stage,scene,camera,parents:{base,body,reservoir,spout,tray,cup,internals,pumpModule,appliance}});
 function selectPart(name){
  selectedPart=name;
  $('part-name').textContent=descriptions[name][0];$('part-description').textContent=descriptions[name][1];
  const photo=$('part-photo');photo.hidden=!['pump','display'].includes(name);if(!photo.hidden){photo.src=name==='pump'?pumpPhoto:oledPhoto;photo.alt=name==='pump'?'รูปปั๊มจริงจากร้านที่เลือก':'รูปOLED1.3นิ้วจากร้าน';}
  document.querySelectorAll('[data-part]').forEach(b=>b.classList.toggle('selected',b.dataset.part===name));
 }
-document.querySelectorAll('[data-part]').forEach(b=>b.addEventListener('click',()=>selectPart(b.dataset.part)));
+document.querySelectorAll('[data-part]').forEach(b=>b.addEventListener('click',()=>{
+ const part=modelParts.find(p=>p.id===b.dataset.part);
+ if(part.group==='internal'&&!exploded)setInsideView(true);
+ selectPart(part.id);
+}));
 selectPart('base');
 
 function status(message,short,kind=''){
@@ -409,12 +418,20 @@ function updatePlacement(value){
 }
 $('desk-placement').addEventListener('input',e=>updatePlacement(Number(e.target.value)));
 updatePlacement(40);
-$('inside').addEventListener('change',e=>{
- internals.visible=e.target.checked;
- shell.transparent=e.target.checked;shell.opacity=e.target.checked?.27:1;shell.depthWrite=!e.target.checked;shell.needsUpdate=true;
- if(e.target.checked){$('part-name').textContent='ชุดปั๊มและทางเดินน้ำ';$('part-description').textContent='แสดงตำแหน่งปั๊ม ท่อน้ำ และแผงควบคุมเพื่อสำรวจการจัดวาง ยังไม่ใช่วงจรหรือแบบประกอบที่ยืนยันแล้ว';}
- else selectPart(selectedPart);
-});
+function setInsideView(value){
+ $('inside').checked=value;internals.visible=value||exploded;
+ shell.transparent=value;shell.opacity=value?.24:1;shell.depthWrite=!value;shell.needsUpdate=true;
+}
+function updateWaterGuide(){
+ const visible=$('show-water-path').checked;waterCircuit.setGuide(visible);
+ $('scene-note').replaceChildren();
+ const first=document.createTextNode(visible?'น้ำ: ขวด → ปั๊ม → หัวจ่าย (เส้นฟ้า)':'ท่อน้ำสีอ่อนเป็นตำแหน่งจัดวางเสนอ');
+ const second=document.createTextNode(visible?'ช่วยมองทะลุ · ช่วงในปั๊มเป็นภาพจำลอง':'เปิดเส้นทางน้ำเพื่อดูช่วงที่ตัวเครื่องบัง');
+ $('scene-note').append(first,document.createElement('br'),second);
+ canvas.dataset.waterGuide=String(visible);
+}
+$('show-water-path').addEventListener('change',updateWaterGuide);updateWaterGuide();
+$('inside').addEventListener('change',e=>{setInsideView(e.target.checked);selectPart(e.target.checked?'gateway':'base');});
 $('show-dimensions').addEventListener('change',e=>{dims.visible=e.target.checked;$('dimensions').classList.toggle('visible',e.target.checked);});
 document.querySelectorAll('[data-finish]').forEach(b=>b.addEventListener('click',()=>{
  finish=b.dataset.finish;shell.color.set(finish==='porcelain'?'#e8eee3':'#34515a');soft.color.set(finish==='porcelain'?'#d7e2d3':'#29404a');
@@ -426,6 +443,7 @@ function setCamera(view){
  const v=views[view];
  cameraTween={from:camera.position.clone(),to:new THREE.Vector3(...v.p),targetFrom:controls.target.clone(),targetTo:new THREE.Vector3(...v.t),time:0};
  activeView=view;controls.maxDistance=view==='exploded'?230:155;
+ canvas.dataset.cameraView=view;
  if(camera.aspect<.85){cameraTween.to.sub(cameraTween.targetTo).multiplyScalar(1.15).add(cameraTween.targetTo);}
  if(view==='exploded'&&camera.aspect<.85){cameraTween.to.set(150,82,145);cameraTween.targetTo.set(13,17,2);}
  if(reduced){camera.position.copy(cameraTween.to);controls.target.copy(cameraTween.targetTo);cameraTween=null;controls.update();}
@@ -433,7 +451,7 @@ function setCamera(view){
  if(view==='base')selectPart('base');
 }
 document.querySelectorAll('[data-camera]').forEach(b=>b.addEventListener('click',()=>setCamera(b.dataset.camera)));
-controls.addEventListener('start',()=>{cameraTween=null;activeView=null;});
+controls.addEventListener('start',()=>{cameraTween=null;activeView=null;canvas.dataset.cameraView='manual';});
 $('exploded').addEventListener('change',e=>{
  exploded=e.target.checked;filling=false;returnPending=false;
  if(exploded){cupAway=false;cupDest.copy(cupDocked);setCamera('exploded');status('แยกชิ้นส่วนเพื่อดูการจัดวาง ปิดโหมดนี้เพื่อลองวงจรเติมน้ำ','มุมแยกชิ้นส่วน');}
@@ -449,31 +467,24 @@ $('reset-view').addEventListener('click',()=>{
  cupAway=false;filling=false;stopped=false;returnPending=false;cupVolume=160;tankVolume=bottleCapacity;remaining=reminderMinutes*60;cupDest.copy(cupDocked);
  exploded=false;$('exploded').checked=false;$('inside').checked=false;internals.visible=false;shell.transparent=false;shell.opacity=1;shell.depthWrite=true;shell.needsUpdate=true;
  status('คืนสถานะตัวอย่างเริ่มต้นแล้ว','พร้อมใช้งาน');selectPart('base');setCamera('hero');updateWater();updateUI();drawScreen();
+ modelLabels.reset();
+ $('show-water-path').checked=true;updateWaterGuide();
 });
 canvas.addEventListener('keydown',e=>{
  if(e.key==='Home'){e.preventDefault();setCamera('hero');return;}
  if(!['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','-','='].includes(e.key))return;
- e.preventDefault();cameraTween=null;
+ e.preventDefault();cameraTween=null;activeView=null;canvas.dataset.cameraView='manual';
  const off=camera.position.clone().sub(controls.target),s=new THREE.Spherical().setFromVector3(off);
  if(e.key==='ArrowLeft')s.theta-=.13;if(e.key==='ArrowRight')s.theta+=.13;
  if(e.key==='ArrowUp')s.phi-=.1;if(e.key==='ArrowDown')s.phi+=.1;
  if(e.key==='+'||e.key==='=')s.radius*=.92;if(e.key==='-')s.radius*=1.08;
- s.phi=THREE.MathUtils.clamp(s.phi,.15,Math.PI*.8);s.radius=THREE.MathUtils.clamp(s.radius,38,155);
+ s.phi=THREE.MathUtils.clamp(s.phi,.15,Math.PI*.8);s.radius=THREE.MathUtils.clamp(s.radius,controls.minDistance,controls.maxDistance);
  camera.position.copy(new THREE.Vector3().setFromSpherical(s).add(controls.target));controls.update();
 });
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();if(activeView)setCamera(activeView);}
 new ResizeObserver(resize).observe(stage);resize();
 function positionLabels(){
- scene.updateMatrixWorld(true);
- for(const a of anchors){
-  const el=$(a.id);projected.copy(a.p).applyMatrix4(a.parent.matrixWorld).project(camera);
-  const w=stage.clientWidth,h=stage.clientHeight;
-  if(projected.z>1||projected.z<0){el.hidden=true;continue;}el.hidden=false;
-  const px=(projected.x*.5+.5)*w,py=(-projected.y*.5+.5)*h;
-  const labelW=el.offsetWidth||100;
-  const x=THREE.MathUtils.clamp(px+(a.side<0?-labelW-17:12),12,w-labelW-12);
-  el.style.left=x+'px';el.style.top=THREE.MathUtils.clamp(py,140,h-135)+'px';
- }
+ modelLabels.update({inside:$('inside').checked,exploded,selected:selectedPart});
 }
 const clock=new THREE.Clock();let elapsed=0,ready=false;
 function animate(){
@@ -482,6 +493,8 @@ function animate(){
  const ease=reduced?1:1-Math.exp(-dt*8);
  explosion=THREE.MathUtils.lerp(explosion,exploded?1:0,ease);
  for(const p of parts)p.object.position.copy(p.offset).multiplyScalar(explosion);
+ waterCircuit.update();
+ canvas.dataset.waterStages='4';canvas.dataset.waterCircuitVisible=String(waterCircuit.group.visible&&appliance.visible);
  const cupGoal=cupDest.clone().add(new THREE.Vector3(10*explosion,6*explosion,13*explosion));cup.position.lerp(cupGoal,ease);
  if(cameraTween){
   cameraTween.time=Math.min(1,cameraTween.time+dt*1.8);const t=1-Math.pow(1-cameraTween.time,3);
@@ -512,6 +525,9 @@ function animate(){
  const color=stopped?'#c87a5b':remaining<=0?'#d3a04d':'#68b9a1';indicatorMat.color.set(color);indicatorMat.emissive.set(color);
  if(remaining<=0&&!reduced)indicatorMat.emissiveIntensity=.35+.2*Math.sin(elapsed*3);else indicatorMat.emissiveIntensity=.4;
  internals.visible=$('inside').checked||exploded;
+ canvas.dataset.cameraAnimating=String(!!cameraTween);
+ canvas.dataset.assemblySettled=String(Math.abs(explosion-(exploded?1:0))<.002);
+ canvas.dataset.cupSettled=String(cup.position.distanceTo(cupGoal)<.02);
  controls.update();updateUI();positionLabels();
  if(elapsed-lastScreenUpdate>.2){drawScreen();lastScreenUpdate=elapsed;}
  renderer.render(scene,camera);
@@ -536,6 +552,21 @@ for(const [label,key] of [['อุปกรณ์ตามรายการ','p
 for(const source of bom.sources){const a=document.createElement('a');a.href=source.url;a.textContent=source.label;a.target='_blank';a.rel='noopener noreferrer';$('source-links').appendChild(a);}
 $('budget-button').addEventListener('click',()=>$('budget-dialog').showModal());$('close-budget').addEventListener('click',()=>$('budget-dialog').close());
 $('desk-scene').addEventListener('change',e=>{desk.visible=e.target.checked;floor.position.y=e.target.checked?-37:-.12;});
-$('export-png').addEventListener('click',()=>{renderer.render(scene,camera);canvas.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='kaew-real-parts.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);});});
+$('export-png').addEventListener('click',()=>{
+ renderer.render(scene,camera);modelLabels.update({inside:$('inside').checked,exploded,selected:selectedPart,force:true});
+ const w=stage.clientWidth,h=stage.clientHeight,ratio=canvas.width/w,columns=w<520?1:2;
+ const footer=modelLabels.shown?104+Math.ceil(modelParts.length/columns)*23:58;
+ const output=document.createElement('canvas');output.width=canvas.width;output.height=Math.ceil((h+footer)*ratio);
+ const ctx=output.getContext('2d');ctx.scale(ratio,ratio);ctx.drawImage(canvas,0,0,w,h);modelLabels.drawAnnotations(ctx);
+ ctx.fillStyle='#f6f9f2';ctx.fillRect(0,h,w,footer);ctx.fillStyle='#244f42';ctx.textBaseline='alphabetic';ctx.font='14px Tahoma, sans-serif';ctx.fillText('Kaew · แบบศึกษาและป้ายกำกับชิ้นส่วน · 31 ต.ค. 2026',16,h+27,w-32);
+ if(modelLabels.shown){
+  ctx.font='12px Tahoma, sans-serif';const rows=Math.ceil(modelParts.length/columns),colWidth=(w-32)/columns;
+  modelParts.forEach((p,i)=>{const col=Math.floor(i/rows),row=i%rows;ctx.fillStyle=p.pending?'#916c31':'#385e4f';ctx.fillText(`${p.number}. ${p.label}${p.pending?' (รอยืนยัน)':p.group==='internal'?' (ภายใน)':''}`,16+col*colWidth,h+56+row*23,colWidth-12);});
+ }
+ ctx.font='11px Tahoma, sans-serif';ctx.fillStyle='#7a6741';ctx.fillText('เส้นฟ้าเป็นทางน้ำช่วยมองทะลุ · ขนาดและตำแหน่งบางชิ้นเป็นข้อเสนอ',16,h+footer-28,w-32);ctx.fillText('ยังไม่ใช่แบบผลิตหรือวงจรพร้อมต่อ',16,h+footer-11,w-32);
+ output.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='kaew-model-labelled.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);});
+});
 
+mountWiringViewer();
+mountControlPanel();
 selectPart('pump');setCamera('hero');updateWater();updateUI();drawScreen();animate();

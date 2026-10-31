@@ -5,6 +5,16 @@
 !stage-pages.cjs
 !kaew-template.html
 !kaew-viewer.js
+!kaew-wiring.js
+!kaew-panel.js
+!kaew-model-parts.cjs
+!kaew-model-labels.js
+!kaew-callout-layout.cjs
+!check-model-labels.cjs
+!kaew-water-circuit.cjs
+!check-water-path.cjs
+!kaew-wiring-data.cjs
+!check-wiring.cjs
 !make-parts-gallery.cjs
 !toolchain/
 toolchain/*
