@@ -1,0 +1,116 @@
+{
+  "timestamp_utc": "2026-11-06T04:24:24.080880+00:00",
+  "native_sha256": "9c62f042e5993a54dd98a32dbd60fe6411da21b25db1fcf2e24f34e9ec083a5a",
+  "upper_case_solids": 1,
+  "pairs": [
+    {
+      "a": "Front_panel",
+      "b": "Upper_case",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Head_mount_bridge",
+      "b": "Upper_case",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Head_mount_bridge",
+      "b": "Spout_left",
+      "distance_mm": 2.4,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Head_mount_bridge",
+      "b": "Spout_right",
+      "distance_mm": 2.4,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Bottle_rear_rail",
+      "b": "Bottle_shelf",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Bottle_rear_rail",
+      "b": "Bottle_ring_111_rear",
+      "distance_mm": 0.2,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Bottle_rear_rail",
+      "b": "Bottle_ring_250_rear",
+      "distance_mm": 0.2,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Level_sensor_saddle",
+      "b": "Bottle_shelf",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Pump_side_keeper__66",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Pump_side_keeper_63",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Base_service_bay",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Base_bay_lid",
+      "b": "Base_service_bay",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Fixed_drip_surround",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "HX711_guard",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "OLED_edge_clip__20",
+      "b": "Front_panel",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "OLED_edge_clip_18",
+      "b": "Front_panel",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Loadcell_fixed_spacer",
+      "b": "Base_plate",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    },
+    {
+      "a": "Loadcell_moving_spacer",
+      "b": "Floating_cup_platform",
+      "distance_mm": 0.0,
+      "overlap_mm3": 0.0
+    }
+  ],
+  "interpretation": "Contact alone is not a mechanical joint; positive gaps require a separate fixing or redesign. Cable and bolt load paths and fastener engagement are not proven by these distances."
+}

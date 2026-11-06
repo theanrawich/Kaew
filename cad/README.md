@@ -2,6 +2,8 @@
 
 Start with [the handoff](../CAD_HANDOFF.md). These are mechanical design proposals, not a manufacturing release.
 
+The newer `kaew-full-assembly-20261106.zip` contains the November 6 assembly and current custom-part exports. Extract it into `cad/` after the older archive. The notes below describe the October 31 snapshot; see the handoff for the latest checks and remaining work.
+
 - `spout-v1/`: two-half PETG mast/spout, checked independently; source, original estimate and export-verification report.
 - `full-assembly-v1/`: all 23 BOM rows represented across 156 CAD objects in the last generated snapshot. This snapshot has known interference findings. Builder and checker have subsequent, **unexecuted** edits.
 - `kaew-cad-snapshots-20261031.zip`: native FreeCAD/STEP/STL snapshots, custom-part exports and images. Extract **into this `cad` directory**, preserving the two subdirectories. The archive contains geometry/images only; current Python sources and status documents are stored separately in Git.

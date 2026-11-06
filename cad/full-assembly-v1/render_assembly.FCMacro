@@ -1,0 +1,84 @@
+"""Render review views without saving the modified display placements."""
+import json, os, traceback
+import FreeCAD as App
+import FreeCADGui as Gui
+from PySide import QtCore, QtWidgets
+
+OUT = os.path.dirname(os.path.abspath(__file__))
+state = {}
+
+def done(error=None):
+    if error:
+        open(os.path.join(OUT, 'render-error.txt'), 'w').write(error)
+    else:
+        open(os.path.join(OUT, 'render-status.json'), 'w').write(json.dumps({'views': ['assembly.png', 'interior.png', 'exploded.png'], 'note': 'Review views; geometry and placement changes not saved.'}, indent=2))
+        # Placement changes are for the exploded review only. Save them to a
+        # clearly named separate file, never over the working assembly. This
+        # also avoids a modal save prompt when the GUI exits.
+        state['doc'].saveAs(os.path.join(OUT, 'render-exploded-review.FCStd'))
+        App.closeDocument(state['doc'].Name)
+    QtWidgets.QApplication.instance().quit()
+
+def save(filename):
+    state['view'].redraw()
+    Gui.updateGui()
+    state['view'].saveImage(os.path.join(OUT, filename), 1600, 1200, 'White')
+
+def stage3():
+    try:
+        save('exploded.png')
+        done()
+    except Exception:
+        done(traceback.format_exc())
+
+def stage2():
+    try:
+        save('interior.png')
+        doc = state['doc']
+        doc.Front_panel.ViewObject.Visibility = True
+        doc.Base_bay_lid.ViewObject.Visibility = True
+        for name, offset in [('Front_panel',(0,55,0)), ('Bottle_shelf',(0,0,55)),
+                             ('Floating_cup_platform',(0,0,35)), ('Base_bay_lid',(-35,0,25)),
+                             ('Spout_left',(-35,0,0)), ('Spout_right',(35,0,0))]:
+            obj=doc.getObject(name)
+            obj.Placement.Base = obj.Placement.Base + App.Vector(*offset)
+        state['view'].viewIsometric(); state['view'].fitAll()
+        QtCore.QTimer.singleShot(1500, stage3)
+    except Exception:
+        done(traceback.format_exc())
+
+def stage1():
+    try:
+        save('assembly.png')
+        doc=state['doc']
+        for name in ['Front_panel','Base_bay_lid','Spout_right']:
+            doc.getObject(name).ViewObject.Visibility=False
+        doc.Crystal_bottle_1p5L.ViewObject.Transparency=78
+        state['view'].viewIsometric(); state['view'].fitAll()
+        QtCore.QTimer.singleShot(1500, stage2)
+    except Exception:
+        done(traceback.format_exc())
+
+def setup():
+    try:
+        doc=App.openDocument(os.path.join(OUT,'kaew-full-assembly-v1.FCStd'))
+        state['doc']=doc
+        Gui.activateWorkbench('PartWorkbench')
+        Gui.getMainWindow().resize(1500,1000)
+        for obj in doc.Objects:
+            if not hasattr(obj, 'ObjectKind'):
+                continue
+            visible=obj.ObjectKind not in ('service','reserved') and obj.AssemblyZone != 'ExternalPower'
+            obj.ViewObject.Visibility=visible
+            obj.ViewObject.ShapeColor=tuple(json.loads(obj.ColorJSON))
+            obj.ViewObject.LineColor=(0.25,0.30,0.29)
+            obj.ViewObject.DisplayMode='Flat Lines'
+            if obj.Material in ('Glass','Bottle'):
+                obj.ViewObject.Transparency=72
+        view=Gui.activeDocument().activeView(); state['view']=view
+        view.setCameraType('Orthographic'); view.viewIsometric(); view.fitAll()
+        QtCore.QTimer.singleShot(2000,stage1)
+    except Exception:
+        done(traceback.format_exc())
+
+QtCore.QTimer.singleShot(1500,setup)

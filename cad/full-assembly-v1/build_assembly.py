@@ -10,7 +10,7 @@ import Part, MeshPart
 
 OUT=Path(__file__).resolve().parent
 ROOT=OUT.parent.parent
-STL=OUT/'custom-parts'
+STL=OUT/'custom-parts-current'
 STL.mkdir(parents=True,exist_ok=True)
 V=App.Vector
 BOM=json.loads((ROOT/'kaew-bom.json').read_text(encoding='utf-8-sig'))
@@ -207,6 +207,7 @@ for level in [111,250]:
     for n,sx in enumerate([-47.5,47.5]):screw('Ring_M3_'+str(level)+'_'+str(n),(bx+sx,by-8,level+3),(0,1,0),length=17)
 level_sensor=add('XKC_Y25_NPN',cyl(14,17,(77.5,-108,140),(1,0,0)),'level','Reservoir','Pump',notes='Reference OD28 x17, verify NPN revision and cable')
 holder=ring(17,14.3,18,(77.8,-108,140),(1,0,0)).fuse(box(4,34,60,(95,-125,101)))
+holder=holder.cut(cyl(2.5,8,(94,-108,140),(1,0,0)))  # level-sensor cable exit
 add('Level_sensor_saddle',holder,'enclosure','Reservoir',custom=True)
 tds_probe=add('TDS_probe',cyl(6,28,(43,-116,114)),'tds','Reservoir','Black')
 add('TDS_electrode_A',cyl(.6,8,(40,-116,108)),'tds','Reservoir','Metal',kind='detail')
@@ -215,6 +216,7 @@ temp_probe=add('DS18B20_probe',cyl(3,50,(27,-104,116)),'temperature','Reservoir'
 
 # Scale: only one fixed end and one moving end; no platform/rim contact.
 tray_shape=rounded(144,144,19,(-72,20,16),5).cut(rounded(138,138,20,(-69,23,15.5),3))
+tray_shape=tray_shape.cut(box(7,6,7,(-58.5,19,22)))  # HX711 cable slot
 tray=add('Fixed_drip_surround',tray_shape,'enclosure','Weighing',custom=True)
 beam_shape=box(80,12.7,12.7,(-40,85.65,20))
 beam_shape=beam_shape.cut(cyl(4.8,15,(0,84.5,26.35),(0,1,0)))
@@ -240,6 +242,7 @@ for i,(x,y) in enumerate([(-53,31),(53,31),(-53,145),(53,145)]):
 hx=pcb_horizontal('HX711','scale',34,20,-40,52,21)
 guard=rounded(44,30,17,(-62,37,16),3).cut(box(39,25,15,(-59.5,39.5,16)))
 guard=guard.cut(box(10,5,5,(-45,62,18)))
+guard=guard.cut(box(8,8,8,(-44,61,21))).cut(box(8,8,8,(-59,35,21)))
 add('HX711_guard',guard,'enclosure','Weighing',custom=True)
 cup_shape=Part.makeCone(31.5,41.5,90,V(0,92,41.5)).cut(Part.makeCone(29,39.5,87.5,V(0,92,44)))
 cup=add('Ocean_Nova_Rock_B06511',cup_shape,'cup','Weighing','Glass',notes='Manufacturer outside diameters/height; wall and inner surface simplified')
@@ -247,6 +250,10 @@ cup=add('Ocean_Nova_Rock_B06511',cup_shape,'cup','Weighing','Glass',notes='Manuf
 # Electronics case and removable front, with actual openings and shared datums.
 body_shape=rounded(126,54,135,(-63,-54,206),4).cut(box(121.2,60,130.2,(-60.6,-51.6,208.4)))
 body_shape=body_shape.cut(cyl(4.5,8,(11,-18,203)))
+# Three separate cable entrances through the right wall, with clearance.
+for z in (215,239,282):
+    body_shape=body_shape.cut(box(12,10,14,(57,-55,z-7)))
+body_shape=body_shape.cut(box(12,19,14,(57,-55,232)))  # TDS approaches ahead of cradle
 case=add('Upper_case',body_shape,'enclosure',custom=True,notes='Upper electronics; removable front')
 front_shape=box(126,3,135,(-63,0,206))
 front_shape=front_shape.cut(box(31,5,16.3,(-15.5,-1,305.85)))
@@ -262,8 +269,10 @@ for x in [-14,14]:
 add('Head_mount_bridge',bridge,'enclosure',custom=True,notes='Shared attachment plate, M3 through fixings to mast/case')
 for i,x in enumerate([-14,14]):screw('Head_bridge_M3_'+str(i),(x,-11,192.4),length=20)
 for i,(x,z) in enumerate([(-56,214),(56,214),(-56,333),(56,333)]):
-    boss=cyl(4.5,10,(x,-10,z),(0,1,0)).cut(cyl(1.7,12,(x,-11,z),(0,1,0)))
-    add('Front_boss_'+str(i),boss,'enclosure',custom=True)
+    # Integrate the screw boss with the side wall; a tangential or gapped
+    # separate part would not provide a physical load path.
+    boss=cyl(4.8,10,(x,-10,z),(0,1,0)).cut(cyl(1.7,12,(x,-11,z),(0,1,0)))
+    case.Shape=case.Shape.fuse(boss).removeSplitter()
     screw('Front_M3_'+str(i),(x,-9,z),(0,1,0),length=12)
 gateway=pcb_vertical('ESP32_S3_N16R8','gateway',25.4,62.74,-30,291,pins=22,dual_usb=True,rf=True)
 node=pcb_vertical('ESP32_30pin_TypeC','node',28,51.5,30,310,pins=15,rf=True)
@@ -271,8 +280,9 @@ tds_board=pcb_vertical('TDS_interface','tds',42,32,29,239)
 amp=pcb_vertical('MAX98357A','amplifier',19.4,17.8,-35,221)
 for name,w,h,x,z in [('S3',25.4,62.74,-30,291),('Node',28,51.5,30,310),('TDS',42,32,29,239),('Amp',19.4,17.8,-35,221)]:
     rails=[]
-    for side in [-1,1]:rails.append(box(2,7,h-8,(x+side*(w/2+1.4)-1,-51,z-h/2+4)))
-    add(name+'_edge_cradle',Part.makeCompound(rails),'enclosure',custom=True,notes='Removable edge clamp; does not invent PCB mounting holes')
+    for side in [-1,1]:
+        rail=box(2,7.8,h-8,(x+side*(w/2+1.4)-1,-51.8,z-h/2+4))
+        case.Shape=case.Shape.fuse(rail).removeSplitter()
 oled_pieces=[(box(33.5,1.6,35.4,(-16.75,-9,296.3)),COL['PCB']),
              (box(31.5,3.4,19,(-15.75,-7.4,304.5)),COL['Black']),
              (box(29.42,.15,14.7,(-14.71,-4,306.65)),(.12,.35,.39))]
@@ -290,16 +300,17 @@ add('Mic_port_gasket',ring(4,1.5,2,(25,-2,220),(0,1,0)),'assembly','HeadElectron
 # Base bay enlarged for insertion/bend spaces, not just bare PCB footprints.
 bay_shape=rounded(38,182,40,(-106,-164,16),3).cut(box(33.2,177.2,42,(-103.6,-161.6,18.4)))
 bay_shape=bay_shape.cut(box(10,18,12,(-108,-154,31))).cut(box(10,16,12,(-108,-114,31)))
+bay_shape=bay_shape.cut(box(8,10,10,(-72,-17,30)))  # main harness outlet
 bay=add('Base_service_bay',bay_shape,'enclosure',custom=True)
 lid=add('Base_bay_lid',rounded(38,182,2.4,(-106,-164,56),3),'enclosure',custom=True)
 buck=pcb_horizontal('XY3606_63x27','buck',27,63,-87,-128,24)
 driver=pcb_horizontal('D4184_module','driver',17,17,-87,-55,24)
 proto=pcb_horizontal('Interface_protoboard','electrical',28,42,-87,-12,24)
 add('Inline_fuse_holder',cyl(4,22,(-92,-34,38),(0,1,0)),'electrical','BaseElectronics','Black',notes='Fuse rating not selected; mechanical envelope')
-fuse_clip=ring(6,4.2,10,(-92,-27,38),(0,1,0)).fuse(box(11,10,4,(-104.5,-27,35)))
+fuse_clip=ring(6,4.2,10,(-92,-27,38),(0,1,0)).fuse(box(8.2,10,4,(-104.5,-27,35)))
 bay.Shape=bay.Shape.fuse(fuse_clip).removeSplitter()
 add('Flyback_provision',cyl(1.8,6,(-77,-25,29),(0,1,0)),'electrical','BaseElectronics','Black',notes='Provision only; actual diode/interface depends on pump')
-add('Pullup_4k7',cyl(1.2,6,(23,-41,280),(1,0,0)),'electrical','HeadElectronics','Reference',notes='DS18B20 pull-up position, electrical implementation still to verify')
+add('Pullup_4k7',cyl(1.2,6,(5,-41,280),(1,0,0)),'electrical','HeadElectronics','Reference',notes='DS18B20 pull-up position, electrical implementation still to verify')
 for i,y in enumerate([-145,-105]):
     add('DC_input_'+str(i+1),ring(5.5,2.75,10,(-109,y,37),(1,0,0)),'electrical','BaseElectronics','Black',notes='Separate control/pump power; pump DC voltage remains unknown')
 
@@ -326,16 +337,25 @@ ROUTES.append({'name':outlet.Name,'length_mm':round(feed_length+entry_path.Lengt
 clear=entry_path.makePipeShell([Part.Wire([Part.makeCircle(4.8,ep[0],V(1,0,0))])],True,False)
 clear=clear.fuse(cyl(4.8,12,(-28,-18,76),(1,0,0)))
 for obj in spout_parts:obj.Shape=obj.Shape.cut(clear).removeSplitter()
-tds_cable=route('TDS_probe_cable',[(43,-116,142),(40,-114,426),(60,-114,436),(75,-80,436),(75,-58,239),(45,-43,239)],1.3,'tds',rounding=10)
+tds_cable=route('TDS_probe_cable',[(43,-116,142),(40,-114,426),(60,-114,436),(75,-80,436),(75,-58,239),(66,-40,239),(45,-40,239)],1.3,'tds',rounding=6)
 temp_cable=route('DS18B20_cable',[(27,-104,166),(40,-102,426),(55,-102,432),(65,-75,432),(65,-50,280),(30,-39,280)],1.5,'temperature',rounding=8)
 route('Level_sensor_cable',[(94.5,-108,140),(102,-108,140),(102,-50,140),(60,-50,220),(29,-39,230)],1.5,'level',rounding=10)
 route('Main_electrical_trunk',[(-87,-12,35),(-50,-12,35),(11,-18,35),(11,-18,210),(11,-30,236)],2.5,rounding=10)
 route('HX711_loadcell_lead',[(0,85.65,26),(0,70,24),(-40,70,24),(-40,60,25)],1,'scale',rounding=5)
-route('HX711_to_gateway',[(-53,52,25),(-62,52,25),(-62,12,25),(11,-18,8),(11,-18,210),(-30,-30,273)],1.2,'electrical',rounding=8)
+route('HX711_to_gateway',[(-53,52,25),(-55,45,25),(-55,12,25),(-30,-18,25),(11,-18,25),(11,-18,210),(-30,-30,273)],1.2,'electrical',rounding=5)
 route('OLED_harness',[(0,-7.4,298),(0,-23,294),(-30,-23,294),(-30,-33,294)],1.2,'electrical',rounding=6)
 route('Speaker_pair',[(-30,-18,247),(-48,-22,247),(-48,-26,221),(-35,-35,221)],1,'electrical',rounding=6)
 route('Mic_harness',[(25,-9,220),(25,-23,220),(-4,-23,265),(-25,-33,265)],1,'electrical',rounding=6)
 route('Stop_harness',[(0,-33,249),(0,-28,239),(11,-28,225),(11,-18,210)],1.4,'electrical',rounding=5)
+
+# Side entries to the separate electrical passage in the spout.  These are
+# local openings, not a blanket exclusion from the interference checks.
+for sp in spout_parts:
+    for z,rad in [(35,3.5),(25,2.2)]:
+        sp.Shape=sp.Shape.cut(cyl(rad,16,(-25,-18,z),(1,0,0))).removeSplitter()
+    # The trunk approaches this entry obliquely; extend the opening to its
+    # swept path instead of forcing an unrealistically sharp cable bend.
+    sp.Shape=sp.Shape.cut(box(8,10,8,(-24,-20,31))).removeSplitter()
 
 # External power adapters and their separate DC cables.
 add('Glink_12V3A_external',rounded(80,42,32,(-220,-160,0),4),'power','ExternalPower','Black',notes='External adapter envelope, not measured GAC12-3 dimensions')

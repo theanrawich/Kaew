@@ -1,4 +1,5 @@
-import json
+import hashlib, json
+from datetime import datetime, timezone
 from pathlib import Path
 import FreeCAD as App
 import Part, Mesh
@@ -34,6 +35,10 @@ for h in [o for o in objects if o.Material=='Cable']:
 report={'valid_objects':sum(o.Shape.isValid() for o in objects),'object_count':len(objects),
         'rigid_intersections':issues,'hose_frame_intersections':hose_issues,
         'harness_frame_intersections':harness_issues,
+        'timestamp_utc':datetime.now(timezone.utc).isoformat(),
+        'source_sha256':{p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in
+                         [OUT/'build_assembly.py',OUT/'check_fit.py',OUT/'kaew-full-assembly-v1.FCStd']},
+        'scope':'Fasteners and external power excluded from rigid pairs; cables and hoses tested against PETG/acrylic only. Service, retention and physical fit require separate review.',
         'status':'DIAGNOSTIC - contacts reviewed individually before release'}
 (OUT/'fit-diagnostic.json').write_text(json.dumps(report,indent=2))
 print(json.dumps(report,indent=2))

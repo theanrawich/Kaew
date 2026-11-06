@@ -1,104 +1,15 @@
 {
-  "valid_objects": 156,
-  "object_count": 156,
-  "rigid_intersections": [
-    {
-      "a": "Spout_left",
-      "b": "Head_mount_bridge",
-      "volume_mm3": 991.304
-    },
-    {
-      "a": "Spout_right",
-      "b": "Head_mount_bridge",
-      "volume_mm3": 838.623
-    },
-    {
-      "a": "Crystal_bottle_1p5L",
-      "b": "Level_sensor_saddle",
-      "volume_mm3": 5.975
-    },
-    {
-      "a": "Original_cap_modified",
-      "b": "Cap_seal_1",
-      "volume_mm3": 88.216
-    },
-    {
-      "a": "Original_cap_modified",
-      "b": "Cap_seal_2",
-      "volume_mm3": 51.459
-    },
-    {
-      "a": "Original_cap_modified",
-      "b": "Cap_seal_3",
-      "volume_mm3": 51.459
-    },
-    {
-      "a": "Original_cap_modified",
-      "b": "Cap_seal_4",
-      "volume_mm3": 36.757
-    },
-    {
-      "a": "Cap_seal_3",
-      "b": "Cap_seal_4",
-      "volume_mm3": 3.835
-    },
-    {
-      "a": "Bottle_rear_rail",
-      "b": "Bottle_ring_111_rear",
-      "volume_mm3": 62.786
-    },
-    {
-      "a": "Bottle_rear_rail",
-      "b": "Bottle_ring_250_rear",
-      "volume_mm3": 62.786
-    },
-    {
-      "a": "Bottle_ring_111_rear",
-      "b": "Level_sensor_saddle",
-      "volume_mm3": 86.686
-    },
-    {
-      "a": "Bottle_ring_111_front",
-      "b": "Level_sensor_saddle",
-      "volume_mm3": 86.686
-    },
-    {
-      "a": "Overload_stop_1",
-      "b": "HX711_guard",
-      "volume_mm3": 132.541
-    },
-    {
-      "a": "HX711",
-      "b": "HX711_guard",
-      "volume_mm3": 93.0
-    },
-    {
-      "a": "Interface_protoboard",
-      "b": "Inline_fuse_holder",
-      "volume_mm3": 17.84
-    },
-    {
-      "a": "Interface_protoboard",
-      "b": "Flyback_provision",
-      "volume_mm3": 12.533
-    }
-  ],
-  "hose_frame_intersections": [
-    {
-      "hose": "Silicone_pump_to_spine",
-      "frame": "Spout_left",
-      "volume_mm3": 50.265
-    },
-    {
-      "hose": "Silicone_pump_to_spine",
-      "frame": "Base_service_bay",
-      "volume_mm3": 259.488
-    },
-    {
-      "hose": "Silicone_pump_to_spine",
-      "frame": "Base_bay_lid",
-      "volume_mm3": 9.781
-    }
-  ],
+  "valid_objects": 148,
+  "object_count": 148,
+  "rigid_intersections": [],
+  "hose_frame_intersections": [],
+  "harness_frame_intersections": [],
+  "timestamp_utc": "2026-11-06T04:24:19.473595+00:00",
+  "source_sha256": {
+    "build_assembly.py": "4f2c6162b6cca0684af9a2aca9a408fae893614dfe744c940f3027dbcb1814d3",
+    "check_fit.py": "6736b1e950bdea04d6f50565b3f257ac2a716fddf95d56930c696a06c5fbabc6",
+    "kaew-full-assembly-v1.FCStd": "9c62f042e5993a54dd98a32dbd60fe6411da21b25db1fcf2e24f34e9ec083a5a"
+  },
+  "scope": "Fasteners and external power excluded from rigid pairs; cables and hoses tested against PETG/acrylic only. Service, retention and physical fit require separate review.",
   "status": "DIAGNOSTIC - contacts reviewed individually before release"
 }

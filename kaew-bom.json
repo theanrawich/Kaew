@@ -1,21 +1,23 @@
 {
-  "checkedAt": "2026-10-30",
+  "checkedAt": "2026-11-06",
   "currency": "THB",
-  "title": "Kaew — ชุดประหยัด ปั๊ม504บาท + OLED139บาท",
+  "title": "Kaew — ชุดประหยัด ไม่มี flow sensor",
   "rows": [
     {
       "id": "gateway",
       "label": "ESP32-S3 N16R8",
       "name": "DIYMORE บอร์ดพัฒนา ESP32-S3-DevKitC-1 N16R8-โมดูล WiFi บลูทูธ 5 ชิป Dual Core 240MHz แรม 8MB/แฟลช 16MB รองรับ AI และ IoT",
       "shop": "Diymore Official Store",
-      "displayedPriceTHB": 323,
+      "displayedPriceTHB": 395,
       "url": "https://shopee.co.th/product/166913933/53161720991",
       "qty": 1,
       "unit": "บอร์ด",
       "status": "candidate",
       "note": "รุ่น N16R8 มี PSRAM 8 MB เป็นข้อเสนอแทน N8 ในร่างเดิม",
-      "unitBudget": 323,
-      "lineBudget": 323
+      "unitBudget": 395,
+      "lineBudget": 395,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ตรวจตัวเลือกเชื่อมในหน้า Shopee 6 พ.ย. 395 บาทแสดงเป็นราคาหลังโค้ด"
     },
     {
       "id": "node",
@@ -29,7 +31,9 @@
       "status": "candidate",
       "note": "Sensor Node แยกจาก Gateway",
       "unitBudget": 158,
-      "lineBudget": 158
+      "lineBudget": 158,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "display",
@@ -45,47 +49,53 @@
       "unitBudget": 139,
       "lineBudget": 139,
       "local": "part-display-oled13.jpg",
-      "userSelected": true
+      "userSelected": true,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "pump",
       "label": "ปั๊มรีดสายแบบปรับ10–250มล./นาที",
       "name": "Glowerstoree-th ปั๊ม peristaltic ของเหลว 10 มล. - 250 มล./นาที ปรับปริมาณการไหลสำหรับพิพิธภัณฑ์สัตว์น้ำ Lab Analytical US Plug 110-240V",
       "shop": "glowerstoree.th",
-      "displayedPriceTHB": 504,
+      "displayedPriceTHB": 511,
       "url": "https://shopee.co.th/product/1922827977/57366647316",
       "qty": 1,
       "unit": "ตัว",
       "status": "selected",
-      "note": "ผู้ใช้เลือกรายการนี้แล้ว;ร้านระบุสูงสุด250มล./นาที ยังไม่ยืนยันDCoutputของadapter,การควบคุมESP32,วัสดุสายหรือขนาดกล่อง",
-      "unitBudget": 504,
-      "lineBudget": 504,
+      "note": "ร้านระบุชื่อสินค้า 10–250 ml/min แต่รายละเอียด 12V 5–120 หรือ 24V 5–200 ml/min สุ่มรุ่น; มีอะแดปเตอร์และท่อระบุในรายการแพ็ก แต่แรงดัน/วิธีสั่ง/food contact/ขนาดจริงยังไม่ยืนยัน",
+      "unitBudget": 511,
+      "lineBudget": 511,
       "local": "pump-250-0.jpg",
-      "userSelected": true
+      "userSelected": true,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "scale",
       "label": "Load cell 1 kg + HX711",
       "name": "Load Cell พร้อม HX711 เซ็นเซอร์ชั่งน้ำหนัก 1Kg 5Kg สินค้าพร้อมส่ง!!!",
       "shop": "safwit",
-      "displayedPriceTHB": 68,
+      "displayedPriceTHB": 72,
       "url": "https://shopee.co.th/product/145695802/6622381424",
       "qty": 1,
       "unit": "ชุด",
       "status": "variant",
       "note": "รายการมี1kg/5kg ต้องเลือก1kgพร้อมHX711; ฐานทำรวมในงบโครง",
-      "unitBudget": 68,
-      "lineBudget": 68
+      "unitBudget": 72,
+      "lineBudget": 72,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ตรวจตัวเลือก 1Kg / HX711 ในหน้า Shopee 6 พ.ย. 72 บาท; ร้านระบุ 80×13×13 มม. ต้องเทียบรูยึดกับ CAD"
     },
     {
       "id": "flow",
-      "label": "เซนเซอร์วัดการไหลต่ำ — รอเลือกรุ่น",
-      "qty": 1,
+      "label": "Flow sensor — ตัดออกจากแผน",
+      "qty": 0,
       "unit": "ตัว",
-      "unitBudget": 300,
-      "lineBudget": 300,
-      "status": "hold",
-      "note": "งบเผื่อ300บาท ไม่ใช่ราคาสินค้าที่หาได้แล้ว ต้องอ่านได้ที่≤0.25L/minและเหมาะกับน้ำดื่ม;ไม่ใช้YF-S4010.3–6L/min",
+      "unitBudget": 0,
+      "lineBudget": 0,
+      "status": "excluded",
+      "note": "ผู้ใช้ตัดออก 6 พ.ย. 2026; ใช้ load cell และเวลาเป็นแนวทางติดตามการจ่ายที่ต้องออกแบบและทดสอบ",
       "url": null
     },
     {
@@ -100,7 +110,9 @@
       "status": "candidate",
       "note": "เป็นโมดูลทั่วไป ไม่อ้างว่าเป็น DFRobot แท้; ขนาดบอร์ดและ food-contact ของ probe ยังไม่ยืนยัน",
       "unitBudget": 178,
-      "lineBudget": 178
+      "lineBudget": 178,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "temperature",
@@ -114,7 +126,8 @@
       "status": "candidate",
       "note": "กันน้ำไม่เท่ากับยืนยัน food-contact ต้องตรวจวัสดุ probe/ซีล",
       "unitBudget": 40,
-      "lineBudget": 40
+      "lineBudget": 40,
+      "priceEvidence": "ยังไม่พบลิงก์เดิมในผลค้นหาล่าสุด คงงบ 40 บาทจาก 30 ต.ค.; ต้องตรวจราคา"
     },
     {
       "id": "level",
@@ -128,7 +141,9 @@
       "status": "variant",
       "note": "เลือกรุ่น NPN; 1 จุดตรวจได้เพียงมี/ไม่มีน้ำที่ระดับติดตั้ง ไม่ใช่ปริมาตรคงเหลือ 1500 มล. แบบต่อเนื่อง",
       "unitBudget": 235,
-      "lineBudget": 235
+      "lineBudget": 235,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ตรวจตัวเลือกวงกลม NPN 5–12V ในหน้า Shopee 6 พ.ย. 235 บาท; การทำงานกับขวดจริงและ interface 3.3V รอทดสอบ"
     },
     {
       "id": "microphone",
@@ -142,7 +157,9 @@
       "status": "candidate",
       "note": "ไมค์แยกจากภาคปั๊ม",
       "unitBudget": 69,
-      "lineBudget": 69
+      "lineBudget": 69,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "amplifier",
@@ -156,21 +173,25 @@
       "status": "candidate",
       "note": "งบแอมป์ mono 3W",
       "unitBudget": 52,
-      "lineBudget": 52
+      "lineBudget": 52,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "speaker",
       "label": "ลำโพง 4Ω 3W 40mm",
       "name": "ดอกลำโพงฟูลเรนจ์ 40mm 4Ω 3W แม่เหล็กแรงสูง เสียงคมชัด เบสแน่น ใช้ซ่อมหรือ DIY ลำโพงบลูทูธ",
       "shop": "ล้านไทย",
-      "displayedPriceTHB": 29,
+      "displayedPriceTHB": 35,
       "url": "https://shopee.co.th/product/284033450/41319319688",
       "qty": 1,
       "unit": "ตัว",
       "status": "candidate",
       "note": "ตรวจขนาดจริงและตำแหน่งรูยึดอีกครั้ง",
-      "unitBudget": 29,
-      "lineBudget": 29
+      "unitBudget": 35,
+      "lineBudget": 35,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "power",
@@ -184,21 +205,25 @@
       "status": "candidate",
       "note": "แยกจากadapterที่ร้านแสดงในชุดปั๊ม ยังไม่ยืนยันว่าชุดปั๊มใช้12V",
       "unitBudget": 179,
-      "lineBudget": 179
+      "lineBudget": 179,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "buck",
       "label": "Buck 12V → 5V XY-3606",
       "name": "XY-3606 โมดูลลดแรงดันไฟ DC-DC 9-36VDC to 5VDC 5A Step Down Module Buck convertor Fix 5VDC 5A LM2596S โมดูลปรับลดแรงดั...",
       "shop": "โอ.อาร์. เทคโนโลยี",
-      "displayedPriceTHB": 66,
+      "displayedPriceTHB": 69,
       "url": "https://shopee.co.th/product/944231623/26113420026",
       "qty": 1,
       "unit": "ตัว",
       "status": "candidate",
       "note": "แยกไฟ logic/audio จากปั๊ม ต้องวัดไฟและทดสอบโหลด",
-      "unitBudget": 66,
-      "lineBudget": 66
+      "unitBudget": 69,
+      "lineBudget": 69,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "driver",
@@ -212,35 +237,41 @@
       "status": "candidate",
       "note": "ตรวจการขับ 3.3V, ใส่ flyback และ default-off; ไม่ใช้ค่ากระแสโฆษณาเป็นกระแสใช้งานจริง",
       "unitBudget": 22,
-      "lineBudget": 22
+      "lineBudget": 22,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "stop",
       "label": "LA16 ปุ่มหยุดฉุกเฉิน",
-      "name": "Emergency Stop Push Button Switch 16mm  สวิตช์ปุ่มหยุดฉุกเฉิน AC 250V 3ขา 6ขา สวิตซ์ดอกเห็ด LA16",
-      "shop": "Plus-electronics",
-      "displayedPriceTHB": 75,
-      "url": "https://shopee.co.th/product/75734101/3023961333",
+      "name": "YIJIA LA16 ปุ่มหยุดฉุกเฉิน 3 ขา 1NO+1NC",
+      "shop": "Electronic.TH",
+      "displayedPriceTHB": 90,
+      "url": "https://shopee.co.th/product/2967600/29329352401",
       "qty": 1,
       "unit": "ตัว",
       "status": "variant",
-      "note": "เลือกรุ่นล็อกและหน้าสัมผัส NC; ต่อวงจรให้ตัดการสั่งปั๊มได้จริง",
-      "unitBudget": 75,
-      "lineBudget": 75
+      "note": "ร้านระบุ maintain และ 1NO+1NC; ยังต้องตรวจ DC rating และวงจรตัดปั๊มจริง",
+      "unitBudget": 90,
+      "lineBudget": 90,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ตรวจตัวเลือก 3 ขา 1NO+1NC ในหน้า Shopee 6 พ.ย. ราคา 90 บาท; rated 5A 250VAC ตามร้าน ไม่ยืนยัน DC rating"
     },
     {
       "id": "tube",
-      "label": "สายซิลิโคน ขนาดใกล้เคียง ID4.8–5 OD8",
-      "name": "[Food grade - 1 เมตร] สายซิลิโคนแบบใส ทนต่ออุณหภูมิร้อน เย็น Silicone Tube Clear Flexible Water Transparent",
-      "shop": "Brewery Hub Official",
-      "displayedPriceTHB": 108,
-      "url": "https://shopee.co.th/product/104910181/25439532350",
+      "label": "สายซิลิโคน ID 5 × OD 8 มม.",
+      "name": "สายยางซิลิโคน 5-8 มิล ต่อ 1 เมตร",
+      "shop": "home winery shop",
+      "displayedPriceTHB": 35,
+      "url": "https://shopee.co.th/product/57577971/5410509537",
       "qty": 2,
       "unit": "เมตร",
       "status": "variant",
-      "note": "ราคาเริ่มต้นต่อเมตรจากรายการหลายขนาด ต้องเทียบID/ODกับสายปั๊มจริงก่อนซื้อ;ไม่ถือว่าสายที่แถมยืนยันfood-contactแล้ว",
-      "unitBudget": 108,
-      "lineBudget": 216
+      "note": "ราคาตัวเลือก 5–8 มม. ตรวจ 6 พ.ย. 2026; ซื้อ 2 เมตร ร้านระบุตัดต่อเนื่อง; ขนาดปั๊มและหลักฐานวัสดุสัมผัสน้ำดื่มยังต้องยืนยัน",
+      "unitBudget": 35,
+      "lineBudget": 70,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "เลือกขนาด 5–8 มม. ในหน้า Shopee ได้ 35 บาท/เมตร"
     },
     {
       "id": "cup",
@@ -254,7 +285,9 @@
       "status": "candidate",
       "note": "คิดเงินซื้อครบแพ็ก ใช้กับเครื่อง1ใบ สำรอง5ใบ; Øปาก83 ฐาน63 สูง90มม.",
       "unitBudget": 145,
-      "lineBudget": 145
+      "lineBudget": 145,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "bottle",
@@ -268,7 +301,9 @@
       "status": "candidate",
       "note": "ร้านมีข้อจำกัดพื้นที่ส่ง; คิดครบแพ็ก ใช้ตั้งเครื่อง1ขวด",
       "unitBudget": 54,
-      "lineBudget": 54
+      "lineBudget": 54,
+      "priceCheckedAt": "2026-11-06",
+      "priceEvidence": "ผลค้นหา Shopee รายการตรง; ราคาแสดงอาจเป็นราคาเริ่มต้นหรือหลังส่วนลด ต้องตรวจตัวเลือกและ checkout"
     },
     {
       "id": "enclosure",
@@ -312,15 +347,15 @@
     }
   ],
   "totals": {
-    "parts": 2552,
-    "hold": 300,
+    "parts": 2513,
+    "hold": 0,
     "fabrication": 1200,
-    "shipping": 250,
-    "subtotal": 4302,
+    "shipping": 0,
+    "subtotal": 3713,
     "contingency": 440,
-    "total": 4742
+    "total": 4153
   },
-  "priceMethod": "ราคาหน้าผลค้นหา30ต.ค.2026 ไม่ใช่checkout quote;รวมแพ็กแก้ว6ใบและน้ำ6ขวดจริง ไม่หักคูปองส่วนตัว",
+  "priceMethod": "ตรวจ variant สาย, S3, load cell, เซนเซอร์ระดับ และปุ่มหยุดใน Shopee 6 พ.ย.; S3 395 หลังโค้ด; ที่เหลือส่วนใหญ่เป็นผลค้นหาและอาจต่างจากตัวเลือก; DS18B20 ราคาเดิม; ไม่คิดค่าส่ง",
   "exclusions": [
     "ค่า API/บริการรายเดือน",
     "เครื่องมือช่างและค่าแรงประกอบ",
@@ -398,20 +433,22 @@
       "note": "รูปทรงอิงภาพ Crystal 1.5L; ตัวเลขเป็นสมมติฐานเพื่อจัดวาง ไม่ใช่ขนาดขวด Crystal ที่ยืนยันจากผู้ผลิต ขนาดแพ็ก6ใช้ตรวจความสมเหตุสมผลเท่านั้น; ไม่มีข้อสรุปเกลียวฝา"
     }
   },
-  "revision": "2026-10-30-selected-pump",
+  "revision": "2026-11-06-refresh-list",
   "status": "planning-estimate-with-open-items",
   "openItems": [
-    "flow sensorต่ำกว่า0.25L/minยังไม่มีSKUยืนยัน งบเผื่อ300บาทอาจเปลี่ยน",
+    "ข้อมูลปั๊มขัดกันและสุ่ม revision; ต้องยืนยันรุ่น แรงดัน วิธีควบคุมและขนาดสายก่อนสรุปวงจร",
+    "ทดสอบแนวทางตรวจการจ่ายด้วย load cell และเวลาโดยไม่มี flow sensor; ขนาดท่อและวัสดุสัมผัสน้ำยังต้องยืนยัน",
     "ปั๊มเลือกรายการแล้ว แต่แรงดันDC,interfaceควบคุม,ขนาดและวัสดุสัมผัสน้ำยังไม่ยืนยัน",
     "ขวดคริสตัลยังไม่มีdrawingขวดเดี่ยว/เกลียวฝา",
-    "โครงและค่าส่งเป็นประมาณการ"
+    "โครงเป็นประมาณการ; ไม่คิดค่าส่ง Shopee ตามคำขอ"
   ],
   "selectedPump": {
-    "price": 504,
+    "price": 511,
     "url": "https://shopee.co.th/product/1922827977/57366647316",
     "userSelected": true,
-    "nominalMaxFlowMlMin": 250,
-    "fill200mlSecondsAtNominal": 48,
-    "flowSource": "seller-claim-unverified"
+    "nominalMaxFlowMlMin": null,
+    "fill200mlSecondsAtNominal": null,
+    "flowSource": "seller-title-conflicts-with-description",
+    "note": "หัวข้อ 10–250 แต่รายละเอียดระบุ 12V 5–120 หรือ 24V 5–200 ml/min; สุ่มรุ่น"
   }
 }

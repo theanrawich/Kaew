@@ -1,0 +1,8 @@
+{
+  "views": [
+    "assembly.png",
+    "interior.png",
+    "exploded.png"
+  ],
+  "note": "Review views; geometry and placement changes not saved."
+}

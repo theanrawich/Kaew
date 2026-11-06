@@ -1,0 +1,319 @@
+{
+  "timestamp_utc": "2026-11-06T04:24:22.444351+00:00",
+  "sha256": {
+    "build_assembly.py": "4f2c6162b6cca0684af9a2aca9a408fae893614dfe744c940f3027dbcb1814d3",
+    "check_fit.py": "6736b1e950bdea04d6f50565b3f257ac2a716fddf95d56930c696a06c5fbabc6",
+    "kaew-full-assembly-v1.FCStd": "9c62f042e5993a54dd98a32dbd60fe6411da21b25db1fcf2e24f34e9ec083a5a",
+    "kaew-full-assembly-v1.step": "3a96d81a73a92943f250d9292d5a3a3f0fd819a1fc8735886a1195699903c868"
+  },
+  "freecad_version": [
+    "1",
+    "1",
+    "4"
+  ],
+  "assembly_step_valid": true,
+  "assembly_step_volume_delta_mm3": 0.0368,
+  "exports": [
+    {
+      "name": "Base_bay_lid",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 6.066581211830893e-06
+    },
+    {
+      "name": "Base_plate",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1
+    },
+    {
+      "name": "Base_service_bay",
+      "step_valid": true,
+      "step_volume_delta_mm3": -0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 3.853466778509857e-05
+    },
+    {
+      "name": "Bottle_rear_rail",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0
+    },
+    {
+      "name": "Bottle_ring_111_front",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.011,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0003788084458522906
+    },
+    {
+      "name": "Bottle_ring_111_rear",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0048,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0014242885483196112
+    },
+    {
+      "name": "Bottle_ring_250_front",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.011,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.00034467878787910593
+    },
+    {
+      "name": "Bottle_ring_250_rear",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0048,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0014056088920059368
+    },
+    {
+      "name": "Bottle_shelf",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1
+    },
+    {
+      "name": "Fixed_drip_surround",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 4.206617701257428e-05
+    },
+    {
+      "name": "Floating_cup_platform",
+      "step_valid": true,
+      "step_volume_delta_mm3": -0.0,
+      "step_solids": 1
+    },
+    {
+      "name": "Front_panel",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.00010840715127047891
+    },
+    {
+      "name": "Head_mount_bridge",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.00013082177283535684
+    },
+    {
+      "name": "HX711_guard",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 8.078301617725671e-05
+    },
+    {
+      "name": "Level_sensor_saddle",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 8.578835154978589e-05
+    },
+    {
+      "name": "Loadcell_fixed_spacer",
+      "step_valid": true,
+      "step_volume_delta_mm3": -0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 9.727385396675929e-05
+    },
+    {
+      "name": "Loadcell_moving_spacer",
+      "step_valid": true,
+      "step_volume_delta_mm3": -0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 1.5064475409775107e-05
+    },
+    {
+      "name": "OLED_edge_clip_18",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 1.1842378929335005e-16
+    },
+    {
+      "name": "OLED_edge_clip__20",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 1.1842378929335005e-16
+    },
+    {
+      "name": "Pump_side_keeper_63",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0
+    },
+    {
+      "name": "Pump_side_keeper__66",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.0
+    },
+    {
+      "name": "Spout_left",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0003,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.00020360760142696595
+    },
+    {
+      "name": "Spout_right",
+      "step_valid": true,
+      "step_volume_delta_mm3": 0.0012,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 0.00019570905924442544
+    },
+    {
+      "name": "Upper_case",
+      "step_valid": true,
+      "step_volume_delta_mm3": -0.0011,
+      "step_solids": 1,
+      "stl_closed": true,
+      "stl_relative_volume_error": 6.641807073529394e-05
+    }
+  ],
+  "service_envelope_intersections_unreviewed": [
+    {
+      "envelope": "S3_USB_insertion",
+      "item": "ESP32_S3_N16R8",
+      "volume_mm3": 9.25
+    },
+    {
+      "envelope": "Node_USB_insertion",
+      "item": "ESP32_30pin_TypeC",
+      "volume_mm3": 14.96
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Bottle_shelf",
+      "volume_mm3": 60742.66
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_10_250ml",
+      "volume_mm3": 442965.63
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_knob",
+      "volume_mm3": 157.08
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_side_keeper__66",
+      "volume_mm3": 1560.0
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_side_keeper_63",
+      "volume_mm3": 1560.0
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_hose_port_1",
+      "volume_mm3": 204.2
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Pump_hose_port_2",
+      "volume_mm3": 204.2
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Crystal_bottle_1p5L",
+      "volume_mm3": 14334.72
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Bottle_rear_rail",
+      "volume_mm3": 888.0
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Bottle_ring_111_rear",
+      "volume_mm3": 2411.94
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "Bottle_ring_111_front",
+      "volume_mm3": 1818.85
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "TDS_probe",
+      "volume_mm3": 2714.34
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "TDS_electrode_A",
+      "volume_mm3": 9.05
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "TDS_electrode_B",
+      "volume_mm3": 9.05
+    },
+    {
+      "envelope": "Pump_lift_with_shelf_removed",
+      "item": "DS18B20_probe",
+      "volume_mm3": 622.04
+    },
+    {
+      "envelope": "Bottle_lift_clearance",
+      "item": "Cap_seal_1",
+      "volume_mm3": 88.22
+    },
+    {
+      "envelope": "Bottle_lift_clearance",
+      "item": "Cap_seal_2",
+      "volume_mm3": 51.46
+    },
+    {
+      "envelope": "Bottle_lift_clearance",
+      "item": "Cap_seal_3",
+      "volume_mm3": 51.46
+    },
+    {
+      "envelope": "Bottle_lift_clearance",
+      "item": "Cap_seal_4",
+      "volume_mm3": 36.76
+    }
+  ],
+  "platform_minimum_distances_mm": {
+    "Fixed_drip_surround": 3.3541,
+    "HX711_guard": 3.5,
+    "Loadcell_fixed_spacer": 16.5,
+    "Loadcell_moving_spacer": 0.0,
+    "Load_cell_1kg": 3.8
+  },
+  "limitations": "Intersection and distance checks do not establish physical strength, mounting, cable bend clearance, water safety or serviceability."
+}

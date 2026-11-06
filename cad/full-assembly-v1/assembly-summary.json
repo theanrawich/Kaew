@@ -1,18 +1,18 @@
 {
-  "object_count": 156,
+  "object_count": 148,
   "bom_rows": 23,
   "covered_rows": 23,
-  "custom_parts": 32,
+  "custom_parts": 24,
   "petg_print_parts": [
     {
       "name": "Spout_left",
-      "volume_cm3": 68.20822851143205,
-      "petg_solid_mass_g": 86.62445020951871
+      "volume_cm3": 67.8682247364517,
+      "petg_solid_mass_g": 86.19264541529365
     },
     {
       "name": "Spout_right",
-      "volume_cm3": 67.98364333945358,
-      "petg_solid_mass_g": 86.33922704110604
+      "volume_cm3": 67.95921429639691,
+      "petg_solid_mass_g": 86.30820215642407
     },
     {
       "name": "Pump_side_keeper__66",
@@ -31,8 +31,8 @@
     },
     {
       "name": "Bottle_ring_111_rear",
-      "volume_cm3": 3.548050499754463,
-      "petg_solid_mass_g": 4.506024134688168
+      "volume_cm3": 3.4243051744010238,
+      "petg_solid_mass_g": 4.348867571489301
     },
     {
       "name": "Bottle_ring_111_front",
@@ -41,8 +41,8 @@
     },
     {
       "name": "Bottle_ring_250_rear",
-      "volume_cm3": 3.5480504997545084,
-      "petg_solid_mass_g": 4.506024134688226
+      "volume_cm3": 3.424305174401045,
+      "petg_solid_mass_g": 4.348867571489327
     },
     {
       "name": "Bottle_ring_250_front",
@@ -51,33 +51,33 @@
     },
     {
       "name": "Level_sensor_saddle",
-      "volume_cm3": 12.859279114241252,
-      "petg_solid_mass_g": 16.33128447508639
+      "volume_cm3": 12.64799130032407,
+      "petg_solid_mass_g": 16.06294895141157
     },
     {
       "name": "Fixed_drip_surround",
-      "volume_cm3": 31.887044166691282,
-      "petg_solid_mass_g": 40.49654609169793
+      "volume_cm3": 31.740044166691302,
+      "petg_solid_mass_g": 40.30985609169795
     },
     {
       "name": "Loadcell_fixed_spacer",
-      "volume_cm3": 1.0160000000000002,
-      "petg_solid_mass_g": 1.2903200000000004
+      "volume_cm3": 0.9345699184189528,
+      "petg_solid_mass_g": 1.18690379639207
     },
     {
       "name": "Loadcell_moving_spacer",
-      "volume_cm3": 0.9651999999999996,
-      "petg_solid_mass_g": 1.2258039999999994
+      "volume_cm3": 0.8878414224980042,
+      "petg_solid_mass_g": 1.1275586065724654
     },
     {
       "name": "HX711_guard",
-      "volume_cm3": 6.884115008234618,
-      "petg_solid_mass_g": 8.742826060457965
+      "volume_cm3": 7.278663675999237,
+      "petg_solid_mass_g": 9.243902868519031
     },
     {
       "name": "Upper_case",
-      "volume_cm3": 102.3183491000422,
-      "petg_solid_mass_g": 129.9443033570536
+      "volume_cm3": 107.36371682843871,
+      "petg_solid_mass_g": 136.35192037211718
     },
     {
       "name": "Front_panel",
@@ -86,48 +86,8 @@
     },
     {
       "name": "Head_mount_bridge",
-      "volume_cm3": 3.585530995059227,
-      "petg_solid_mass_g": 4.553624363725218
-    },
-    {
-      "name": "Front_boss_0",
-      "volume_cm3": 0.5453804846631877,
-      "petg_solid_mass_g": 0.6926332155222483
-    },
-    {
-      "name": "Front_boss_1",
-      "volume_cm3": 0.5453804846631877,
-      "petg_solid_mass_g": 0.6926332155222483
-    },
-    {
-      "name": "Front_boss_2",
-      "volume_cm3": 0.5453804846631887,
-      "petg_solid_mass_g": 0.6926332155222497
-    },
-    {
-      "name": "Front_boss_3",
-      "volume_cm3": 0.5453804846631887,
-      "petg_solid_mass_g": 0.6926332155222497
-    },
-    {
-      "name": "S3_edge_cradle",
-      "volume_cm3": 1.5327200000000007,
-      "petg_solid_mass_g": 1.946554400000001
-    },
-    {
-      "name": "Node_edge_cradle",
-      "volume_cm3": 1.2179999999999995,
-      "petg_solid_mass_g": 1.5468599999999995
-    },
-    {
-      "name": "TDS_edge_cradle",
-      "volume_cm3": 0.6719999999999998,
-      "petg_solid_mass_g": 0.8534399999999998
-    },
-    {
-      "name": "Amp_edge_cradle",
-      "volume_cm3": 0.2744000000000003,
-      "petg_solid_mass_g": 0.3484880000000004
+      "volume_cm3": 3.50410091347818,
+      "petg_solid_mass_g": 4.450208160117288
     },
     {
       "name": "OLED_edge_clip__20",
@@ -141,8 +101,8 @@
     },
     {
       "name": "Base_service_bay",
-      "volume_cm3": 54.14946935529228,
-      "petg_solid_mass_g": 68.7698260812212
+      "volume_cm3": 54.71835464736808,
+      "petg_solid_mass_g": 69.49231040215746
     },
     {
       "name": "Base_bay_lid",
@@ -150,9 +110,9 @@
       "petg_solid_mass_g": 21.05642016967326
     }
   ],
-  "petg_nominal_mass_g": 567.2930556900402,
+  "petg_nominal_mass_g": 565.9211124423892,
   "all_actual_delivered_parts_unmeasured": true,
   "flow_is_reservation_only": true,
-  "installed_tube_mm": 1358.2,
+  "installed_tube_mm": 1332.2,
   "status": "FULL ASSEMBLY STUDY - fit checks pending; not manufacturing release"
 }
