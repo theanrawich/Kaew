@@ -1,6 +1,7 @@
 *
 !.gitignore
 !build-kaew.cjs
+!cad-viewer.js
 !check-standalone.cjs
 !stage-pages.cjs
 !kaew-template.html
