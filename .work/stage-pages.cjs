@@ -6,6 +6,8 @@ const files = [
   ['kaew-3d.html', 'index.html'],
   ['kaew-3d.html', 'kaew-3d.html'],
   ['kaew-parts.html', 'kaew-parts.html'],
+  ['pump-options.html', 'pump-options.html'],
+  ['pump-options.json', 'pump-options.json'],
   ['kaew-bom.json', 'kaew-bom.json'],
   ['KAEW_SHOPPING_LIST.md', 'KAEW_SHOPPING_LIST.md'],
 ];

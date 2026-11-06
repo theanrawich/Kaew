@@ -9,6 +9,6 @@ if(!fs.existsSync(templatePath))fs.copyFileSync(path.join(root,'kaew-3d.html'),t
 const template=fs.readFileSync(templatePath,'utf8');
 const bundle=result.outputFiles[0].text.replace(/<\/script/gi,'<\\/script');
 const license=fs.readFileSync(path.join(buildDir,'node_modules','three','LICENSE'),'utf8');
-const html=template.replace('<!-- KAEW_BUNDLE -->',()=>'<!-- Third-party library: Three.js (MIT)\n'+license+'\n-->\n<script>'+bundle+'</script>');
+const html=template.replace('<!-- KAEW_BUNDLE -->',()=>'<!-- Third-party library: Three.js (MIT)\n'+license+'\n-->\n<script>'+bundle+'</script>').replace('</header>','<a href="pump-options.html" style="color:#176653;padding:8px;white-space:nowrap">เปรียบเทียบปั๊ม</a></header>');
 fs.writeFileSync(path.join(root,'kaew-3d.html'),html,'utf8');
 console.log(JSON.stringify({file:path.join(root,'kaew-3d.html'),bytes:Buffer.byteLength(html),externalAssets:0}));
