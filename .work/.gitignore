@@ -2,6 +2,7 @@
 !.gitignore
 !build-kaew.cjs
 !cad-viewer.js
+!export-cad-colors.py
 !check-standalone.cjs
 !stage-pages.cjs
 !kaew-template.html

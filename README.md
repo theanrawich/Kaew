@@ -2,7 +2,7 @@
 
 โมเดล 3D แบบโต้ตอบของ Kaew พร้อมภาพอุปกรณ์ ลิงก์ Shopee และงบประมาณตั้งต้น **4,742 บาท** (ข้อมูล 30 ตุลาคม 2026)
 
-- **[เปิดแบบ CAD 3D](https://theanrawich.github.io/Kaew/)** — หมุนและซูมชุดประกอบจาก STEP วันที่ 6 พฤศจิกายน 2026
+- **[เปิดแบบ CAD 3D](https://theanrawich.github.io/Kaew/)** — หมุนและซูมชุดประกอบจาก FreeCAD วันที่ 6 พฤศจิกายน 2026
 - **[เปิดโมเดลแนวคิดเดิม](https://theanrawich.github.io/Kaew/kaew-3d.html)** — แยกชิ้นส่วน ดูภายใน/มิติ และจำลองเติมน้ำ
 - **[ดูรูปอุปกรณ์](https://theanrawich.github.io/Kaew/kaew-parts.html)**
 - [รายการซื้อและงบประมาณ](KAEW_SHOPPING_LIST.md) · [ข้อมูล BOM](kaew-bom.json)
