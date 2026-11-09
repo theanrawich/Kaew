@@ -1,16 +1,27 @@
 #include <Arduino.h>
 #include <HX711.h>
+#include <Preferences.h>
 #include "safety.h"
+#include "scale_processing.h"
+#include "wire_protocol.h"
 
 namespace {
 constexpr int HX_DATA = 17, HX_CLOCK = 18;
 // These interfaces are intentionally disabled until the exact hardware is verified.
 constexpr int PUMP_PIN = -1;
 constexpr int ESTOP_PIN = -1;
-constexpr bool CALIBRATED = false;
+constexpr int LINK_RX = 1, LINK_TX = 2;
 HX711 scale;
+Preferences preferences;
+Calibration calibration{};
+WeightFilter filter;
+CupDetector cup;
+CupTare cupTare;
+FrameParser parser;
+Receiver receiver;
+uint32_t accepted = 0, duplicates = 0, rejected = 0;
 SafetyController controller;
-Inputs inputs{false, false, false, false, CALIBRATED, 0, 0, 0};
+Inputs inputs{false, false, false, false, false, 0, 0, 0};
 uint32_t lastPrint = 0;
 }
 
@@ -19,19 +30,53 @@ void setup() {
   if (PUMP_PIN >= 0) { digitalWrite(PUMP_PIN, LOW); pinMode(PUMP_PIN, OUTPUT); }
   if (ESTOP_PIN >= 0) pinMode(ESTOP_PIN, INPUT_PULLUP);
   Serial.begin(115200);
+  Serial.setTimeout(10);
+  Serial1.begin(115200, SERIAL_8N1, LINK_RX, LINK_TX);
+  if (preferences.begin("kaew-scale", false) && preferences.getBytesLength("cal-v1") == sizeof calibration)
+    preferences.getBytes("cal-v1", &calibration, sizeof calibration);
+  if (!validCalibration(calibration)) calibration = Calibration{};
   scale.begin(HX_DATA, HX_CLOCK);
 }
 
 void loop() {
   inputs.nowMs = millis();
+  while (Serial1.available()) {
+    Packet p{}; bool ack = false;
+    if (parser.push(static_cast<uint8_t>(Serial1.read()), p, ack) && !ack) {
+      Receive result = receiver.accept(p, inputs.nowMs);
+      if (result == Receive::Accepted || result == Receive::Duplicate) {
+        uint8_t bytes[FRAME_SIZE]; encode(p, true, bytes); Serial1.write(bytes, sizeof bytes);
+        if (result == Receive::Accepted) ++accepted; else ++duplicates;
+      } else ++rejected;
+    }
+  }
+  inputs.tankWet = receiver.fresh(inputs.nowMs) && receiver.latest().level == 1;
   inputs.estopOk = ESTOP_PIN >= 0 && digitalRead(ESTOP_PIN) == HIGH;
+  if (Serial.available() && !controller.pumping()) {
+    String line = Serial.readStringUntil('\n'); long zero, known; float grams;
+    if (line == "TARE") {
+      Serial.println(cupTare.set(inputs.cupPresent, inputs.scaleValid, inputs.weightG) ? "cup tare set (must be empty)" : "cup tare rejected");
+    } else if (sscanf(line.c_str(), "CAL %ld %ld %f", &zero, &known, &grams) == 3) {
+      Calibration next{};
+      if (makeCalibration(zero, known, grams, next) && preferences.putBytes("cal-v1", &next, sizeof next) == sizeof next) {
+        calibration = next; filter = WeightFilter{}; cup = CupDetector{}; cupTare.clear(); Serial.println("calibration saved; verify with known masses");
+      } else Serial.println("calibration rejected or storage failed");
+    }
+  }
   if (scale.is_ready()) {
     long raw = scale.read();
-    // Raw samples are observable, but never treated as grams without calibration.
-    inputs.scaleValid = false;
-    inputs.scaleAtMs = inputs.nowMs;
+    inputs.calibrated = validCalibration(calibration);
+    if (inputs.calibrated && filter.push(toGrams(calibration, raw))) {
+      inputs.weightG = filter.weight(); inputs.scaleValid = filter.stable();
+      inputs.scaleAtMs = inputs.nowMs; inputs.cupPresent = cup.update(inputs.scaleValid, inputs.weightG);
+    } else { inputs.scaleValid = false; inputs.cupPresent = false; }
+    if (!inputs.cupPresent) cupTare.clear();
     if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {
-      Serial.printf("hx711_raw=%ld pump=off commissioning_required=1\n", raw);
+      float volume = 0; bool volumeKnown = cupTare.volume(inputs.cupPresent, inputs.weightG, volume);
+      Serial.printf("hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu pump=off\n",
+        raw, inputs.calibrated, inputs.weightG, inputs.scaleValid, inputs.cupPresent, volumeKnown, volume,
+        receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0, static_cast<unsigned long>(accepted),
+        static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected));
       lastPrint = inputs.nowMs;
     }
   }

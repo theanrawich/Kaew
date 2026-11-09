@@ -31,5 +31,8 @@ int main() {
   i.weightG = 100; assert(c.reset(i));
   i.nowMs = 0xfffffff0u; i.scaleAtMs = i.nowMs; assert(c.start(i, 250));
   i.nowMs = 0x00000800u; c.update(i); assert(c.fault() == Fault::StaleScale);
+  i.scaleAtMs = i.nowMs; assert(c.reset(i)); assert(c.start(i, 250));
+  i.nowMs += 100; i.scaleAtMs = i.nowMs; i.weightG = 60; c.update(i);
+  assert(!c.pumping()); assert(c.fault() == Fault::AbnormalWeight);
   return 0;
 }
