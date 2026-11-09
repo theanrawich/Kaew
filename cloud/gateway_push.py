@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 from outbox import Outbox
+from outbox_worker import OutboxWorker
 
 
 def main():
@@ -11,6 +12,15 @@ def main():
     token = os.environ.get('KAEW_DEVICE_TOKEN', '')
     path = os.environ.get('KAEW_OUTBOX_PATH', str(Path(__file__).resolve().parent / 'outbox.sqlite3'))
     queue = Outbox(path)
+    if '--worker' in sys.argv:
+        import time
+        worker = OutboxWorker(queue, url, token)
+        worker.start()
+        try:
+            while True: time.sleep(60)
+        except KeyboardInterrupt:
+            worker.stop()
+            return 0
     if '--flush' not in sys.argv:
         raw = sys.stdin.read(4097)
         if len(raw) > 4096: raise ValueError('sample too large')

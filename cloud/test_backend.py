@@ -5,11 +5,17 @@ import threading
 import unittest
 import subprocess
 import sys
+import time
+import socket
+import sqlite3
+from contextlib import closing
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
-from server import create_server
+from server import create_server, migrate
 from outbox import Outbox
+from outbox_worker import OutboxWorker
 
 
 class BackendTest(unittest.TestCase):
@@ -109,6 +115,69 @@ class BackendTest(unittest.TestCase):
         with self.assertRaises(OverflowError): outbox.enqueue(dict(self.sample, seq=2))
         with self.assertRaises(ValueError): outbox.flush('http://example.com', 'device-secret')
         self.assertEqual(outbox.count(), 1)
+
+    def test_worker_recovers_persisted_queue_automatically(self):
+        path = os.path.join(self.directory.name, 'worker.sqlite3')
+        Outbox(path).enqueue(self.sample)
+        worker = OutboxWorker(Outbox(path), self.url, 'device-secret', idle_seconds=0.05)
+        worker.start()
+        try:
+            deadline = time.monotonic() + 3
+            while Outbox(path).count() and time.monotonic() < deadline: time.sleep(0.02)
+            self.assertEqual(Outbox(path).count(), 0)
+            self.assertEqual(len(self.request('GET', '/api/telemetry', 'admin-secret')[1]['items']), 1)
+        finally: worker.stop()
+
+    def test_drinking_event_and_reminder_are_persisted(self):
+        drink = {'event_id':'drink-1','kind':'drink','source':'simulated','volume_ml':120}
+        self.assertEqual(self.request('POST','/api/events','admin-secret',drink)[0],201)
+        self.assertEqual(self.request('POST','/api/events','admin-secret',drink)[0],200)
+        self.assertEqual(self.request('POST','/api/events','device-secret',drink)[0],401)
+        self.assertEqual(self.request('GET','/api/summary','admin-secret')[1]['drinking_ml'],120)
+        reminder = {'interval_minutes':30,'next_due':time.time()-1}
+        self.assertEqual(self.request('POST','/api/reminder','admin-secret',reminder)[0],200)
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline:
+            _, records=self.request('GET','/api/notifications','admin-secret')
+            if records['items']: break
+            time.sleep(.05)
+        self.assertEqual(len(records['items']),1)
+        self.assertEqual(records['items'][0]['provider'],'mock')
+
+    def test_existing_database_migrates_without_losing_telemetry(self):
+        path=os.path.join(self.directory.name,'old.sqlite3')
+        with closing(sqlite3.connect(path)) as db, db:
+            db.executescript((Path(__file__).parent/'migrations/001_initial.sql').read_text())
+            db.execute("INSERT INTO devices(id) VALUES ('node-1')")
+            db.execute("INSERT INTO telemetry(device_id,session,seq,level,temperature_c,tds_adc,received_at) VALUES ('node-1',1,1,'wet',25,1000,1)")
+        migrate(path)
+        with closing(sqlite3.connect(path)) as db:
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],3)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM telemetry').fetchone()[0],1)
+
+    def test_worker_reconnects_after_outage(self):
+        sock=socket.socket(); sock.bind(('127.0.0.1',0)); port=sock.getsockname()[1]; sock.close()
+        outbox=Outbox(os.path.join(self.directory.name,'offline.sqlite3')); outbox.enqueue(self.sample)
+        worker=OutboxWorker(outbox, 'http://127.0.0.1:%d'%port, 'device-secret', idle_seconds=.05, max_backoff=.2)
+        worker.start(); server=None; thread=None
+        try:
+            deadline=time.monotonic()+3
+            while worker.failures==0 and time.monotonic()<deadline: time.sleep(.02)
+            self.assertGreater(worker.failures,0); self.assertEqual(outbox.count(),1)
+            server=create_server('127.0.0.1',port,os.path.join(self.directory.name,'recovered.sqlite3'),'device-secret','admin-secret')
+            thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
+            deadline=time.monotonic()+4
+            while outbox.count() and time.monotonic()<deadline: time.sleep(.02)
+            self.assertEqual(outbox.count(),0)
+        finally:
+            worker.stop()
+            if server: server.shutdown(); server.server_close(); thread.join()
+
+    def test_hydration_goal_is_user_configured_and_persistent(self):
+        self.assertEqual(self.request('GET','/api/goal','admin-secret')[1]['goal_ml'],None)
+        self.assertEqual(self.request('POST','/api/goal','admin-secret',{'goal_ml':2000})[0],200)
+        self.assertEqual(self.request('POST','/api/goal','admin-secret',{'goal_ml':-10})[0],400)
+        self.assertEqual(self.request('GET','/api/goal','admin-secret')[1]['goal_ml'],2000)
 
 
 if __name__ == '__main__':

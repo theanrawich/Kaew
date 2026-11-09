@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value INTEGER NOT NULL);
+PRAGMA user_version = 3;

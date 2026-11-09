@@ -19,4 +19,10 @@ firmware/test/safety_test.exe
 
 Repeat for `scale_test.cpp`, `protocol_test.cpp`, and `integration_test.cpp`. The integration test uses the same C++ packet, receiver and safety classes as the firmware; the separate browser simulation has not yet been migrated to this wire protocol.
 
-All limits are illustrative. Stable-only cup detection currently fails closed during changing weight and clears tare; it is not yet suitable for actual dispensing. Controller command integration, full cup lifecycle, validated timing/noise limits, driver feedback, brownout and hardware interlocks remain incomplete. No test here demonstrates actual pump shutoff or water safety. See `docs/EXECUTION.md` for the continuation point.
+All limits are illustrative. Cup detection now permits changing weight during the simulated dispensing state, but its filtering, lifecycle and tare handling are not yet validated for actual dispensing. Controller command integration, validated timing/noise limits, driver feedback, brownout and hardware interlocks remain incomplete. No test here demonstrates actual pump shutoff or water safety. See `docs/EXECUTION.md` for the continuation point.
+
+## Experimental gateway publisher
+
+Publisher configuration defaults to disabled in `include/cloud_config.h`. A private, gitignored `include/cloud_config.local.h` may define `KAEW_CLOUD_ENABLED`, `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`, `KAEW_CLOUD_URL` (the complete `/api/telemetry` URL), `KAEW_CLOUD_TOKEN` and `KAEW_CLOUD_CA` (PEM trust anchor). HTTPS requires a nonempty CA and synchronized clock; no certificate-validation bypass is provided. For an isolated LAN experiment only, `KAEW_ALLOW_DEV_HTTP` can explicitly enable plain HTTP. Never commit credentials or use HTTP on an untrusted network.
+
+The publisher runs in a lower-priority FreeRTOS task and retries the oldest entry without blocking the safety loop. Its queue holds 16 records **only in RAM**, so power loss loses queued data. On queue saturation the gateway withholds UART acknowledgement and level data may become stale; the sender's bounded retry can ultimately discard a record. This is not durable delivery and has not been tested on hardware. Actual HTTPS, Wi-Fi reconnection, certificates, NTP and performance require real-device testing.

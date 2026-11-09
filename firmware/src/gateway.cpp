@@ -4,6 +4,7 @@
 #include "safety.h"
 #include "scale_processing.h"
 #include "wire_protocol.h"
+#include "cloud_publisher.h"
 
 namespace {
 constexpr int HX_DATA = 17, HX_CLOCK = 18;
@@ -19,6 +20,7 @@ CupDetector cup;
 CupTare cupTare;
 FrameParser parser;
 Receiver receiver;
+CloudPublisher cloud;
 uint32_t accepted = 0, duplicates = 0, rejected = 0;
 SafetyController controller;
 Inputs inputs{false, false, false, false, false, 0, 0, 0};
@@ -36,6 +38,7 @@ void setup() {
     preferences.getBytes("cal-v1", &calibration, sizeof calibration);
   if (!validCalibration(calibration)) calibration = Calibration{};
   scale.begin(HX_DATA, HX_CLOCK);
+  cloud.begin();
 }
 
 void loop() {
@@ -43,8 +46,11 @@ void loop() {
   while (Serial1.available()) {
     Packet p{}; bool ack = false;
     if (parser.push(static_cast<uint8_t>(Serial1.read()), p, ack) && !ack) {
+      if (!cloud.hasSpace()) { ++rejected; continue; }
+      Receiver previous = receiver;
       Receive result = receiver.accept(p, inputs.nowMs);
       if (result == Receive::Accepted || result == Receive::Duplicate) {
+        if (result == Receive::Accepted && !cloud.enqueue(p)) { receiver = previous; ++rejected; continue; }
         uint8_t bytes[FRAME_SIZE]; encode(p, true, bytes); Serial1.write(bytes, sizeof bytes);
         if (result == Receive::Accepted) ++accepted; else ++duplicates;
       } else ++rejected;

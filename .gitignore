@@ -5,6 +5,7 @@ node_modules/
 .pio-core/
 firmware/.pio/
 firmware/test/*.exe
+firmware/include/cloud_config.local.h
 cloud/*.sqlite3*
 __pycache__/
 _site/
