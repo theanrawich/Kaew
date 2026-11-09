@@ -17,6 +17,8 @@ jobs:
           python-version: '3.11'
       - name: Simulator tests
         run: node --test simulation/*.test.mjs
+      - name: Cloud API and pipeline tests
+        run: python -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Host safety tests
         run: |
           g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o /tmp/kaew-safety-test
