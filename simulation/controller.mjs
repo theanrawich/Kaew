@@ -3,7 +3,7 @@ export function createSimulation({tankMl = 1500, flowMlPerMinute = 120} = {}) {
   if (!Number.isFinite(tankMl) || tankMl < 0 || !Number.isFinite(flowMlPerMinute) || flowMlPerMinute <= 0) throw new RangeError('invalid plant');
   // Two seconds is an illustrative timeout, not a measured hardware setting.
   const staleAfterS = 2;
-  const state = {tankMl, cupMl: 0, cupPresent: false, pump: false, scaleOk: true, scaleUpdates: true, lastScaleSampleS: 0, stopPressed: false, fault: null, targetMl: 0, elapsed: 0, flowMlPerMinute, time: 0, events: []};
+  const state = {tankMl, cupMl: 0, cupPresent: false, pump: false, scaleOk: true, scaleUpdates: true, lastScaleSampleS: 0, stopPressed: false, tankPermitted: true, fault: null, targetMl: 0, elapsed: 0, flowMlPerMinute, time: 0, events: []};
   const log = message => { state.events.unshift({time: state.time, message}); state.events.length = Math.min(state.events.length, 100); };
   const stop = reason => { state.pump = false; if (reason) {state.fault = reason; log(reason);} };
   const freshScale = () => state.scaleOk && state.time - state.lastScaleSampleS < staleAfterS;
@@ -12,14 +12,15 @@ export function createSimulation({tankMl = 1500, flowMlPerMinute = 120} = {}) {
     removeCup() { state.cupPresent = false; stop('cup removed'); },
     pressStop() { state.stopPressed = true; stop('stop pressed'); },
     failScale() { state.scaleOk = false; stop('scale fault'); },
-    reset() { if (state.stopPressed || !freshScale() || !state.cupPresent || state.tankMl <= 0) return false; state.fault = null; log('fault reset'); return true; },
+    reset() { if (state.stopPressed || !freshScale() || !state.cupPresent || !state.tankPermitted || state.tankMl <= 0) return false; state.fault = null; log('fault reset'); return true; },
     releaseStop() { state.stopPressed = false; },
+    setTankPermitted(value) { if (typeof value !== 'boolean') throw new TypeError('invalid tank status'); state.tankPermitted = value; if (!value && state.pump) stop('tank sensor unavailable'); },
     repairScale() { state.scaleOk = true; if (state.scaleUpdates) state.lastScaleSampleS = state.time; },
     pauseScaleUpdates() { state.scaleUpdates = false; log('scale updates paused'); },
     resumeScaleUpdates() { state.scaleUpdates = true; if (state.scaleOk) state.lastScaleSampleS = state.time; log('scale updates resumed'); },
     reboot() { state.pump = false; state.fault = 'reboot'; state.elapsed = 0; log('reboot: pump off'); },
     start(target) {
-      if (state.pump || !Number.isFinite(target) || target <= 0 || target > 300 || target <= state.cupMl || !state.cupPresent || state.stopPressed || !freshScale() || state.fault || state.tankMl <= 0) return false;
+      if (state.pump || !Number.isFinite(target) || target <= 0 || target > 300 || target <= state.cupMl || !state.cupPresent || state.stopPressed || !freshScale() || !state.tankPermitted || state.fault || state.tankMl <= 0) return false;
       state.targetMl = target; state.elapsed = 0; state.pump = true; log('pump started'); return true;
     },
     step(dt) {

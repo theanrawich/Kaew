@@ -45,7 +45,7 @@ public:
     if(have_ && p.session!=latest_.session && fresh(now)) return Receive::SessionMismatch;
     if(have_ && p.session==latest_.session) {
       if(p.seq==latest_.seq) return Receive::Duplicate;
-      if(p.seq<latest_.seq) return Receive::Old;
+      if(uint32_t(p.seq-latest_.seq)>=0x80000000u) return Receive::Old;
     }
     have_=true; latest_=p; at_=now; return Receive::Accepted;
   }

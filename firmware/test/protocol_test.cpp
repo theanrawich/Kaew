@@ -2,6 +2,8 @@
 #include "wire_protocol.h"
 int main() {
   Packet p{1, 7, 0, 2500, 1234, 1}; uint8_t b[FRAME_SIZE]; encode(p, false, b);
+  const uint8_t golden[FRAME_SIZE] = {0x4b,0x57,1,1,1,7,0,0,0,0,0,0,0,0xc4,0x09,0xd2,0x04,1,0xeb,0x72};
+  assert(std::memcmp(b, golden, FRAME_SIZE)==0);
   Packet decoded{}; bool ack = false;
   assert(decode(b, decoded, ack) && !ack && decoded.session == 7 && decoded.adc == 1234);
   b[15] ^= 1; assert(!decode(b, decoded, ack)); b[15] ^= 1;
@@ -25,5 +27,9 @@ int main() {
   for (auto byte : b) done = parser.push(byte, decoded, ack) || done;
   assert(done && !ack && decoded.seq==p.seq);
   encode(p, false, b); b[2]=2; assert(!decode(b, decoded, ack));
+  Receiver wrap; Packet w{1, 99, 0xffffffffu, 2500, 0, 1};
+  assert(wrap.accept(w, 1)==Receive::Accepted); w.seq=0;
+  assert(wrap.accept(w, 2)==Receive::Accepted); w.seq=0xffffffffu;
+  assert(wrap.accept(w, 3)==Receive::Old);
   return 0;
 }

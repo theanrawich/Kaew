@@ -67,8 +67,9 @@ void loop() {
     long raw = scale.read();
     inputs.calibrated = validCalibration(calibration);
     if (inputs.calibrated && filter.push(toGrams(calibration, raw))) {
-      inputs.weightG = filter.weight(); inputs.scaleValid = filter.stable();
-      inputs.scaleAtMs = inputs.nowMs; inputs.cupPresent = cup.update(inputs.scaleValid, inputs.weightG);
+      inputs.weightG = filter.weight(); inputs.scaleValid = controller.pumping() || filter.stable();
+      inputs.scaleAtMs = inputs.nowMs;
+      inputs.cupPresent = controller.pumping() ? cup.updateDispensing(true, inputs.weightG) : cup.update(inputs.scaleValid, inputs.weightG);
     } else { inputs.scaleValid = false; inputs.cupPresent = false; }
     if (!inputs.cupPresent) cupTare.clear();
     if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {

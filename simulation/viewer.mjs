@@ -1,16 +1,19 @@
 import * as THREE from '../.work/toolchain/node_modules/three/build/three.module.js';
 import {OrbitControls} from '../.work/toolchain/node_modules/three/examples/jsm/controls/OrbitControls.js';
-import {createSimulation} from './controller.mjs?v=2';
+import {createWireSimulation} from './wire-simulation.mjs';
+import {encodeFrame} from './wire-codec.mjs';
 import {createLocalPipeline} from './telemetry.mjs';
 
-const simulation = createSimulation();
+const wireSimulation = createWireSimulation();
+const simulation = wireSimulation.plant;
 const state = simulation.state;
 const telemetry = createLocalPipeline({capacity: 5, historyLimit: 100});
 let telemetrySequence = 0;
+let wireSequence = 0, wireOnline = true, nextWire = 0;
 const telemetryPanel = document.createElement('section');
 telemetryPanel.innerHTML = `<h3>ข้อมูลจำลองในหน่วยความจำ</h3>
-<p><small>Node → Gateway → ที่เก็บจำลองในแท็บนี้ ไม่ใช่ cloud หรือเซนเซอร์จริง ปิด/รีโหลดแล้วข้อมูลหาย</small></p>
-<div class="actions"><button id="telemetry-send">ส่งตัวอย่างจำลอง</button><button id="telemetry-link">จำลองปลายทางออฟไลน์</button></div>
+<p><small>Node ส่งเฟรม UART จำลองทุกวินาที ข้อมูลระดับหมดอายุใน 5 วินาที; ที่เก็บอยู่ในแท็บ ไม่ใช่ cloud หรือเซนเซอร์จริง</small></p>
+<div class="actions"><button id="telemetry-send">ส่งตัวอย่างจำลอง</button><button id="telemetry-link">จำลองปลายทางออฟไลน์</button><button id="wire-link">ตัดสาย UART จำลอง</button></div>
 <p id="telemetry-status" aria-live="polite"></p><ol id="telemetry-history"></ol>`;
 document.querySelector('#events').previousElementSibling.before(telemetryPanel);
 function renderTelemetry(message = '') {
@@ -26,11 +29,12 @@ function renderTelemetry(message = '') {
 document.querySelector('#telemetry-send').onclick = () => {
   const sample = {nodeId: 'node-1', sessionId: 'browser-session', seq: telemetrySequence, timeS: state.time, readings: {tankMl: state.tankMl}};
   const result = telemetry.receive(sample);
-  if (result !== 'queue_full' && result !== 'invalid') telemetrySequence++;
+  telemetrySequence = (telemetrySequence + 1) >>> 0;
   const labels = {forwarded: 'ส่งถึงที่เก็บจำลอง', buffered: 'เก็บในคิวชั่วคราว', queue_full: 'คิวเต็ม: ไม่รับข้อมูลใหม่', duplicate: 'ข้อความซ้ำ', invalid: 'ข้อมูลไม่ถูกต้อง'};
   renderTelemetry(labels[result]);
 };
 document.querySelector('#telemetry-link').onclick = () => { telemetry.setOnline(!telemetry.snapshot().online); renderTelemetry(''); };
+document.querySelector('#wire-link').onclick = () => { wireOnline=!wireOnline; document.querySelector('#wire-link').textContent=wireOnline?'ตัดสาย UART จำลอง':'ต่อสาย UART จำลอง'; };
 renderTelemetry();
 const scene = new THREE.Scene(); scene.background = new THREE.Color('#101a22');
 const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 5000); camera.position.set(600, 440, 700);
@@ -70,6 +74,6 @@ function renderState(){
   document.querySelector('#events').replaceChildren(...state.events.slice(0,12).map(e=>{const li=document.createElement('li');li.textContent=`${e.time.toFixed(1)}s: ${e.message}`;return li;}));
 }
 for(const [id,method] of Object.entries({place:'placeCup',remove:'removeCup',stop:'pressStop',release:'releaseStop',fail:'failScale',repair:'repairScale',reset:'reset',reboot:'reboot'})) document.querySelector('#'+id).onclick=()=>{simulation[method]();renderState();};
-document.querySelector('#start').onclick=()=>{simulation.start(Number(document.querySelector('#target').value));renderState();};
+document.querySelector('#start').onclick=()=>{wireSimulation.start(Number(document.querySelector('#target').value));renderState();};
 const resize=()=>{const {clientWidth:w,clientHeight:h}=host;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();};new ResizeObserver(resize).observe(host);
-let last;function frame(now){const dt=last === undefined ? 0 : Math.max(0,Math.min((now-last)/1000,0.1));last=now;simulation.step(dt);renderState();renderer.render(scene,camera);requestAnimationFrame(frame);}renderState();requestAnimationFrame(frame);
+let last;function frame(now){const dt=last === undefined ? 0 : Math.max(0,Math.min((now-last)/1000,0.1));last=now;if(wireOnline && state.time>=nextWire){wireSimulation.receive(encodeFrame({node:1,session:1,seq:wireSequence,centiC:2500,adc:1000,level:state.tankMl>0?1:2}));wireSequence=(wireSequence+1)>>>0;nextWire=state.time+1;}wireSimulation.step(dt);renderState();renderer.render(scene,camera);requestAnimationFrame(frame);}renderState();requestAnimationFrame(frame);

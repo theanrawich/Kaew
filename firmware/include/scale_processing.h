@@ -45,6 +45,10 @@ public:
     if (!stable || !std::isfinite(grams) || grams < 30 || grams > 900) { count_ = 0; return present_ = false; }
     if (count_ < 3) ++count_; return present_ = count_ >= 3;
   }
+  bool updateDispensing(bool valid, float grams) {
+    if (!valid || !std::isfinite(grams) || grams < 30 || grams > 900) { count_ = 0; return present_ = false; }
+    return present_;
+  }
 };
 // Only valid for the cup explicitly tared while empty; reset on removal/reboot.
 class CupTare {

@@ -27,6 +27,8 @@ jobs:
           /tmp/kaew-protocol-test
           g++ -std=c++17 -Ifirmware/include firmware/test/integration_test.cpp -o /tmp/kaew-integration-test
           /tmp/kaew-integration-test
+          g++ -std=c++17 -Ifirmware/include firmware/test/dispense_test.cpp -o /tmp/kaew-dispense-test
+          /tmp/kaew-dispense-test
       - name: Install PlatformIO
         run: python -m pip install platformio==6.2.0
       - name: Build both firmware targets
