@@ -33,6 +33,8 @@ jobs:
           /tmp/kaew-dispense-test
           g++ -std=c++17 -Ifirmware/include firmware/test/durable_queue_test.cpp -o /tmp/kaew-durable-queue-test
           /tmp/kaew-durable-queue-test
+          g++ -std=c++17 -Ifirmware/include firmware/test/audio_test.cpp -o /tmp/kaew-audio-test
+          /tmp/kaew-audio-test
       - name: Install PlatformIO
         run: python -m pip install platformio==6.2.0
       - name: Build both firmware targets

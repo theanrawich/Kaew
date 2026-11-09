@@ -5,6 +5,10 @@
 #include "scale_processing.h"
 #include "wire_protocol.h"
 #include "cloud_publisher.h"
+#include "audio_io.h"
+#ifndef KAEW_AUDIO_ENABLED
+#define KAEW_AUDIO_ENABLED 0
+#endif
 
 namespace {
 constexpr int HX_DATA = 17, HX_CLOCK = 18;
@@ -21,6 +25,7 @@ CupTare cupTare;
 FrameParser parser;
 Receiver receiver;
 CloudPublisher cloud;
+AudioIO audio;
 uint32_t accepted = 0, duplicates = 0, rejected = 0;
 SafetyController controller;
 Inputs inputs{false, false, false, false, false, 0, 0, 0};
@@ -39,6 +44,7 @@ void setup() {
   if (!validCalibration(calibration)) calibration = Calibration{};
   scale.begin(HX_DATA, HX_CLOCK);
   cloud.begin();
+  if (KAEW_AUDIO_ENABLED && !audio.begin()) Serial.println("audio driver init failed");
 }
 
 void loop() {

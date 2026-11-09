@@ -17,6 +17,8 @@ from server import create_server, migrate
 from outbox import Outbox
 from outbox_worker import OutboxWorker
 from voice_pipeline import VoicePipeline
+from audio_service import process_audio
+from test_audio import wav_fixture
 
 
 class BackendTest(unittest.TestCase):
@@ -154,7 +156,7 @@ class BackendTest(unittest.TestCase):
             db.execute("INSERT INTO telemetry(device_id,session,seq,level,temperature_c,tds_adc,received_at) VALUES ('node-1',1,1,'wet',25,1000,1)")
         migrate(path)
         with closing(sqlite3.connect(path)) as db:
-            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],6)
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],7)
             self.assertEqual(db.execute('SELECT COUNT(*) FROM telemetry').fetchone()[0],1)
 
     def test_legacy_mock_notification_history_remains_visible(self):
@@ -280,6 +282,51 @@ class BackendTest(unittest.TestCase):
         voice=VoicePipeline(FakeASR(),service,FakeTTS())
         reminder=voice.handle('sample1'); self.assertTrue(reminder['executed']); self.assertEqual(reminder['minutes'],30)
         refill=voice.handle('sample2'); self.assertFalse(refill['executed']); self.assertTrue(refill['audio'].startswith('mock-audio:'))
+
+    def test_wav_input_to_backend_to_playable_wav_with_mock_speech(self):
+        class ASR:
+            def transcribe(self,audio): return 'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'
+        class TTS:
+            def synthesize(self,text): return wav_fixture()
+        command=lambda text: self.request('POST','/api/voice','admin-secret',{'text':text})[1]
+        out=Path(self.directory.name)/'response.wav'
+        result=process_audio(wav_fixture(),ASR(),command,TTS(),out)
+        self.assertTrue(result['executed']); self.assertEqual(result['minutes'],30)
+        self.assertTrue(out.read_bytes().startswith(b'RIFF'))
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder']['interval_minutes'],30)
+
+    def test_three_voice_examples_with_mock_asr_tts_and_real_backend(self):
+        class ASR:
+            def __init__(self,text): self.text=text
+            def transcribe(self,audio): return self.text
+        class TTS:
+            def synthesize(self,text): return wav_fixture()
+        cases=[('แก้ว เติมน้ำให้หน่อย','refill'),('แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ','reminder'),('แก้ว ตอนนี้น้ำเหลือเท่าไหร่','level')]
+        for index,(text,intent) in enumerate(cases):
+            result=process_audio(wav_fixture(),ASR(text),lambda s:self.request('POST','/api/voice','admin-secret',{'text':s})[1],TTS(),Path(self.directory.name)/('reply%d.wav'%index))
+            self.assertEqual(result['intent'],intent); self.assertTrue(result['audio_written'])
+            if intent=='refill': self.assertFalse(result['executed'])
+
+    def test_advice_uses_history_and_never_authorizes_actuation(self):
+        self.request('POST','/api/events','admin-secret',{'event_id':'a1','kind':'drink','source':'simulated','volume_ml':120})
+        contexts=[]
+        def fake(context):
+            contexts.append(context)
+            return {'refill_ml':180,'reminder_minutes':45,'confidence':0.8,'explanation':'Based on recent intake.'}
+        self.server.hydration_provider=fake
+        status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':True})
+        self.assertEqual(status,200); self.assertEqual(contexts[0]['drank_ml'],120)
+        self.assertEqual(result['advice']['source'],'model'); self.assertFalse(result['actuation_allowed'])
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],1)
+
+    def test_voice_device_status_does_not_fabricate_connection(self):
+        status,answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว สถานะอุปกรณ์'})
+        self.assertEqual(status,200); self.assertEqual(answer['intent'],'status')
+        self.assertFalse(answer['online']); self.assertIn('ออฟไลน์',answer['reply'])
+        self.request('POST','/api/telemetry','device-secret',self.sample)
+        _,answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว device status'})
+        self.assertTrue(answer['online'])
 
 
 if __name__ == '__main__':

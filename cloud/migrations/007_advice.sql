@@ -1,0 +1,4 @@
+BEGIN;
+CREATE TABLE IF NOT EXISTS advice_log(id INTEGER PRIMARY KEY AUTOINCREMENT, created_at REAL NOT NULL, input_json TEXT NOT NULL, output_json TEXT NOT NULL, simulated INTEGER NOT NULL);
+PRAGMA user_version = 7;
+COMMIT;

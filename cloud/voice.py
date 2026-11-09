@@ -9,6 +9,7 @@ def parse_text(text):
     if not text.startswith('แก้ว'): return {'intent':'no_wake'}
     text=text[4:].strip()
     if any(word in text for word in ('หยุด','stop','พอแล้ว')): return {'intent':'stop'}
+    if any(word in text for word in ('สถานะอุปกรณ์','สถานะเครื่อง','device status')): return {'intent':'status'}
     if any(word in text for word in ('เตือน','remind','reminder')):
         if 'ครึ่งชั่วโมง' in text: minutes=30
         else:

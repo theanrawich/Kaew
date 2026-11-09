@@ -2,6 +2,10 @@ node_modules/
 .kaew-toolchain/
 .kaew-pio-venv/
 .kaew-browser/
+.kaew-voice/
+.kaew-voice-test/
+.kaew-models/
+.kaew-model-cache/
 .pio-core/
 firmware/.pio/
 firmware/test/*.exe

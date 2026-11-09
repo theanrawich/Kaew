@@ -9,6 +9,7 @@ import time
 import threading
 from notifications import MockProvider, TelegramProvider
 from voice import parse_text
+from hydration_ai import recommend, OllamaProvider
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -27,7 +28,7 @@ def connect(path):
 def migrate(path):
     with closing(connect(path)) as db, db:
         version = db.execute('PRAGMA user_version').fetchone()[0]
-        if version > 6: raise RuntimeError('database schema newer than server')
+        if version > 7: raise RuntimeError('database schema newer than server')
         if version == 0:
             db.executescript((ROOT / 'migrations/001_initial.sql').read_text(encoding='utf-8'))
             version = 1
@@ -45,6 +46,9 @@ def migrate(path):
             version = 5
         if version == 5:
             db.executescript((ROOT / 'migrations/006_telemetry_source.sql').read_text(encoding='utf-8'))
+            version = 6
+        if version == 6:
+            db.executescript((ROOT / 'migrations/007_advice.sql').read_text(encoding='utf-8'))
         db.execute('INSERT OR IGNORE INTO devices(id) VALUES (?)', ('node-1',))
 
 
@@ -91,12 +95,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
-        if path in ('/api/events', '/api/reminder', '/api/goal', '/api/voice'):
+        if path in ('/api/events', '/api/reminder', '/api/goal', '/api/voice', '/api/advice'):
             data = self.read_json()
             if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
             if path == '/api/events': return self.add_event(data)
             if path == '/api/goal': return self.set_goal(data)
             if path == '/api/voice': return self.voice(data)
+            if path == '/api/advice': return self.advice(data)
             return self.set_reminder(data)
         if path != '/api/telemetry': return self.reply(404, {'error': 'not_found'})
         data = self.read_json()
@@ -172,9 +177,32 @@ class Handler(BaseHTTPRequestHandler):
             text={'wet':'ข้อมูลระดับล่าสุดระบุว่าพบระดับน้ำ แต่อาจล่าช้า', 'dry':'ข้อมูลระดับล่าสุดระบุว่าน้ำต่ำ แต่อาจล่าช้า','unknown':'ยังไม่ทราบระดับน้ำ'}[level]
             if row and row['source']=='simulated': text += ' (ข้อมูลจำลอง)'
             return self.reply(200, {'intent':kind,'level':level,'executed':True,'reply':text})
+        if kind=='status':
+            with closing(connect(self.server.db_path)) as db:
+                row=db.execute("SELECT last_seen,(SELECT source FROM telemetry WHERE device_id='node-1' ORDER BY id DESC LIMIT 1) AS source FROM devices WHERE id='node-1'").fetchone()
+            online=bool(row and row['last_seen'] and time.time()-row['last_seen']<30)
+            text='ข้อมูลล่าสุดระบุว่าอุปกรณ์'+('ออนไลน์' if online else 'ออฟไลน์')
+            if row and row['source']=='simulated': text+=' (ข้อมูลจำลอง)'
+            return self.reply(200, {'intent':kind,'online':online,'executed':True,'reply':text})
         if kind=='refill': return self.reply(200, {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'})
         if kind=='stop': return self.reply(200, {'intent':kind,'executed':False,'reply':'ยังไม่มีช่องสั่งหยุดผ่านเสียง กรุณาใช้ปุ่มหยุดจริง'})
         return self.reply(200, {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'})
+
+    def advice(self,data):
+        if not isinstance(data,dict) or set(data)!={'include_simulated'} or type(data['include_simulated']) is not bool:
+            return self.reply(400,{'error':'invalid_advice_request'})
+        now=time.time(); include=data['include_simulated']
+        with closing(connect(self.server.db_path)) as db, db:
+            sources=('measured','estimated','simulated') if include else ('measured','estimated')
+            placeholders=','.join('?' for _ in sources)
+            row=db.execute("SELECT COALESCE(SUM(volume_ml),0) AS total,MAX(received_at) AS last FROM events WHERE kind='drink' AND received_at>=? AND source IN ("+placeholders+")",(now-86400,*sources)).fetchone()
+            goal=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
+            context={'goal_ml':goal['value'] if goal else None,'drank_ml':min(row['total'],20000),
+                     'minutes_since_drink':min(max((now-row['last'])/60,0),10080) if row['last'] else None,'cup_ml':None,'profile':'balanced'}
+            result=recommend(context,self.server.hydration_provider)
+            db.execute('INSERT INTO advice_log(created_at,input_json,output_json,simulated) VALUES (?,?,?,?)',
+                       (now,json.dumps(context),json.dumps(result,ensure_ascii=False),int(include)))
+        return self.reply(200,{'advice':result,'simulated_inputs_included':include,'actuation_allowed':False})
 
     def do_GET(self):
         path = urlsplit(self.path).path
@@ -265,6 +293,8 @@ def create_server(host, port, db_path, device_token, admin_token, provider=None)
     server = KaewServer((host, port), Handler)
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
     server.provider = provider or MockProvider()
+    model=os.environ.get('KAEW_OLLAMA_MODEL','')
+    server.hydration_provider = OllamaProvider(model) if model else None
     server.provider_name = 'telegram' if isinstance(server.provider, TelegramProvider) else 'mock'
     server.stop_reminders = threading.Event()
     server.reminder_thread = threading.Thread(target=reminder_loop,args=(server,),daemon=True)
