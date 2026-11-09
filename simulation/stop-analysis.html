@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kaew — ทดลองสมมติฐานการหยุด</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; background: #edf4ef; color: #193e3a; }
+    body { max-width: 850px; margin: auto; padding: 24px; line-height: 1.6; }
+    h1 { line-height: 1.3; } .notice { padding: 14px; background: #fff0cf; border-left: 4px solid #a76613; }
+    form { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 20px 0; }
+    label { display: grid; gap: 4px; } input { padding: 8px; font: inherit; width: 100%; box-sizing: border-box; }
+    section { background: white; padding: 16px; border-radius: 8px; } output { font-weight: 700; }
+    .error { color: #a12b20; } a { color: #126858; }
+  </style>
+</head>
+<body>
+  <h1>ทดลองผลของความหน่วงในการหยุด</h1>
+  <p class="notice"><strong>สมมติฐานเท่านั้น:</strong> ตัวเลขเริ่มต้นไม่ใช่ผลวัดของ Kaew และใช้ตัดสินความปลอดภัยหรือกำหนดค่าเฟิร์มแวร์ไม่ได้ แบบนี้สมมติอัตราการไหลคงที่และน้ำตกค้างเป็นปริมาณคงที่</p>
+  <form id="scenario">
+    <label>เป้าหมาย (มล.)<input name="targetMl" type="number" min="0.01" step="any" value="100" required></label>
+    <label>อัตราไหลสมมติ (มล./นาที)<input name="flowMlMin" type="number" min="0.01" step="any" value="120" required></label>
+    <label>ระยะระหว่างตัวอย่าง (วินาที)<input name="sampleIntervalS" type="number" min="0.001" step="any" value="1.5" required></label>
+    <label>หน่วงหลังอ่านถึงเป้า (วินาที)<input name="responseDelayS" type="number" min="0" step="any" value="0.25" required></label>
+    <label>น้ำไหลต่อหลังคำสั่งหยุด (มล.)<input name="residualMl" type="number" min="0" step="any" value="2" required></label>
+    <label>น้ำที่จ่ายได้ในถัง (มล.)<input name="tankMl" type="number" min="0" step="any" value="500" required></label>
+  </form>
+  <section aria-live="polite">
+    <p id="error" class="error" hidden>กรอกค่าตามช่วงที่ระบุให้ครบ</p>
+    <div id="result"><p>สถานะ: <output id="status"></output></p><p>เวลาสั่งหยุด: <output id="stop"></output></p><p>น้ำที่จ่ายรวม: <output id="delivered"></output></p><p>ปริมาณเกินเป้า: <output id="overshoot"></output></p></div>
+  </section>
+  <p>แบบนี้ไม่จำลองความผิดพลาดของเซนเซอร์ การยกแก้ว การรั่ว siphon การเปลี่ยนแปลงอัตราไหล หรือการหยุดทางไฟฟ้าจริง ต้องวัดกับฮาร์ดแวร์และทดสอบแยก</p>
+  <p><a href="index.html">กลับไปยังแบบจำลอง 3D</a></p>
+  <script type="module">
+    import { estimateStop } from './stop-analysis.mjs';
+    const form = document.querySelector('#scenario');
+    const el = id => document.getElementById(id);
+    function update() {
+      try {
+        if (!form.checkValidity()) throw new RangeError('invalid input');
+        const values = Object.fromEntries([...new FormData(form)].map(([key, value]) => [key, Number(value)]));
+        const r = estimateStop(values);
+        el('status').textContent = r.stoppedBy === 'target' ? 'สั่งหยุดตามเป้า' : (r.targetReached ? 'น้ำหมดก่อนสั่งหยุด' : 'น้ำหมดก่อนถึงเป้า');
+        el('stop').textContent = r.stopCommandS === null ? 'ไม่มีคำสั่งหยุดตามเป้า' : `${r.stopCommandS.toFixed(2)} วินาที`;
+        el('delivered').textContent = `${r.deliveredMl.toFixed(2)} มล.`;
+        el('overshoot').textContent = `${r.overshootMl.toFixed(2)} มล.`;
+        el('error').hidden = true; el('result').hidden = false;
+      } catch { el('error').hidden = false; el('result').hidden = true; }
+    }
+    form.addEventListener('input', update); form.addEventListener('submit', event => event.preventDefault()); update();
+  </script>
+</body>
+</html>

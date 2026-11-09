@@ -36,12 +36,15 @@ for (const [boardId, board] of Object.entries(data.boards)) {
   assert.ok(board.connections.some(c => c.from === 'board.3V3' && c.to === 'rail.3V3'));
 }
 const gateway = data.boards.gateway.connections;
+assert.ok(!gateway.some(c => /FLOW3V3/.test(c.from + c.to)), 'Removed flow sensor must not have a proposed wire');
+assert.ok(!data.boards.gateway.devices.some(d => d.pins.includes('FLOW3V3')), 'Removed flow sensor must not appear as an interface');
+assert.ok(data.boards.gateway.devices.some(d => d.pins.includes('STOP3V3')), 'Keep the unverified stop status interface');
 assert.ok(gateway.some(c => c.from === 'amp.SPK+' && c.to === 'speaker.+'));
 assert.ok(gateway.some(c => c.from === 'amp.SPK-' && c.to === 'speaker.-'));
 assert.ok(!gateway.some(c => c.device === 'speaker' && /GND/.test(c.from + c.to)), 'BTL speaker output must never be grounded');
 assert.ok(data.boards.node.connections.some(c => c.from === 'pullup.B' && c.to === 'temperature.DQ'), 'DS18B20 needs a real pullup branch');
 assert.ok(data.boards.node.connections.some(c => c.from === 'tds.OUT' && c.to === 'analog.IN'));
 assert.ok(data.boards.node.connections.some(c => c.from === 'analog.OUT3V3' && c.to === 'board.GPIO34' && c.status === 'hold'));
-assert.ok(gateway.filter(c => c.device === 'flow').every(c => c.status === 'hold'));
+assert.ok(gateway.filter(c => c.device === 'stop').every(c => c.status === 'hold'));
 assert.ok(gateway.filter(c => c.device === 'pump').every(c => c.status === 'hold'));
 console.log(JSON.stringify({wiring: 'valid', boards: Object.keys(data.boards).length, connections: total}));

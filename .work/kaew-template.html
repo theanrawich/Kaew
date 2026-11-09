@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#edf3f1">
-<title>Kaew — รุ่นประหยัด ปั๊ม504บาท + OLED</title>
+<title>Kaew — แบบแนวคิดและรายการซื้อประมาณการ</title>
 <style>
 :root{--paper:#edf3f1;--ink:#183e48;--muted:#687f82;--teal:#247c73;--line:#cedbd6;--white:#fcfdf9;--warning:#b34a36;font-family:"Segoe UI",Tahoma,sans-serif;color:var(--ink);background:var(--paper);font-synthesis:none}
 *{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer;color:inherit}button:focus-visible,input:focus-visible,canvas:focus-visible{outline:3px solid #279d8b;outline-offset:4px}button:disabled{cursor:default;opacity:.4}button,canvas{-webkit-tap-highlight-color:transparent}button{transition:background .18s,color .18s,transform .18s}button:active:not(:disabled){transform:translateY(1px)}
@@ -164,7 +164,7 @@
   </main>
   <footer class="footer"><span>Kaew · แบบศึกษาชุดประหยัด · 30 ต.ค. 2026</span><span>อิงสเปกบางชิ้น · ขวด/ปั๊มยังประมาณ · ยังไม่ใช่แบบผลิต</span></footer>
 </div>
-<dialog class="dialog" id="budget-dialog" aria-labelledby="budget-title"><header class="dialog-header"><h2 id="budget-title">รายการซื้อและงบตั้งต้น</h2><button class="dialog-close" id="close-budget">ปิด</button></header><div class="dialog-content"><div class="budget-lead"><strong id="budget-total"></strong><span>บาท รวมเผื่อแล้ว</span></div><p class="budget-note">ปั๊ม504บาทตามที่เลือก และOLED1.3นิ้ว139บาท ราคาสินค้าจากผลค้นหาShopeeวันที่30ต.ค.2026 ยังไม่ใช่ราคาcheckout คิดแพ็กแก้ว6ใบและน้ำ6ขวดเต็มแพ็ก ไม่หักคูปองส่วนบุคคล</p><div class="budget-checks">flow sensorยังรอเลือกรุ่น: กันงบ300บาท และไม่ใช้YF-S4010.3–6L/minกับปั๊มสูงสุด0.25L/min · โครงและค่าส่งเป็นประมาณการ · แรงดันDC/การควบคุมปั๊มและวัสดุสัมผัสน้ำยังต้องตรวจ · ไม่รวมค่าAPIรายเดือนหรือเครื่องมือช่าง</div><table class="bom-table"><thead><tr><th>อุปกรณ์ / ลิงก์Shopee</th><th>ซื้อ</th><th>รวมบาท</th></tr></thead><tbody id="bom-body"></tbody></table><div class="budget-breakdown" id="budget-breakdown"></div><details><summary>แหล่งอ้างอิงขนาดและสเปก</summary><div class="source-links" id="source-links"></div></details></div></dialog>
+<dialog class="dialog" id="budget-dialog" aria-labelledby="budget-title"><header class="dialog-header"><h2 id="budget-title">รายการซื้อและงบตั้งต้น</h2><button class="dialog-close" id="close-budget">ปิด</button></header><div class="dialog-content"><div class="budget-lead"><strong id="budget-total"></strong><span>บาท รวมเผื่อแล้ว</span></div><p class="budget-note">ราคาโดยประมาณจากข้อมูลรายการซื้อ 6 พ.ย. 2026 ยังไม่ใช่ราคา checkout; S3 เป็นราคาหลังโค้ด และ DS18B20 ใช้ราคาเดิม คิดแก้วและน้ำเต็มแพ็ก</p><div class="budget-checks">แผนปัจจุบันไม่มี flow sensor · ไม่คิดค่าส่ง Shopee ตามข้อตกลง · โครงและวัสดุประกอบเป็นประมาณการ · รุ่นและการควบคุมปั๊ม วัสดุสัมผัสน้ำและราคาตัวเลือกยังต้องตรวจ · ไม่รวมค่า API หรือเครื่องมือช่าง · ยังไม่พร้อมซื้อครบชุด</div><table class="bom-table"><thead><tr><th>อุปกรณ์ / ลิงก์Shopee</th><th>ซื้อ</th><th>รวมบาท</th></tr></thead><tbody id="bom-body"></tbody></table><div class="budget-breakdown" id="budget-breakdown"></div><details><summary>แหล่งอ้างอิงขนาดและสเปก</summary><div class="source-links" id="source-links"></div></details></div></dialog>
 <dialog id="wiring-dialog" aria-labelledby="wiring-title" aria-describedby="wiring-disclaimer">
   <header class="wiring-header">
     <div><h2 id="wiring-title">สายนี้ ต่อขาไหน</h2><p>เลือกอุปกรณ์หรือสายเพื่อไล่ดูจุดต่อทั้งสองด้าน</p></div>

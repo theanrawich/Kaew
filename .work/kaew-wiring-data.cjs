@@ -30,7 +30,7 @@ module.exports = {
     device('amp','MAX98357A','แอมป์ · I²S TX',30,1,['VIN','GND','BCLK','LRC','DIN','SPK+','SPK-'],'BCLK=GPIO10, LRC=GPIO11, DIN=GPIO12; VIN จาก 5V ไม่ใช่ 3V3 regulator; ตรวจ SD/MODE และ GAIN ตาม revision ของแอมป์ก่อนใช้'),
     device('speaker','ลำโพง 4Ω 3W','ขั้วลอยจากแอมป์',30,-18,['+','-'],'ต่อเฉพาะ SPK+ กับ SPK- ของแอมป์ ทั้งสองขาเป็น BTL ห้ามนำขั้วใดไปต่อ GND'),
     device('pump','ภาคขับปั๊ม','D4184 / interface รอตรวจ',-30,-36,['CTRL3V3','GND'],'GPIO15 เป็นขาสั่งที่จองไว้ ถึงภาคอินเทอร์เฟซ logic 3.3V เท่านั้น ยังไม่ยืนยันว่า D4184 ขับตรงได้; วงจรกำลัง, default-off, flyback, hardware stop และแรงดันปั๊มยังรอยืนยัน ไม่วาดสายมอเตอร์หรือไฟบ้าน','hold'),
-    device('flow','Flow / stop interface','ยังไม่ใช่ขั้วเซนเซอร์จริง',30,-36,['FLOW3V3','STOP3V3','GND'],'จอง GPIO7 สำหรับ pulse ผ่านวงจรปรับระดับ และ GPIO16 สำหรับรายงานสถานะหยุดผ่านอินเทอร์เฟซ; ยังไม่เลือกรุ่น flow และวงจร NC ตัดคำสั่งปั๊มจริง การอ่าน GPIO อย่างเดียวไม่ใช่ emergency stop','hold'),
+    device('stop','Stop status interface','วงจรยังรอยืนยัน',30,-36,['STOP3V3','GND'],'จอง GPIO16 สำหรับรายงานสถานะหยุดผ่านอินเทอร์เฟซที่รอออกแบบ; การอ่าน GPIO อย่างเดียวไม่ใช่การตัดกำลังปั๊ม ต้องมี hardware stop แยก แผนปัจจุบันไม่มี flow sensor','hold'),
     supply(),rail()
    ],
    connections:[...common(),
@@ -41,7 +41,7 @@ module.exports = {
     wire('amp','supply.5V','amp.VIN','power','VIN แอมป์ใช้ไฟ 5V จาก buck; ตรวจความสามารถจ่ายกระแส'),wire('amp','rail.GND','amp.GND','ground','กราวด์ logic ของแอมป์'),wire('amp','board.GPIO10','amp.BCLK','clock','I²S TX bit clock'),wire('amp','board.GPIO11','amp.LRC','scl','I²S TX word select'),wire('amp','board.GPIO12','amp.DIN','audio','ข้อมูลเสียงจากบอร์ดไปแอมป์'),
     wire('speaker','amp.SPK+','speaker.+','audio','SPK+ → ลำโพง +; ห้ามต่อกราวด์'),wire('speaker','amp.SPK-','speaker.-','data','SPK- → ลำโพง -; ห้ามต่อกราวด์'),
     wire('pump','board.GPIO15','pump.CTRL3V3','pending','ขาสั่งจองไว้ รอตรวจวงจรรับ logic 3.3V / default-off ก่อนต่อปั๊ม','hold'),wire('pump','rail.GND','pump.GND','ground','กราวด์ฝั่ง logic ของอินเทอร์เฟซ รอตรวจการแยกวงจร','hold'),
-    wire('flow','flow.FLOW3V3','board.GPIO7','pending','ขา pulse จองไว้ รอเลือกรุ่นและวงจรแปลงเป็น 3.3V','hold'),wire('flow','flow.STOP3V3','board.GPIO16','pending','อ่านสถานะจาก interface ที่รอยืนยัน; ต้องมีวงจร hardware stop แยก','hold'),wire('flow','rail.GND','flow.GND','ground','กราวด์ฝั่ง logic รอยืนยัน interface','hold')
+    wire('stop','stop.STOP3V3','board.GPIO16','pending','อ่านสถานะจาก interface ที่รอยืนยัน; ต้องมีวงจร hardware stop แยก','hold'),wire('stop','rail.GND','stop.GND','ground','กราวด์ฝั่ง logic รอยืนยัน interface','hold')
    ]
   },
   node:{

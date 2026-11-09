@@ -286,7 +286,7 @@ dimension([25,-10.8,-17],[25,-10.8,18],'ลึกเสนอ 350 มม.',[28,-
 dimension([27,-11.4,-17],[27,33.6,-17],'สูงเสนอ 450 มม.',[29,22,-17]);
 dimension([7.35,2.0,8],[15.65,2.0,8],'ปากแก้ว 83 มม.',[11.5,4.5,10]);
 dimLabel('ขวด Ø85 × 320 mm*',15.2,32.2,-10.5,'#9a6c32');
-canvas.dataset.units='mm';canvas.dataset.footprintMm='220x350';canvas.dataset.heightMm='450';canvas.dataset.cupMm='83x63x90';canvas.dataset.pumpPrice='504';
+canvas.dataset.units='mm';canvas.dataset.footprintMm='220x350';canvas.dataset.heightMm='450';canvas.dataset.cupMm='83x63x90';canvas.dataset.pumpPrice=String(bom.rows.find(row=>row.id==='pump').unitBudget);
 
 const profiles={small:{volume:160,minutes:18},normal:{volume:220,minutes:25},late:{volume:240,minutes:20}};
 const bottleCapacity=1500;
@@ -546,7 +546,7 @@ for(const row of bom.rows){
  for(const v of [row.qty+' '+row.unit,money(row.lineBudget)]){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);}
  $('bom-body').appendChild(tr);
 }
-for(const [label,key] of [['อุปกรณ์ตามรายการ','parts'],['กันไว้สำหรับflow sensor','hold'],['โครงและของประกอบ','fabrication'],['ค่าส่งเผื่อ','shipping'],['เงินสำรอง','contingency']]){
+for(const [label,key] of [['อุปกรณ์ตามรายการ','parts'],['โครงและของประกอบ','fabrication'],['ค่าส่ง Shopee ตามข้อตกลง','shipping'],['เงินสำรอง','contingency']]){
  const d=document.createElement('div');const dt=document.createElement('span');dt.textContent=label;const dd=document.createElement('strong');dd.textContent=money(bom.totals[key])+' บาท';d.append(dt,dd);$('budget-breakdown').appendChild(d);
 }
 for(const source of bom.sources){const a=document.createElement('a');a.href=source.url;a.textContent=source.label;a.target='_blank';a.rel='noopener noreferrer';$('source-links').appendChild(a);}
