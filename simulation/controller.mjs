@@ -19,7 +19,7 @@ export function createSimulation({tankMl = 1500, flowMlPerMinute = 120} = {}) {
     resumeScaleUpdates() { state.scaleUpdates = true; if (state.scaleOk) state.lastScaleSampleS = state.time; log('scale updates resumed'); },
     reboot() { state.pump = false; state.fault = 'reboot'; state.elapsed = 0; log('reboot: pump off'); },
     start(target) {
-      if (!Number.isFinite(target) || target <= 0 || target > 300 || target <= state.cupMl || !state.cupPresent || state.stopPressed || !freshScale() || state.fault || state.tankMl <= 0) return false;
+      if (state.pump || !Number.isFinite(target) || target <= 0 || target > 300 || target <= state.cupMl || !state.cupPresent || state.stopPressed || !freshScale() || state.fault || state.tankMl <= 0) return false;
       state.targetMl = target; state.elapsed = 0; state.pump = true; log('pump started'); return true;
     },
     step(dt) {

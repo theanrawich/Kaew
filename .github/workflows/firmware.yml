@@ -1,0 +1,27 @@
+name: Firmware and simulator checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Simulator tests
+        run: node --test simulation/*.test.mjs
+      - name: Host safety tests
+        run: |
+          g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o /tmp/kaew-safety-test
+          /tmp/kaew-safety-test
+      - name: Install PlatformIO
+        run: python -m pip install platformio==6.2.0
+      - name: Build both firmware targets
+        run: pio run -d firmware

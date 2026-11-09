@@ -51,3 +51,14 @@ test('large steps cannot move water past the simulated stale deadline', () => {
   assert.equal(s.state.fault, 'scale stale');
   assert.equal(s.state.cupMl, 4); // 120 mL/min for two simulated seconds.
 });
+
+test('a second start cannot reset the running pump timeout', () => {
+  const s = createSimulation({flowMlPerMinute: 1});
+  s.placeCup();
+  assert.equal(s.start(200), true);
+  s.step(179);
+  assert.equal(s.start(200), false);
+  s.step(2);
+  assert.equal(s.state.pump, false);
+  assert.equal(s.state.fault, 'timeout');
+});

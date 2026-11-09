@@ -1,4 +1,9 @@
 node_modules/
+.kaew-toolchain/
+.kaew-pio-venv/
+.pio-core/
+firmware/.pio/
+firmware/test/*.exe
 _site/
 *.log
 .DS_Store
@@ -14,6 +19,9 @@ Thumbs.db
 !/KAEW_SHOPPING_LIST.md
 !/CAD_HANDOFF.md
 /docs/
+!/docs/
+/docs/*
+!/docs/EXECUTION.md
 /output/*
 !/output/real-parts/
 /output/real-parts/*
