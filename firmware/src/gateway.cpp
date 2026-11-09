@@ -43,15 +43,21 @@ void setup() {
 
 void loop() {
   inputs.nowMs = millis();
+  Packet persisted{};
+  while (cloud.takeAck(persisted)) {
+    uint8_t bytes[FRAME_SIZE]; encode(persisted, true, bytes); Serial1.write(bytes, sizeof bytes);
+  }
   while (Serial1.available()) {
     Packet p{}; bool ack = false;
     if (parser.push(static_cast<uint8_t>(Serial1.read()), p, ack) && !ack) {
-      if (!cloud.hasSpace()) { ++rejected; continue; }
       Receiver previous = receiver;
       Receive result = receiver.accept(p, inputs.nowMs);
       if (result == Receive::Accepted || result == Receive::Duplicate) {
-        if (result == Receive::Accepted && !cloud.enqueue(p)) { receiver = previous; ++rejected; continue; }
-        uint8_t bytes[FRAME_SIZE]; encode(p, true, bytes); Serial1.write(bytes, sizeof bytes);
+        if (cloud.enabled()) {
+          if (!cloud.enqueue(p)) { if (result == Receive::Accepted) receiver = previous; ++rejected; continue; }
+        } else {
+          uint8_t bytes[FRAME_SIZE]; encode(p, true, bytes); Serial1.write(bytes, sizeof bytes);
+        }
         if (result == Receive::Accepted) ++accepted; else ++duplicates;
       } else ++rejected;
     }
@@ -80,10 +86,10 @@ void loop() {
     if (!inputs.cupPresent) cupTare.clear();
     if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {
       float volume = 0; bool volumeKnown = cupTare.volume(inputs.cupPresent, inputs.weightG, volume);
-      Serial.printf("hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu pump=off\n",
+      Serial.printf("hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=off\n",
         raw, inputs.calibrated, inputs.weightG, inputs.scaleValid, inputs.cupPresent, volumeKnown, volume,
         receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0, static_cast<unsigned long>(accepted),
-        static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected));
+        static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected), static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()));
       lastPrint = inputs.nowMs;
     }
   }

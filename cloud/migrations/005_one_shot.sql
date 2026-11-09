@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE reminders ADD COLUMN repeat_enabled INTEGER NOT NULL DEFAULT 1;
+PRAGMA user_version = 5;
+COMMIT;

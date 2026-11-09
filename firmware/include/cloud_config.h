@@ -25,3 +25,7 @@
 #ifndef KAEW_ALLOW_DEV_HTTP
 #define KAEW_ALLOW_DEV_HTTP 0
 #endif
+// Minimum spacing between persistent sample writes, in milliseconds.
+#ifndef KAEW_DURABLE_MIN_MS
+#define KAEW_DURABLE_MIN_MS 1000
+#endif
