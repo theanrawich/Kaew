@@ -4,3 +4,4 @@ torch==2.5.1
 transformers==4.46.3
 pythainlp==5.4.0
 tzdata==2026.6
+lm-format-enforcer==0.10.11

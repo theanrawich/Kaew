@@ -13,8 +13,9 @@ CASES = [
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--model',required=True)
+    parser.add_argument('--constrained',action='store_true')
     args=parser.parse_args()
-    provider=TransformersProvider(args.model)
+    provider=TransformersProvider(args.model,constrained=args.constrained)
     for context in CASES:
         started=time.monotonic()
         try:

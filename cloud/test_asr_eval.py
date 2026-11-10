@@ -26,4 +26,12 @@ class EvalTest(unittest.TestCase):
     def test_malformed_spoken_number_requires_clarification(self):
         self.assertEqual(parse_text('แก้ว เตือนอีก สิบสิบ นาที')['intent'],'clarify_reminder')
 
+    def test_wake_recall_and_false_activation_are_separate_from_intent(self):
+        cases=[{'text':'แก้ว เติมน้ำให้หน่อย','intent':'refill','audio':'a'},
+               {'text':'พูดเรื่องอื่น','intent':'no_wake','audio':'b'}]
+        responses={'a':'แก้ว เติมน้ำให้หน่อย','b':'แก้ว เติมน้ำให้หน่อย'}
+        result=evaluate_cases(cases,lambda p:responses[p],lambda s:s.split())
+        self.assertEqual(result['wake_recall'],1)
+        self.assertEqual(result['false_activation_rate'],1)
+
 if __name__=='__main__': unittest.main()

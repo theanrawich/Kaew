@@ -1,5 +1,5 @@
 import unittest
-from hydration_ai import recommend, InvalidInput, TransformersProvider
+from hydration_ai import recommend, InvalidInput, TransformersProvider, ADVICE_SCHEMA
 
 
 class HydrationAITest(unittest.TestCase):
@@ -26,6 +26,7 @@ class HydrationAITest(unittest.TestCase):
     def test_missing_cup_data_cannot_suggest_dispensing_volume(self):
         model=lambda context: {'refill_ml':200,'reminder_minutes':45,'confidence':0.8,'explanation':'ok'}
         result=recommend(dict(self.context,cup_ml=None),model)
+        self.assertEqual(result['source'],'fallback')
         self.assertEqual(result['refill_ml'],0)
         self.assertFalse(result['actuation_allowed'])
 
@@ -35,6 +36,10 @@ class HydrationAITest(unittest.TestCase):
         self.assertEqual(result['source'],'model')
         self.assertFalse(result['actuation_allowed'])
         self.assertEqual(recommend(self.context,TransformersProvider('unused',engine=lambda p: 'not JSON'))['source'],'fallback')
+
+    def test_schema_requires_exact_advisory_fields(self):
+        self.assertFalse(ADVICE_SCHEMA['additionalProperties'])
+        self.assertEqual(set(ADVICE_SCHEMA['required']),{'refill_ml','reminder_minutes','confidence','explanation'})
 
 
 if __name__=='__main__': unittest.main()

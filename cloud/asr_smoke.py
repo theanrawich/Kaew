@@ -13,7 +13,7 @@ import threading
 import urllib.request
 import wave
 from pathlib import Path
-from audio_service import FasterWhisperASR, MmsThaiTTS, process_audio
+from audio_service import FasterWhisperASR, TransformersThaiASR, MmsThaiTTS, process_audio
 from server import create_server
 
 
@@ -28,6 +28,7 @@ class ToneTTS:
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--model',required=True); parser.add_argument('--wav',required=True)
+    parser.add_argument('--backend',choices=('faster-whisper','transformers'),default='faster-whisper')
     parser.add_argument('--tts-model',help='local MMS Thai model; otherwise use a mock tone')
     parser.add_argument('--output',help='optional destination WAV')
     args=parser.parse_args()
@@ -42,7 +43,8 @@ def main():
                 with urllib.request.urlopen(request,timeout=5) as response: return json.load(response)
             tts=MmsThaiTTS(args.tts_model) if args.tts_model else ToneTTS()
             output=Path(args.output) if args.output else Path(directory)/'output.wav'
-            result=process_audio(Path(args.wav).read_bytes(),FasterWhisperASR(args.model),command,tts,output)
+            asr=(FasterWhisperASR if args.backend=='faster-whisper' else TransformersThaiASR)(args.model)
+            result=process_audio(Path(args.wav).read_bytes(),asr,command,tts,output)
             print(json.dumps({'intent':result['intent'],'executed':result['executed'],'audio_written':result['audio_written'],'tts':'mms_thai' if args.tts_model else 'mock_tone'}))
         finally:
             server.shutdown();server.server_close();thread.join()

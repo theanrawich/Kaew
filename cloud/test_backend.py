@@ -78,6 +78,14 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(body['device']['id'], 'node-1')
         self.assertTrue(body['device']['online'])
 
+    def test_voice_level_does_not_present_stale_observation_as_current(self):
+        self.request('POST','/api/telemetry','device-secret',self.sample)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE telemetry SET received_at=?',(time.time()-3600,))
+        status,body=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่'})
+        self.assertEqual(status,200)
+        self.assertEqual(body['level'],'unknown')
+
     def test_concurrent_retries_are_idempotent(self):
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(lambda _: self.request('POST', '/api/telemetry', 'device-secret', self.sample)[0], range(8)))
@@ -316,7 +324,7 @@ class BackendTest(unittest.TestCase):
         self.server.hydration_provider=fake
         status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':True})
         self.assertEqual(status,200); self.assertEqual(contexts[0]['drank_ml'],120)
-        self.assertEqual(result['advice']['source'],'model'); self.assertFalse(result['actuation_allowed'])
+        self.assertEqual(result['advice']['source'],'fallback'); self.assertFalse(result['actuation_allowed'])
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],1)
 

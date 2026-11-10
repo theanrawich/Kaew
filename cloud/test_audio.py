@@ -7,7 +7,7 @@ import unittest
 import wave
 from pathlib import Path
 from types import SimpleNamespace
-from audio_service import validate_wav, FasterWhisperASR, GoogleThaiTTS, AudioError, process_audio, normalize_thai_tts, MmsThaiTTS
+from audio_service import validate_wav, FasterWhisperASR, TransformersThaiASR, GoogleThaiTTS, AudioError, process_audio, normalize_thai_tts, MmsThaiTTS
 
 
 def wav_fixture(silent=False):
@@ -73,6 +73,13 @@ class AudioTest(unittest.TestCase):
         with wave.open(io.BytesIO(audio),'rb') as w:
             self.assertEqual((w.getframerate(),w.getnchannels(),w.getsampwidth()),(16000,1,2))
         with self.assertRaises(AudioError): tts.synthesize('')
+
+    def test_transformers_asr_uses_validated_pcm(self):
+        calls=[]
+        asr=TransformersThaiASR(engine=lambda samples: calls.append(len(samples)) or 'แก้ว เติมน้ำให้หน่อย')
+        self.assertEqual(asr.transcribe(wav_fixture()),'แก้ว เติมน้ำให้หน่อย')
+        self.assertGreater(calls[0],0)
+        with self.assertRaises(AudioError): asr.transcribe(wav_fixture(silent=True))
 
 
 if __name__=='__main__': unittest.main()

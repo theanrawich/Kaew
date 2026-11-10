@@ -4,6 +4,10 @@ import math
 import urllib.request
 from notifications import NoRedirect
 
+ADVICE_SCHEMA={'type':'object','additionalProperties':False,
+               'properties':{'refill_ml':{'type':'number'},'reminder_minutes':{'type':'number'},
+                             'confidence':{'type':'number'},'explanation':{'type':'string'}},
+               'required':['refill_ml','reminder_minutes','confidence','explanation']}
 
 class InvalidInput(ValueError): pass
 
@@ -31,6 +35,8 @@ def recommend(context,provider):
         if not isinstance(result,dict) or set(result)!={'refill_ml','reminder_minutes','confidence','explanation'}: return fallback()
         if not (_number(result['refill_ml'],0,250) and _number(result['reminder_minutes'],15,240) and
                 _number(result['confidence'],0.5,1) and isinstance(result['explanation'],str) and 0<len(result['explanation'])<=300): return fallback()
+        # Missing cup or goal makes a refill suggestion unverifiable.
+        if context['cup_ml'] is None or context['goal_ml'] is None: return fallback()
         # A model's self-reported confidence is not a calibrated probability.
         bounded=dict(result)
         # Provisional 250 mL limit only bounds an advisory; unknown cup forbids a volume proposal.
@@ -49,7 +55,7 @@ class OllamaProvider:
     def __call__(self,context):
         prompt=('Return JSON only with refill_ml (0..250), reminder_minutes (15..240), confidence (0..1), '
                 'explanation (short). This is a nonmedical hydration reminder. Use null inputs as unknown. Data: '+json.dumps(context,ensure_ascii=False))
-        body=json.dumps({'model':self.model,'prompt':prompt,'format':'json','stream':False,'options':{'temperature':0}}).encode()
+        body=json.dumps({'model':self.model,'prompt':prompt,'format':ADVICE_SCHEMA,'stream':False,'options':{'temperature':0}}).encode()
         request=urllib.request.Request(self.url,data=body,method='POST',headers={'Content-Type':'application/json'})
         with urllib.request.build_opener(NoRedirect()).open(request,timeout=15) as response:
             raw=response.read(16385)
@@ -61,28 +67,34 @@ class OllamaProvider:
 
 class TransformersProvider:
     """Optional local CPU inference. Outputs remain advisory and independently validated."""
-    def __init__(self, model_path, engine=None):
+    def __init__(self, model_path, engine=None, constrained=False):
         if engine is None:
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
             tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
             model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True)
             model.eval()
+            prefix_allowed_tokens_fn=None
+            if constrained:
+                from lmformatenforcer import JsonSchemaParser
+                from lmformatenforcer.integrations.transformers import build_transformers_prefix_allowed_tokens_fn
+                prefix_allowed_tokens_fn=build_transformers_prefix_allowed_tokens_fn(tokenizer,JsonSchemaParser(ADVICE_SCHEMA))
             def engine(prompt):
                 messages=[{'role':'user','content':prompt}]
                 text=tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
                 inputs=tokenizer(text, return_tensors='pt')
                 with torch.inference_mode():
-                    output=model.generate(**inputs, max_new_tokens=160, do_sample=False)
+                    output=model.generate(**inputs, max_new_tokens=256, do_sample=False,
+                                          prefix_allowed_tokens_fn=prefix_allowed_tokens_fn)
                 return tokenizer.decode(output[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
         self.engine=engine
 
     def __call__(self, context):
         validate_context(context)
-        prompt=('Provide a nonmedical hydration suggestion based on this data. '
-                'Return only a JSON object with numeric refill_ml (0 to 250), '
-                'reminder_minutes (15 to 240), confidence (0 to 1), and a short '
-                'explanation string. Unknown values are not measurements. Data: '
+        prompt=('Return a JSON hydration suggestion. refill_ml must be 0 to 250; '
+                'reminder_minutes 15 to 240; confidence 0.5 to 1. '
+                'Keep explanation under ten words. Avoid medical claims. '
+                'Treat null as unknown. Data: '
                 +json.dumps(context,ensure_ascii=False))
         result=self.engine(prompt)
         if not isinstance(result,str) or len(result)>4096: raise ValueError('invalid model output')

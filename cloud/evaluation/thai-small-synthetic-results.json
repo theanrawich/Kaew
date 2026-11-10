@@ -1,0 +1,77 @@
+{
+  "cases": 9,
+  "cer": 0.18222222222222223,
+  "wer": 0.35185185185185186,
+  "intent_accuracy": 0.1111111111111111,
+  "wake_recall": 0.8888888888888888,
+  "false_activation_rate": null,
+  "results": [
+    {
+      "reference": "แก้ว เติมน้ำให้หน่อย",
+      "prediction": "แก้วเติมนั้นให้หน่อย",
+      "expected_intent": "refill",
+      "intent": "unknown",
+      "latency_s": 2.488
+    },
+    {
+      "reference": "แก้ว ช่วยเติมน้ำให้หน่อย",
+      "prediction": "แก้วช่วยเติมน้อยให้หน่อย",
+      "expected_intent": "refill",
+      "intent": "unknown",
+      "latency_s": 2.501
+    },
+    {
+      "reference": "แก้ว รินน้ำให้หน่อย",
+      "prediction": "แก้วริน นั้น ให้ หน่อย",
+      "expected_intent": "refill",
+      "intent": "unknown",
+      "latency_s": 2.475
+    },
+    {
+      "reference": "แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ",
+      "prediction": "แก้วอีกสามสิบวันนะที่เตือนให้ดือเมื่อนาน",
+      "expected_intent": "reminder",
+      "intent": "clarify_reminder",
+      "latency_s": 2.938
+    },
+    {
+      "reference": "แก้ว เตือนอีก 15 นาที",
+      "prediction": "แก้ไว้เตือนอีก 15 นาที",
+      "expected_intent": "reminder",
+      "intent": "no_wake",
+      "latency_s": 2.511
+    },
+    {
+      "reference": "แก้ว ช่วยเตือนให้ดื่มน้ำอีก 45 นาที",
+      "prediction": "แก้วชั่วเตือนให้ดื่มเนาะอีกเพราะสิบสิบห้าละนาที",
+      "expected_intent": "reminder",
+      "intent": "clarify_reminder",
+      "latency_s": 3.243
+    },
+    {
+      "reference": "แก้ว ตอนนี้น้ำเหลือเท่าไหร่",
+      "prediction": "แก้วตอนนี้เน้อเหลือเท่าไหร่",
+      "expected_intent": "level",
+      "intent": "unknown",
+      "latency_s": 2.701
+    },
+    {
+      "reference": "แก้ว น้ำในขวดเป็นอย่างไร",
+      "prediction": "แก้วนั้นในขวดที่เป็นอย่างไร",
+      "expected_intent": "level",
+      "intent": "unknown",
+      "latency_s": 2.617
+    },
+    {
+      "reference": "แก้ว ระดับน้ำเป็นอย่างไร",
+      "prediction": "แก้วระดับน้ำเป็นอย่างไร",
+      "expected_intent": "level",
+      "intent": "level",
+      "latency_s": 2.551
+    }
+  ],
+  "model": ".kaew-models/whisper-th-small",
+  "corpus": "Synthetic-only Thai command prompts; not a human speech benchmark.",
+  "tokenizer": "PyThaiNLP newmm",
+  "warning": "Check corpus provenance before interpreting accuracy."
+}

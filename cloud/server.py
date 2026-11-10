@@ -173,7 +173,9 @@ class Handler(BaseHTTPRequestHandler):
         if kind=='level':
             with closing(connect(self.server.db_path)) as db:
                 row=db.execute('SELECT level,received_at,source FROM telemetry ORDER BY id DESC LIMIT 1').fetchone()
-            level=row['level'] if row else 'unknown'
+            # Receipt time is not measurement time; delayed outbox records may already be old.
+            # Expiry can invalidate a value, but cannot establish sensor freshness.
+            level=row['level'] if row and 0<=time.time()-row['received_at']<5 else 'unknown'
             text={'wet':'ข้อมูลระดับล่าสุดระบุว่าพบระดับน้ำ แต่อาจล่าช้า', 'dry':'ข้อมูลระดับล่าสุดระบุว่าน้ำต่ำ แต่อาจล่าช้า','unknown':'ยังไม่ทราบระดับน้ำ'}[level]
             if row and row['source']=='simulated': text += ' (ข้อมูลจำลอง)'
             return self.reply(200, {'intent':kind,'level':level,'executed':True,'reply':text})

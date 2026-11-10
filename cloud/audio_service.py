@@ -58,6 +58,35 @@ class FasterWhisperASR:
         return text
 
 
+class TransformersThaiASR:
+    """Local Thai-finetuned Whisper, with the same strict WAV boundary."""
+    def __init__(self, model_path=None, engine=None):
+        if engine is None:
+            if not model_path: raise AudioError('local ASR model path required')
+            try:
+                import numpy as np
+                import torch
+                from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+                processor=AutoProcessor.from_pretrained(model_path,local_files_only=True)
+                model=AutoModelForSpeechSeq2Seq.from_pretrained(model_path,local_files_only=True).eval()
+                def engine(samples):
+                    array=np.asarray(samples,dtype=np.float32)/32768.0
+                    inputs=processor(array,sampling_rate=16000,return_tensors='pt')
+                    with torch.inference_mode():
+                        ids=model.generate(inputs.input_features,language='th',task='transcribe',max_new_tokens=180)
+                    return processor.batch_decode(ids,skip_special_tokens=True)[0]
+            except Exception: raise AudioError('Thai ASR model or runtime unavailable') from None
+        self.engine=engine
+
+    def transcribe(self,audio):
+        validate_wav(audio)
+        pcm=inspect_wav(audio,True)['pcm']
+        try: text=self.engine([x[0] for x in struct.iter_unpack('<h',pcm)]).strip()
+        except Exception: raise AudioError('Thai speech recognition failed') from None
+        if not text or len(text)>500: raise AudioError('no usable speech recognized')
+        return text
+
+
 def google_tts_request(payload,token):
     request=urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize',data=json.dumps(payload).encode(),
         headers={'Content-Type':'application/json','Authorization':'Bearer '+token},method='POST')
