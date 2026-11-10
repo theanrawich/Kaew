@@ -59,7 +59,7 @@ def validate(data):
     return (isinstance(data['device_id'], str) and integer(data['session'], 1, 4294967295)
             and integer(data['seq'], 0, 4294967295) and data['level'] in ('wet', 'dry', 'unknown')
             and (temp is None or (type(temp) in (int, float) and math.isfinite(temp) and -55 <= temp <= 125))
-            and integer(data['tds_adc'], 0, 4095) and data.get('source','unknown') in ('unknown','device','simulated'))
+            and (integer(data['tds_adc'], 0, 4095) or data['tds_adc'] == 65535 and type(data['tds_adc']) is int) and data.get('source','unknown') in ('unknown','device','simulated'))
 
 
 def queue_notification(db, key, kind, text, provider, now):

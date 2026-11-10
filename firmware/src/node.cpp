@@ -6,7 +6,8 @@
 
 namespace {
 constexpr int TEMP_PIN = 4;
-constexpr int TDS_PIN = 34;
+// Disabled until the exact TDS board output and GPIO voltage are verified.
+constexpr int TDS_PIN = -1;
 // Do not configure the level input before its output interface is verified.
 constexpr int LEVEL_PIN = -1;
 OneWire oneWire(TEMP_PIN);
@@ -42,7 +43,7 @@ void loop() {
     float c = temp.getTempCByIndex(0);
     bool valid = c != DEVICE_DISCONNECTED_C && c >= -55.0f && c <= 125.0f;
     // Raw ADC is not a calibrated TDS measurement. Unknown level fails closed.
-    uint16_t adc = static_cast<uint16_t>(analogRead(TDS_PIN));
+    uint16_t adc = TDS_PIN < 0 ? UINT16_MAX : static_cast<uint16_t>(analogRead(TDS_PIN));
     uint8_t level = LEVEL_PIN < 0 ? 0 : (digitalRead(LEVEL_PIN) ? 1 : 2);
     if (!sender.pending()) {
       Packet p{1, sessionId, sequence++, static_cast<int16_t>(valid ? c * 100.0f : INT16_MIN), adc, level};

@@ -6,6 +6,10 @@ int main() {
   assert(std::memcmp(b, golden, FRAME_SIZE)==0);
   Packet decoded{}; bool ack = false;
   assert(decode(b, decoded, ack) && !ack && decoded.session == 7 && decoded.adc == 1234);
+  Packet unknown=p; unknown.adc=65535; encode(unknown,false,b);
+  assert(decode(b,decoded,ack) && decoded.adc==65535);
+  unknown.adc=4096; encode(unknown,false,b); assert(!decode(b,decoded,ack));
+  encode(p,false,b);
   b[15] ^= 1; assert(!decode(b, decoded, ack)); b[15] ^= 1;
   Receiver r; assert(r.accept(p, 100) == Receive::Accepted);
   assert(r.accept(p, 200) == Receive::Duplicate); assert(r.receivedAt() == 100);

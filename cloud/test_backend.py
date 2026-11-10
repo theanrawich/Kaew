@@ -22,6 +22,12 @@ from test_audio import wav_fixture
 
 
 class BackendTest(unittest.TestCase):
+    def test_unknown_adc_is_persisted_without_becoming_a_measurement(self):
+        sample=dict(self.sample,tds_adc=65535)
+        self.assertEqual(self.request('POST','/api/telemetry','device-secret',sample)[0],201)
+        self.assertEqual(self.request('GET','/api/telemetry','admin-secret')[1]['items'][0]['tds_adc'],65535)
+        self.assertEqual(self.request('POST','/api/telemetry','device-secret',dict(sample,seq=2,tds_adc=4096))[0],400)
+
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.directory.name, 'kaew.sqlite3')

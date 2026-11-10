@@ -20,7 +20,7 @@ inline bool decode(const uint8_t *b, Packet &p, bool &ack) {
   if(b[0]!=0x4b || b[1]!=0x57 || b[2]!=1 || (b[3]!=1 && b[3]!=2) ||
      crc16(b,18)!=(uint16_t(b[18]) | (uint16_t(b[19])<<8))) return false;
   Packet q{b[4],get32(b+5),get32(b+9),int16_t(uint16_t(b[13])|(uint16_t(b[14])<<8)),uint16_t(uint16_t(b[15])|(uint16_t(b[16])<<8)),b[17]};
-  if(q.node!=1 || q.session==0 || q.adc>4095 || q.level>2 || (q.centiC != INT16_MIN && (q.centiC < -5500 || q.centiC > 12500))) return false;
+  if(q.node!=1 || q.session==0 || (q.adc>4095 && q.adc!=UINT16_MAX) || q.level>2 || (q.centiC != INT16_MIN && (q.centiC < -5500 || q.centiC > 12500))) return false;
   p=q; ack=b[3]==2; return true;
 }
 class FrameParser {

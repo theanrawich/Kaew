@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {encodeFrame, decodeFrame, createWireReceiver} from './wire-codec.mjs';
 
 const packet = {node:1, session:7, seq:0, centiC:2500, adc:1234, level:1};
+test('unconnected ADC has an explicit unknown sentinel', () => {
+  const unknown={...packet,adc:65535};
+  assert.deepEqual(decodeFrame(encodeFrame(unknown)),{...unknown,ack:false});
+  assert.throws(()=>encodeFrame({...packet,adc:4096}));
+});
 test('golden UART frame round trips and corruption is rejected', () => {
   const frame = encodeFrame(packet);
   assert.equal(Buffer.from(frame).toString('hex'), '4b570101010700000000000000c409d20401eb72');

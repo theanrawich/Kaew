@@ -11,11 +11,13 @@ The sensor node and gateway use a dedicated full-duplex 115200 baud, 8N1 UART. F
 | 5 | 4 | Nonzero random boot-session ID |
 | 9 | 4 | Unsigned sequence counter |
 | 13 | 2 | Signed centidegrees C, `-32768` = invalid |
-| 15 | 2 | Raw TDS ADC, 0–4095; not calibrated TDS |
+| 15 | 2 | Raw TDS ADC, 0–4095; `65535` = unknown/not connected; not calibrated TDS |
 | 17 | 1 | Level `0` unknown, `1` wet, `2` dry |
 | 18 | 2 | CRC, little-endian |
 
 Golden sample: node 1, session 7, sequence 0, 25.00 C, ADC 1234, wet: `4b570101010700000000000000c409d20401eb72`. Both host C++ and JS tests compare their encoder with these bytes. Unsupported version/type, bad CRC or invalid values are rejected. The stream parser re-synchronizes on magic. ACK echoes the sample with type 2 and a new CRC.
+
+The unknown ADC value extends v1 without changing frame layout. Older v1 gateways reject it: update backend and gateway before flashing the updated node. Existing numeric samples remain unchanged; historical readings cannot be retrospectively classified as connected or floating.
 
 One sample may be pending. Sender transmits immediately, retries at 500 ms, and drops after four transmissions and a final 500 ms wait. New samples are skipped while pending; no persistent offline queue exists. Gateway acknowledges duplicates without changing the last accepted timestamp. Same-session sequence uses unsigned modular ordering with a half-range window: zero distance is duplicate, distances `1..0x7fffffff` are newer, and the remainder are old. A changed session is refused until the previous reading has been stale for 5 s. An unknown, dry, malformed or stale tank reading cannot authorize dispensing.
 

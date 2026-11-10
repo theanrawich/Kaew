@@ -2,7 +2,7 @@
 export function crc16(bytes) {
   let c=0xffff; for (const byte of bytes) { c ^= byte << 8; for (let i=0;i<8;i++) c=((c & 0x8000) ? (c<<1)^0x1021 : c<<1)&0xffff; } return c;
 }
-function valid(p) { return p && p.node===1 && Number.isInteger(p.session) && p.session>0 && p.session<=0xffffffff && Number.isInteger(p.seq) && p.seq>=0 && p.seq<=0xffffffff && Number.isInteger(p.centiC) && (p.centiC===-32768 || (p.centiC>=-5500 && p.centiC<=12500)) && Number.isInteger(p.adc) && p.adc>=0 && p.adc<=4095 && Number.isInteger(p.level) && p.level>=0 && p.level<=2; }
+function valid(p) { return p && p.node===1 && Number.isInteger(p.session) && p.session>0 && p.session<=0xffffffff && Number.isInteger(p.seq) && p.seq>=0 && p.seq<=0xffffffff && Number.isInteger(p.centiC) && (p.centiC===-32768 || (p.centiC>=-5500 && p.centiC<=12500)) && Number.isInteger(p.adc) && ((p.adc>=0 && p.adc<=4095) || p.adc===65535) && Number.isInteger(p.level) && p.level>=0 && p.level<=2; }
 export function encodeFrame(p, ack=false) {
   if (!valid(p) || typeof ack !== 'boolean') throw new TypeError('invalid packet');
   const b=new Uint8Array(20), v=new DataView(b.buffer); b.set([0x4b,0x57,1,ack?2:1,p.node]);
