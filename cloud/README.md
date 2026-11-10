@@ -49,4 +49,20 @@ If command execution succeeds but speech output fails, the result explicitly rep
 
 For an isolated smoke test with a local model and WAV, run `python cloud/asr_smoke.py --model <local-model-dir> --wav <16k-mono-wav>`. This starts a temporary loopback backend and exercises real ASR and command handling; its TTS output is a generated test tone, not speech. A public Thai sample used for development is available from [Thai Speech 20K](https://huggingface.co/datasets/hotdogs/thai-speech-20k). Neither that single sample nor the mock tests establish Thai command accuracy.
 
+### Local experimental Thai speech and model evaluation
+
+For an optional no-credential TTS path install `cloud/requirements-local-models.txt` into a separate Python environment and download the [Meta MMS Thai model](https://huggingface.co/facebook/mms-tts-tha) to a local directory. Its model license is **CC-BY-NC-4.0**; assess usage rights before deployment. Model binaries and generated voice files must remain outside Git. `audio_cli.py` accepts `--tts-model <local-mms-dir>` instead of the Google token. Output is mono 16 kHz signed 16-bit PCM WAV. The local provider accepts Thai text and decimal integers only, and rejects unsupported characters. It is not a streaming or interruptible playback implementation.
+
+For a reproducible isolated smoke run with real ASR and real TTS, use:
+
+```powershell
+python cloud/asr_smoke.py --model <whisper-dir> --wav <input.wav> --tts-model <mms-dir> --output <response.wav>
+```
+
+This does not force an intent or demonstrate a simulated refill. A `no_wake` response means the recognizer failed to detect the invocation and no action was executed. No personal audio is stored by the server; explicitly supplied input and output files are retained by the caller.
+
+`cloud/generate_asr_corpus.py --model <mms-dir> --out <private-dir>` generates nine synthetic phrases from the tracked `asr_commands.json`. Run `cloud/asr_eval.py --model <whisper-dir> --manifest <private-dir>/manifest.json --output <private-dir>/results.json`. CER uses normalized Thai characters without whitespace; WER uses PyThaiNLP newmm tokens. This tiny, single synthetic voice corpus cannot establish real-world recognition accuracy or represent different speakers and noise conditions. Do not use its intent results to authorize physical dispensing.
+
+`cloud/evaluate_hydration.py --model <qwen-dir>` runs three local advisory cases using the optional Transformers provider. Outputs are strictly validated, rejected on invalid JSON or invalid values, and always have `actuation_allowed: false`. The model is not integrated into the backend advice endpoint. Model output may contain unsupported medical claims and is not medical advice. The small-model experiment documented in `docs/EXECUTION.md` failed to produce acceptable decisions.
+
 `POST /api/advice` with admin authentication and `{"include_simulated":false}` obtains an advisory from an optional loopback Ollama model selected with `KAEW_OLLAMA_MODEL`, using persisted intake and goal data. Without a running model or with invalid/low-confidence output it falls back to zero refill and a 60-minute reminder. It records the request and response. Model-reported confidence is not a calibrated probability; recommendations are not medical advice. Cup data is currently unknown to this endpoint, so suggested refill is zero and `actuation_allowed` is always false. No actual Ollama model inference has been tested or connected to the dispensing controller. This feature is not a completed course AI closed loop.

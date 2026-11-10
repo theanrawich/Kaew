@@ -7,7 +7,7 @@ import unittest
 import wave
 from pathlib import Path
 from types import SimpleNamespace
-from audio_service import validate_wav, FasterWhisperASR, GoogleThaiTTS, AudioError, process_audio
+from audio_service import validate_wav, FasterWhisperASR, GoogleThaiTTS, AudioError, process_audio, normalize_thai_tts, MmsThaiTTS
 
 
 def wav_fixture(silent=False):
@@ -64,6 +64,15 @@ class AudioTest(unittest.TestCase):
             result=process_audio(wav_fixture(),ASR(),command,BrokenTTS(),dest)
             self.assertTrue(result['executed']); self.assertFalse(result['audio_written'])
             self.assertEqual(len(calls),1); self.assertFalse(dest.exists())
+
+    def test_thai_numbers_and_mock_mms_pcm_make_esp_compatible_wav(self):
+        self.assertEqual(normalize_thai_tts('อีก 30 นาที'),'อีก สามสิบ นาที')
+        self.assertEqual(normalize_thai_tts('น้ำ 21 มล.'),'น้ำ ยี่สิบเอ็ด มล')
+        tts=MmsThaiTTS(engine=lambda text: (16000,[0.1,-0.1]*200))
+        audio=tts.synthesize('เตือนอีก 30 นาที')
+        with wave.open(io.BytesIO(audio),'rb') as w:
+            self.assertEqual((w.getframerate(),w.getnchannels(),w.getsampwidth()),(16000,1,2))
+        with self.assertRaises(AudioError): tts.synthesize('')
 
 
 if __name__=='__main__': unittest.main()

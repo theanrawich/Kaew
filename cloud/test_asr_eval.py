@@ -1,0 +1,29 @@
+import unittest
+from asr_eval import edit_distance, evaluate_cases
+from voice import parse_text
+
+
+class EvalTest(unittest.TestCase):
+    def test_edit_distance_and_weighted_rates(self):
+        self.assertEqual(edit_distance(list('abc'),list('adc')),1)
+        cases=[{'text':'แก้ว เติมน้ำให้หน่อย','intent':'refill','audio':'a'},
+               {'text':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่','intent':'level','audio':'b'}]
+        predictions={'a':'แก้ว เติมน้ำให้หน่อย','b':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่'}
+        result=evaluate_cases(cases,lambda p:predictions[p],lambda s:s.split())
+        self.assertEqual(result['cer'],0); self.assertEqual(result['wer'],0); self.assertEqual(result['intent_accuracy'],1)
+
+    def test_wrong_or_failed_recognition_is_not_counted_correct(self):
+        cases=[{'text':'แก้ว เติมน้ำให้หน่อย','intent':'refill','audio':'a'}]
+        result=evaluate_cases(cases,lambda p:'',lambda s:s.split())
+        self.assertEqual(result['intent_accuracy'],0); self.assertGreater(result['cer'],0)
+
+    def test_thai_spoken_numbers_are_normalized_for_error_rates(self):
+        cases=[{'text':'แก้ว เตือนอีก 30 นาที','intent':'reminder','audio':'a'}]
+        result=evaluate_cases(cases,lambda p:'แก้ว เตือนอีก สามสิบ นาที',lambda s:s.split())
+        self.assertEqual(result['cer'],0); self.assertEqual(result['wer'],0)
+        self.assertEqual(result['intent_accuracy'],1)
+
+    def test_malformed_spoken_number_requires_clarification(self):
+        self.assertEqual(parse_text('แก้ว เตือนอีก สิบสิบ นาที')['intent'],'clarify_reminder')
+
+if __name__=='__main__': unittest.main()

@@ -3,6 +3,7 @@ node_modules/
 .kaew-pio-venv/
 .kaew-browser/
 .kaew-voice/
+.kaew-tts/
 .kaew-voice-test/
 .kaew-models/
 .kaew-model-cache/

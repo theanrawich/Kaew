@@ -1,0 +1,6 @@
+# Optional CPU-only development dependencies; model weights are obtained separately.
+-r requirements-voice.txt
+torch==2.5.1
+transformers==4.46.3
+pythainlp==5.4.0
+tzdata==2026.6

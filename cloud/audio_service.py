@@ -4,7 +4,9 @@ import binascii
 import io
 import json
 import math
+import re
 import struct
+import unicodedata
 import urllib.request
 import wave
 from pathlib import Path
@@ -79,6 +81,61 @@ class GoogleThaiTTS:
             inspect_wav(audio)
             return audio
         except (Exception, binascii.Error): raise AudioError('Thai speech synthesis failed') from None
+
+
+def _thai_number(n):
+    if not 0<=n<=999999: raise AudioError('number out of range')
+    if n==0: return 'ศูนย์'
+    digits=('ศูนย์','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า')
+    places=('','สิบ','ร้อย','พัน','หมื่น','แสน'); out=''
+    for position in range(5,-1,-1):
+        digit=(n//(10**position))%10
+        if not digit: continue
+        if position==1: out+=('' if digit==1 else 'ยี่' if digit==2 else digits[digit])+'สิบ'
+        elif position==0 and digit==1 and n>=10: out+='เอ็ด'
+        else: out+=digits[digit]+places[position]
+    return out
+
+
+def normalize_thai_tts(text):
+    if not isinstance(text,str) or not 0<len(text)<=300: raise AudioError('invalid TTS text')
+    text=unicodedata.normalize('NFC',text)
+    text=re.sub(r'\d+',lambda match:_thai_number(int(match.group())),text)
+    text=re.sub(r'[.,!?\-:;()]+','',text)
+    if any(not (ch.isspace() or '\u0e00'<=ch<='\u0e7f') for ch in text): raise AudioError('unsupported TTS characters')
+    text=' '.join(text.split())
+    if not text: raise AudioError('empty TTS text')
+    return text
+
+
+class MmsThaiTTS:
+    """Local Meta MMS Thai VITS; model license is CC-BY-NC-4.0."""
+    def __init__(self,model_path=None,engine=None):
+        if engine is None:
+            if not model_path: raise AudioError('local MMS model path required')
+            try:
+                import torch
+                from transformers import VitsModel, AutoTokenizer
+                model=VitsModel.from_pretrained(model_path,local_files_only=True).eval()
+                tokenizer=AutoTokenizer.from_pretrained(model_path,local_files_only=True)
+                def engine(text):
+                    with torch.inference_mode(): output=model(**tokenizer(text,return_tensors='pt')).waveform
+                    return model.config.sampling_rate,output.squeeze().cpu().tolist()
+            except Exception: raise AudioError('MMS TTS model or runtime unavailable') from None
+        self.engine=engine
+
+    def synthesize(self,text):
+        text=normalize_thai_tts(text)
+        try:
+            rate,samples=self.engine(text)
+            if rate!=16000 or not 0<len(samples)<=rate*30: raise ValueError('invalid speech output')
+            if any(not math.isfinite(x) for x in samples): raise ValueError('nonfinite audio')
+            pcm=b''.join(struct.pack('<h',int(max(-1,min(1,x))*32767)) for x in samples)
+            out=io.BytesIO()
+            with wave.open(out,'wb') as w:
+                w.setnchannels(1);w.setsampwidth(2);w.setframerate(rate);w.writeframes(pcm)
+            return out.getvalue()
+        except Exception: raise AudioError('local Thai speech synthesis failed') from None
 
 
 def process_audio(audio, asr, command, tts, output_path):

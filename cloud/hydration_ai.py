@@ -57,3 +57,33 @@ class OllamaProvider:
             outer=json.loads(raw)
         if outer.get('done') is not True: raise ValueError('incomplete model response')
         return json.loads(outer['response'])
+
+
+class TransformersProvider:
+    """Optional local CPU inference. Outputs remain advisory and independently validated."""
+    def __init__(self, model_path, engine=None):
+        if engine is None:
+            import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
+            tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
+            model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True)
+            model.eval()
+            def engine(prompt):
+                messages=[{'role':'user','content':prompt}]
+                text=tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                inputs=tokenizer(text, return_tensors='pt')
+                with torch.inference_mode():
+                    output=model.generate(**inputs, max_new_tokens=160, do_sample=False)
+                return tokenizer.decode(output[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
+        self.engine=engine
+
+    def __call__(self, context):
+        validate_context(context)
+        prompt=('Provide a nonmedical hydration suggestion based on this data. '
+                'Return only a JSON object with numeric refill_ml (0 to 250), '
+                'reminder_minutes (15 to 240), confidence (0 to 1), and a short '
+                'explanation string. Unknown values are not measurements. Data: '
+                +json.dumps(context,ensure_ascii=False))
+        result=self.engine(prompt)
+        if not isinstance(result,str) or len(result)>4096: raise ValueError('invalid model output')
+        return json.loads(result)

@@ -1,5 +1,5 @@
 import unittest
-from hydration_ai import recommend, InvalidInput
+from hydration_ai import recommend, InvalidInput, TransformersProvider
 
 
 class HydrationAITest(unittest.TestCase):
@@ -28,6 +28,13 @@ class HydrationAITest(unittest.TestCase):
         result=recommend(dict(self.context,cup_ml=None),model)
         self.assertEqual(result['refill_ml'],0)
         self.assertFalse(result['actuation_allowed'])
+
+    def test_local_provider_validates_json_and_never_authorizes_actuation(self):
+        provider=TransformersProvider('unused',engine=lambda prompt: '{"refill_ml":150,"reminder_minutes":45,"confidence":0.8,"explanation":"Recent intake."}')
+        result=recommend(self.context,provider)
+        self.assertEqual(result['source'],'model')
+        self.assertFalse(result['actuation_allowed'])
+        self.assertEqual(recommend(self.context,TransformersProvider('unused',engine=lambda p: 'not JSON'))['source'],'fallback')
 
 
 if __name__=='__main__': unittest.main()
