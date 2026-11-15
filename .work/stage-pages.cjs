@@ -2,6 +2,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = path.dirname(__dirname);
 const destination = path.join(root, '_site');
+// cad-viewer.js is a generated bundle (gitignored); build it on clean checkouts.
+if (!fs.existsSync(path.join(root, 'cad-viewer.js'))) require('./build-cad-viewer.cjs');
 const files = [
   ['kaew-3d.html', 'index.html'],
   ['cad-viewer.html', 'cad-viewer.html'],
