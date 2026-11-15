@@ -31,7 +31,7 @@ class BackendTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.path = os.path.join(self.directory.name, 'kaew.sqlite3')
-        self.server = create_server('127.0.0.1', 0, self.path, 'device-secret', 'admin-secret')
+        self.server = create_server('127.0.0.1', 0, self.path, 'device-secret', 'admin-secret', hydration_provider=None)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.url = 'http://127.0.0.1:%s' % self.server.server_port
@@ -69,7 +69,7 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(len(result['items']), 1)
         self.assertEqual(result['items'][0]['level'], 'wet')
         self.server.shutdown(); self.server.server_close(); self.thread.join()
-        self.server = create_server('127.0.0.1', 0, self.path, 'device-secret', 'admin-secret')
+        self.server = create_server('127.0.0.1', 0, self.path, 'device-secret', 'admin-secret', hydration_provider=None)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True); self.thread.start()
         self.url = 'http://127.0.0.1:%s' % self.server.server_port
         self.assertEqual(len(self.request('GET', '/api/telemetry', 'admin-secret')[1]['items']), 1)
@@ -170,7 +170,8 @@ class BackendTest(unittest.TestCase):
             db.execute("INSERT INTO telemetry(device_id,session,seq,level,temperature_c,tds_adc,received_at) VALUES ('node-1',1,1,'wet',25,1000,1)")
         migrate(path)
         with closing(sqlite3.connect(path)) as db:
-            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],7)
+            self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],8)
+            self.assertTrue({'model','fallback'} <= {r[1] for r in db.execute('PRAGMA table_info(advice_log)')})
             self.assertEqual(db.execute('SELECT COUNT(*) FROM telemetry').fetchone()[0],1)
 
     def test_legacy_mock_notification_history_remains_visible(self):
@@ -188,7 +189,7 @@ class BackendTest(unittest.TestCase):
             deadline=time.monotonic()+3
             while worker.failures==0 and time.monotonic()<deadline: time.sleep(.02)
             self.assertGreater(worker.failures,0); self.assertEqual(outbox.count(),1)
-            server=create_server('127.0.0.1',port,os.path.join(self.directory.name,'recovered.sqlite3'),'device-secret','admin-secret')
+            server=create_server('127.0.0.1',port,os.path.join(self.directory.name,'recovered.sqlite3'),'device-secret','admin-secret',hydration_provider=None)
             thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
             deadline=time.monotonic()+4
             while outbox.count() and time.monotonic()<deadline: time.sleep(.02)
@@ -322,17 +323,125 @@ class BackendTest(unittest.TestCase):
             if intent=='refill': self.assertFalse(result['executed'])
 
     def test_advice_uses_history_and_never_authorizes_actuation(self):
+        self.request('POST','/api/goal','admin-secret',{'goal_ml':2000})
+        self.request('POST','/api/telemetry','device-secret',dict(self.sample,temperature_c=28,source='device'))
         self.request('POST','/api/events','admin-secret',{'event_id':'a1','kind':'drink','source':'simulated','volume_ml':120})
         contexts=[]
         def fake(context):
             contexts.append(context)
-            return {'refill_ml':180,'reminder_minutes':45,'confidence':0.8,'explanation':'Based on recent intake.'}
+            return {'suggested_ml':180,'next_reminder_minutes':45,'reason':'Based on recent intake.'}
         self.server.hydration_provider=fake
         status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':True})
         self.assertEqual(status,200); self.assertEqual(contexts[0]['drank_ml'],120)
-        self.assertEqual(result['advice']['source'],'fallback'); self.assertFalse(result['actuation_allowed'])
+        self.assertEqual(contexts[0]['goal_ml'],2000)
+        self.assertEqual(contexts[0]['temperature_c'],28)
+        self.assertEqual(contexts[0]['tank_level'],'wet')
+        self.assertEqual(contexts[0]['timezone'],'Asia/Bangkok')
+        self.assertLess(contexts[0]['minutes_since_drink'],1)
+        self.assertFalse(result['advice']['fallback']); self.assertFalse(result['actuation_allowed'])
         with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],2)
+
+    def test_advice_schedules_model_and_fallback_and_latest_is_admin_only(self):
+        self.assertEqual(self.request('GET','/api/advice','device-secret')[0],401)
+        self.assertIsNone(self.request('GET','/api/advice','admin-secret')[1]['advice'])
+        def timeout(c): raise TimeoutError()
+        for provider,minutes,fallback in ((lambda c:{'next_reminder_minutes':35,'suggested_ml':220,'reason':'Recent intake.'},35,False),(None,60,True),(lambda c:'invalid JSON',60,True),(timeout,60,True)):
+            self.server.hydration_provider=provider
+            before=time.time()
+            status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':False})
+            self.assertEqual(status,200)
+            decision=result['advice']
+            self.assertEqual(decision['fallback'],fallback); self.assertFalse(decision['actuation_allowed'])
+            latest=self.request('GET','/api/advice','admin-secret')[1]['advice']
+            self.assertEqual(latest,decision)
+            rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+            self.assertEqual(rem['interval_minutes'],minutes)
+            self.assertGreaterEqual(rem['next_due'],before+minutes*60)
+            self.assertLessEqual(rem['next_due'],time.time()+minutes*60)
+        self.assertEqual(self.request('GET','/api/notifications','admin-secret')[1]['items'],[])
+
+    def test_drink_reschedules_once_without_nagging_and_preserves_voice_reminder(self):
+        contexts=[]
+        def model(c):
+            contexts.append(c)
+            return {'next_reminder_minutes':25,'suggested_ml':210,'reason':'Recent drink.'}
+        self.server.hydration_provider=model
+        drink={'event_id':'auto-1','kind':'drink','source':'measured','volume_ml':150}
+        self.request('POST','/api/events','admin-secret',drink)
+        self.request('POST','/api/events','admin-secret',drink)
+        self.assertEqual(len(contexts),1)
+        self.request('POST','/api/events','admin-secret',{'event_id':'no-inference','kind':'fault','source':'measured','volume_ml':None})
+        self.assertEqual(len(contexts),1)
+        self.assertEqual(contexts[0]['drink_count'],1)
+        self.assertEqual(contexts[0]['drank_ml'],150)
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['interval_minutes'],25)
+        self.assertFalse(any(n['kind']=='reminder' for n in self.request('GET','/api/notifications','admin-secret')[1]['items']))
+        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
+        voice=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.request('POST','/api/events','admin-secret',dict(drink,event_id='auto-2'))
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder'],voice)
+        self.request('POST','/api/advice','admin-secret',{'include_simulated':False})
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder']['interval_minutes'],25)
+
+    def test_reminder_commits_fire_before_model_and_does_not_overwrite_new_voice(self):
+        entered=threading.Event(); release=threading.Event()
+        def model(c):
+            entered.set(); release.wait(3)
+            return {'next_reminder_minutes':40,'suggested_ml':200,'reason':'Next reminder.'}
+        self.server.hydration_provider=model
+        self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()-1})
+        try:
+            self.assertTrue(entered.wait(2))
+            # A separate writer succeeds while inference is blocked; fire is durable.
+            with closing(sqlite3.connect(self.path,timeout=.2)) as db, db:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM notification_jobs WHERE kind='reminder'").fetchone()[0],1)
+                db.execute('UPDATE reminders SET repeat_enabled=0,next_due=?',(time.time()+900,))
+        finally: release.set()
+        deadline=time.monotonic()+2
+        while time.monotonic()<deadline:
+            with closing(sqlite3.connect(self.path)) as db:
+                if db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0]: break
+            time.sleep(.02)
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()[0],0)
             self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],1)
+
+    def test_overdue_voice_reminder_is_not_discarded_by_a_drink(self):
+        # Pause scheduler so the pending overdue reminder cannot race the request.
+        self.server.stop_reminders.set(); self.server.reminder_thread.join(); self.server.delivery_thread.join()
+        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE reminders SET next_due=?',(time.time()-1,))
+        pending=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.request('POST','/api/events','admin-secret',{'event_id':'pending','kind':'drink','source':'measured','volume_ml':100})
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder'],pending)
+
+    def test_repeating_fire_uses_model_to_schedule_next_and_delivers_once(self):
+        contexts=[]
+        def model(c):
+            contexts.append(c)
+            return {'next_reminder_minutes':42,'suggested_ml':230,'reason':'Next interval.'}
+        model.model='mock-reminder-model'
+        self.server.hydration_provider=model
+        self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()-1})
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline:
+            notes=self.request('GET','/api/notifications','admin-secret')[1]['items']
+            if notes and notes[0]['status']=='delivered': break
+            time.sleep(.03)
+        self.assertEqual(len(notes),1); self.assertEqual(notes[0]['status'],'delivered')
+        self.assertEqual(len(contexts),1); self.assertEqual(contexts[0]['last_interval_minutes'],30)
+        self.assertIsNotNone(contexts[0]['last_reminder_at'])
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['interval_minutes'],42)
+        decision=self.request('GET','/api/advice','admin-secret')[1]['advice']
+        self.assertAlmostEqual(rem['next_due'],decision['timestamp']+42*60)
+        with closing(sqlite3.connect(self.path)) as db:
+            model_id,fallback,output=db.execute('SELECT model,fallback,output_json FROM advice_log').fetchone()
+        self.assertEqual(model_id,'mock-reminder-model'); self.assertEqual(fallback,0)
+        self.assertFalse(json.loads(output)['actuation_allowed'])
 
     def test_voice_device_status_does_not_fabricate_connection(self):
         status,answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว สถานะอุปกรณ์'})

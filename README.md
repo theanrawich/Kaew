@@ -2,7 +2,7 @@
 
 Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง, cloud และแบบ CAD
 
-สถานะ 15 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway ยังไม่สั่งเริ่มปั๊ม และ AI ยังไม่เป็น closed loop Cloud เปิดใช้งานแล้วที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
+สถานะ 15 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway ยังไม่สั่งเริ่มปั๊ม และ AI reminder closed loop มีในซอฟต์แวร์แล้ว (ยังไม่ deploy การเปลี่ยนแปลงนี้) Cloud เปิดใช้งานแล้วที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
 
 ระบบสื่อสารตามเส้นทางนี้:
 
@@ -61,7 +61,7 @@ python cloud/server.py
 
 Hosted stack ที่เลือกคือ **Render web service เดียว** ให้บริการทั้ง API และ dashboard ผ่าน HTTPS และเก็บข้อมูลที่ **Supabase Postgres** โดยใช้ secret `DATABASE_URL` เมื่อไม่ตั้งตัวแปรนี้จะใช้ SQLite local ตาม `KAEW_DB_PATH` ต่อไป ไม่ต้องติดตั้ง psycopg สำหรับการพัฒนา SQLite
 
-Cloud API และ dashboard เปิดใช้งานแล้วที่ <https://kaew-cloud.onrender.com> โดย POST telemetry ไปที่ `https://kaew-cloud.onrender.com/api/telemetry` ใช้ device token; dashboard ใช้ admin token แยกกัน งาน checkpoint นี้ไม่ต้อง deploy หรือแก้ Render/Supabase อีก ดู [cloud/README.md](cloud/README.md) สำหรับ local setup และข้อมูลดูแลระบบ ข้อมูล hosted อยู่ใน Supabase แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
+Cloud API และ dashboard เปิดใช้งานแล้วที่ <https://kaew-cloud.onrender.com> โดย POST telemetry ไปที่ `https://kaew-cloud.onrender.com/api/telemetry` ใช้ device token; dashboard ใช้ admin token แยกกัน การอัปเดต AI นี้ต้องให้ operator apply Postgres migration 002, ตั้ง GROQ_API_KEY secret บน kaew-cloud และ deploy จาก prod หลัง merge (หรือ reviewed branch) ภายหลัง ดู [cloud/README.md](cloud/README.md) สำหรับ local setup และข้อมูลดูแลระบบ ข้อมูล hosted อยู่ใน Supabase แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
 
 Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://kaew-cloud.onrender.com/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** สำหรับ checkpoint ได้เตรียม local header แล้วโดย Wi-Fi SSID/password ยังว่าง ให้กรอกในเครื่องก่อน build แล้ว flash gateway ก่อน node ตาม [ขั้นตอน firmware](firmware/README.md#build-and-flash) ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
 
@@ -84,3 +84,7 @@ node .work/stage-pages.cjs
 เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [CAD handoff](docs/CAD_HANDOFF.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [execution ledger](docs/EXECUTION.md) · [เป้าหมายผลิตภัณฑ์](docs/product-intent.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
 
 สมาชิก SengKeng มี 5 คน: **Theanrawich Thungpromsri, Pongsest Ruangwitthayanusorn, Ratchapol Srisongkram, Tanakrit Onjinda และ Suphachok** เกณฑ์ M8 ต้องมี commit จริงจากสมาชิกทุกคน แต่ละคนต้องทำงานและ commit ด้วยบัญชีของตนเอง ไม่สร้างประวัติแทนกัน
+
+AI reminder loop ตอบเกณฑ์ **M4**: ประวัติการดื่ม/telemetry → โมเดลเลือกช่วงเตือนครั้งถัดไป → server ตรวจและจำกัด 15–180 นาที → บันทึก `reminders.next_due` → scheduler สร้าง notification job เมื่อถึงเวลา → delivery worker ส่งผ่าน Telegram (ถ้าตั้งค่า) หรือ mock แล้วเลือกช่วงถัดไปอีกครั้ง การบันทึก drink event และ admin `POST /api/advice` ตั้งเวลาใหม่โดยไม่ส่งเตือนทันที; dashboard แสดง decision ล่าสุดผ่าน admin `GET /api/advice` ถ้าโมเดลไม่พร้อม ใช้ 60 นาที/200 มล. พร้อมบันทึก `fallback=true` และยังตั้งเตือนจริง ปริมาณ `suggested_ml` เป็นคำแนะนำเท่านั้น **AI ไม่ควบคุมปั๊ม และ `actuation_allowed` เป็น false เสมอ**
+
+ตั้ง `GROQ_API_KEY` เป็น secret ใน process environment; `KAEW_AI_MODEL` มีค่าเริ่มต้น `openai/gpt-oss-20b` ซึ่ง handoff ยืนยันว่าเป็น Groq production model ที่เร็วประมาณ 1000 tok/s เหมาะกับ demo และแทน Llama free-tier รุ่นที่เลิกใช้แล้ว Optional `OPENROUTER_API_KEY` เป็น secret สำหรับ provider สำรอง ใช้ model id เดียวกัน ไม่มี key ก็เริ่ม server ได้และ fallback โดยไม่เรียก network Server ไม่โหลด `.env` เอง ใช้ decision-on-request และ scheduler ใน web service เดิม ไม่เพิ่ม cron/paid addon; Render free-plan sleep จะพัก scheduler ด้วย ยังต้องพิสูจน์ hardware/Telegram live delivery ดู [รายละเอียดและขั้นตอน operator](cloud/README.md#closed-loop-ai-reminders-m4)

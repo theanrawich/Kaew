@@ -10,7 +10,9 @@ import threading
 from database import connect, Target, verify_postgres
 from notifications import MockProvider, TelegramProvider
 from voice import parse_text
-from hydration_ai import recommend, OllamaProvider
+from hydration_ai import recommend, select_provider
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -25,7 +27,7 @@ def migrate(path):
         return
     with closing(connect(path)) as db, db:
         version = db.execute('PRAGMA user_version').fetchone()[0]
-        if version > 7: raise RuntimeError('database schema newer than server')
+        if version > 8: raise RuntimeError('database schema newer than server')
         if version == 0:
             db.executescript((ROOT / 'migrations/001_initial.sql').read_text(encoding='utf-8'))
             version = 1
@@ -46,6 +48,9 @@ def migrate(path):
             version = 6
         if version == 6:
             db.executescript((ROOT / 'migrations/007_advice.sql').read_text(encoding='utf-8'))
+            version = 7
+        if version == 7:
+            db.executescript((ROOT / 'migrations/008_advice_loop.sql').read_text(encoding='utf-8'))
         db.execute('INSERT INTO devices(id) VALUES (?) ON CONFLICT (id) DO NOTHING', ('node-1',))
 
 
@@ -65,6 +70,55 @@ def queue_notification(db, key, kind, text, provider, now):
         if last is not None and now-last < 300: return
     db.execute('INSERT INTO notification_jobs(id,kind,text,status,next_attempt,created_at,provider) VALUES (?,?,?,\'pending\',?,?,?) ON CONFLICT (id) DO NOTHING',
                (key,kind,text,now,now,provider))
+
+
+def reminder_snapshot(db):
+    row=db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
+    return tuple(row[k] for k in ('interval_minutes','next_due','repeat_enabled')) if row else None
+
+
+def apply_advice(server, include_simulated=False, automatic=False, expected_reminder=None):
+    """Inference runs outside DB transactions; logging and conditional schedule commit together.
+
+    Serialize in-process decisions and compare the reminder snapshot after inference
+    so a concurrent voice/manual reminder is never overwritten by stale inference.
+    """
+    with server.advice_lock:
+        now=time.time()
+        with closing(connect(server.db_path)) as db:
+            before=reminder_snapshot(db)
+            if automatic and ((before and not before[2]) or
+                              (expected_reminder is not None and before!=expected_reminder)):
+                return None
+            sources=('measured','estimated','simulated') if include_simulated else ('measured','estimated')
+            placeholders=','.join('?' for _ in sources)
+            row=db.execute("SELECT COALESCE(SUM(volume_ml),0) AS total,COUNT(*) AS count FROM events WHERE kind='drink' AND received_at>=? AND source IN ("+placeholders+")",(now-86400,*sources)).fetchone()
+            last=db.execute("SELECT MAX(received_at) AS last FROM events WHERE kind='drink' AND source IN ("+placeholders+")",sources).fetchone()['last']
+            goal=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
+            telemetry_sources=('device','unknown','simulated') if include_simulated else ('device','unknown')
+            telemetry=db.execute("SELECT temperature_c,level,source FROM telemetry WHERE source IN ("+','.join('?' for _ in telemetry_sources)+") ORDER BY id DESC LIMIT 1",telemetry_sources).fetchone()
+            previous=db.execute("SELECT MAX(created_at) AS last FROM notification_jobs WHERE kind='reminder'").fetchone()['last']
+            context={'goal_ml':goal['value'] if goal else None,'drank_ml':min(row['total'],20000),
+                     'drink_count':row['count'],'minutes_since_drink':min(max((now-last)/60,0),10080) if last is not None else None,
+                     'cup_ml':None,'profile':'balanced','time_of_day':datetime.fromtimestamp(now,ZoneInfo('Asia/Bangkok')).strftime('%H:%M'),
+                     'timezone':'Asia/Bangkok','temperature_c':telemetry['temperature_c'] if telemetry else None,
+                     'tank_level':telemetry['level'] if telemetry else 'unknown',
+                     'telemetry_source':telemetry['source'] if telemetry else None,
+                     'last_reminder_at':previous,'last_interval_minutes':before[0] if before else None}
+        result=recommend(context,server.hydration_provider)
+        now=time.time()
+        with closing(connect(server.db_path)) as db, db:
+            db.execute('BEGIN IMMEDIATE')
+            # A changed reminder supersedes this in-flight decision (including manual requests).
+            scheduled=reminder_snapshot(db)==before
+            result.update(timestamp=now,scheduled=scheduled,actuation_allowed=False)
+            db.execute('INSERT INTO advice_log(created_at,input_json,output_json,simulated,model,fallback) VALUES (?,?,?,?,?,?)',
+                       (now,json.dumps(context),json.dumps(result,ensure_ascii=False),int(include_simulated),result['model'],int(result['fallback'])))
+            if scheduled:
+                minutes=result['next_reminder_minutes']
+                db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,1) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=1',
+                           (minutes,now+minutes*60))
+        return result
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -142,12 +196,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {'status':'duplicate'})
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)',(ident,kind,source,volume,time.time()))
             if kind == 'fault': queue_notification(db,'fault:'+ident,'fault','แก้ว: พบเหตุขัดข้อง โปรดตรวจอุปกรณ์'+(' (ข้อมูลจำลอง)' if source=='simulated' else ''),self.server.provider_name,time.time())
+        if kind == 'drink':
+            apply_advice(self.server, include_simulated=(source=='simulated'), automatic=True)
         return self.reply(201, {'status':'stored'})
 
     def set_reminder(self, data):
         if not isinstance(data,dict) or set(data)!={'interval_minutes','next_due'} or type(data['interval_minutes']) is not int or not 1<=data['interval_minutes']<=1440 or type(data['next_due']) not in (int,float) or not math.isfinite(data['next_due']) or not 0<data['next_due']<time.time()+86400*366:
             return self.reply(400, {'error':'invalid_reminder'})
         with closing(connect(self.server.db_path)) as db, db:
+            db.execute('BEGIN IMMEDIATE')
             db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,1) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(data['interval_minutes'],data['next_due']))
         return self.reply(200, {'status':'saved'})
 
@@ -165,6 +222,7 @@ class Handler(BaseHTTPRequestHandler):
         if kind=='reminder':
             minutes=intent['minutes']
             with closing(connect(self.server.db_path)) as db, db:
+                db.execute('BEGIN IMMEDIATE')
                 db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,0) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(minutes,time.time()+minutes*60))
             return self.reply(200, {'intent':kind,'minutes':minutes,'executed':True,'reply':'ได้เลย จะเตือนอีก %d นาที'%minutes})
         if kind=='level':
@@ -190,17 +248,8 @@ class Handler(BaseHTTPRequestHandler):
     def advice(self,data):
         if not isinstance(data,dict) or set(data)!={'include_simulated'} or type(data['include_simulated']) is not bool:
             return self.reply(400,{'error':'invalid_advice_request'})
-        now=time.time(); include=data['include_simulated']
-        with closing(connect(self.server.db_path)) as db, db:
-            sources=('measured','estimated','simulated') if include else ('measured','estimated')
-            placeholders=','.join('?' for _ in sources)
-            row=db.execute("SELECT COALESCE(SUM(volume_ml),0) AS total,MAX(received_at) AS last FROM events WHERE kind='drink' AND received_at>=? AND source IN ("+placeholders+")",(now-86400,*sources)).fetchone()
-            goal=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
-            context={'goal_ml':goal['value'] if goal else None,'drank_ml':min(row['total'],20000),
-                     'minutes_since_drink':min(max((now-row['last'])/60,0),10080) if row['last'] else None,'cup_ml':None,'profile':'balanced'}
-            result=recommend(context,self.server.hydration_provider)
-            db.execute('INSERT INTO advice_log(created_at,input_json,output_json,simulated) VALUES (?,?,?,?)',
-                       (now,json.dumps(context),json.dumps(result,ensure_ascii=False),int(include)))
+        include=data['include_simulated']
+        result=apply_advice(self.server,include_simulated=include)
         return self.reply(200,{'advice':result,'simulated_inputs_included':include,'actuation_allowed':False})
 
     def do_GET(self):
@@ -212,9 +261,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
-        if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal'): return self.reply(404, {'error': 'not_found'})
+        if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
         if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
         with closing(connect(self.server.db_path)) as db, db:
+            if path == '/api/advice':
+                row=db.execute('SELECT output_json,model,fallback,created_at FROM advice_log ORDER BY id DESC LIMIT 1').fetchone()
+                result=json.loads(row['output_json']) if row else None
+                if result is not None:
+                    result.update(model=row['model'],fallback=bool(row['fallback']),timestamp=row['created_at'],actuation_allowed=False)
+                return self.reply(200,{'advice':result,'actuation_allowed':False})
             if path == '/api/goal':
                 row=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
                 return self.reply(200, {'goal_ml': row['value'] if row else None})
@@ -244,7 +299,7 @@ class Handler(BaseHTTPRequestHandler):
 class KaewServer(ThreadingHTTPServer):
     def server_close(self):
         self.stop_reminders.set()
-        self.reminder_thread.join(timeout=3)
+        self.reminder_thread.join(timeout=22)
         self.delivery_thread.join(timeout=6)
         super().server_close()
 
@@ -252,19 +307,24 @@ class KaewServer(ThreadingHTTPServer):
 def reminder_loop(server):
     while not server.stop_reminders.wait(0.25):
         try:
+            fired=None
             with closing(connect(server.db_path)) as db, db:
                 db.execute('BEGIN IMMEDIATE')
                 row=db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
                 now=time.time()
                 if row and row['next_due'] <= now:
                     queue_notification(db,'reminder:'+str(row['next_due']),'reminder','แก้ว: ถึงเวลาดื่มน้ำแล้ว',server.provider_name,now)
-                    if row['repeat_enabled']: db.execute('UPDATE reminders SET next_due=? WHERE id=1',(now+row['interval_minutes']*60,))
+                    if row['repeat_enabled']:
+                        fired=(row['interval_minutes'],now+row['interval_minutes']*60,1)
+                        db.execute('UPDATE reminders SET next_due=? WHERE id=1',(fired[1],))
                     else: db.execute('DELETE FROM reminders WHERE id=1')
                 device=db.execute("SELECT last_seen,(SELECT source FROM telemetry WHERE device_id='node-1' ORDER BY id DESC LIMIT 1) AS source FROM devices WHERE id='node-1'").fetchone()
                 state=db.execute("SELECT value FROM alert_state WHERE key='offline'").fetchone()
                 if device and device['last_seen'] and now-device['last_seen']>=30 and (not state or state['value']!='1'):
                     queue_notification(db,'offline:'+str(device['last_seen']),'offline','แก้ว: อุปกรณ์ขาดการเชื่อมต่อ'+(' (ข้อมูลจำลอง)' if device['source']=='simulated' else ''),server.provider_name,now)
                     db.execute("INSERT INTO alert_state VALUES ('offline','1') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
+            if fired is not None:
+                apply_advice(server,automatic=True,expected_reminder=fired)
         except sqlite3.Error:
             continue
 
@@ -286,15 +346,18 @@ def delivery_loop(server):
             continue
 
 
-def create_server(host, port, db_path, device_token, admin_token, provider=None):
+_ENV_PROVIDER = object()
+
+
+def create_server(host, port, db_path, device_token, admin_token, provider=None, hydration_provider=_ENV_PROVIDER):
     if not device_token or not admin_token or device_token == admin_token: raise ValueError('distinct tokens required')
     db_path = Target.from_environment(db_path)
     migrate(db_path)
     server = KaewServer((host, port), Handler)
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
     server.provider = provider or MockProvider()
-    model=os.environ.get('KAEW_OLLAMA_MODEL','')
-    server.hydration_provider = OllamaProvider(model) if model else None
+    server.hydration_provider = select_provider() if hydration_provider is _ENV_PROVIDER else hydration_provider
+    server.advice_lock = threading.Lock()
     server.provider_name = 'telegram' if isinstance(server.provider, TelegramProvider) else 'mock'
     server.stop_reminders = threading.Event()
     server.reminder_thread = threading.Thread(target=reminder_loop,args=(server,),daemon=True)
