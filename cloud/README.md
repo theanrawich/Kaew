@@ -67,7 +67,7 @@ Local SQLite tests need no dependency install. For a **disposable local** Postgr
 
 Render + Supabase is the selected path; existing Fly config remains an alternative, not a guaranteed free tier. Apply the same schema first. Export `KAEW_FLY_APP`, **`DATABASE_URL`** and the two distinct tokens privately, then run `bash cloud/deploy.sh fly` after installing/logging in to flyctl and provisioning an authorized app. The helper imports these three secrets over stdin and deploys with `cloud/fly.toml`, one Machine and a remote Docker builder. No Supabase URI belongs in TOML. See [Fly configuration](https://fly.io/docs/reference/configuration/) and [secret import](https://fly.io/docs/flyctl/secrets-import/).
 
-The non-root Docker image includes psycopg from `cloud/requirements.txt`, Python 3.11 and `PYTHONDONTWRITEBYTECODE=1`. Build from repo root with `docker build -f cloud/Dockerfile -t kaew-cloud .`. Supply `DATABASE_URL` and both tokens at runtime behind a TLS edge. Without `DATABASE_URL`, the image falls back to `/data/kaew.sqlite3` for local experiments; retain it with a volume writable by UID 10001. Optional voice/model packages are not installed.
+The non-root Docker image includes psycopg from `cloud/requirements.txt`, Python 3.11 and `PYTHONDONTWRITEBYTECODE=1`. Build from repo root with `docker build -f cloud/Dockerfile -t kaew-cloud .` (BuildKit reads `cloud/Dockerfile.dockerignore`). Supply `DATABASE_URL` and both tokens at runtime behind a TLS edge. Without `DATABASE_URL`, the image falls back to `/data/kaew.sqlite3` for local experiments; retain it with a volume writable by UID 10001. Optional voice/model packages are not installed.
 
 ## Verify telemetry and gateway
 
