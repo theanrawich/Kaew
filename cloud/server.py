@@ -1,4 +1,4 @@
-"""Local development telemetry service. Not an Internet-facing production server."""
+"""Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
 import hmac
 from contextlib import closing
 import json
@@ -7,6 +7,7 @@ import os
 import sqlite3
 import time
 import threading
+from database import connect, Target, verify_postgres
 from notifications import MockProvider, TelegramProvider
 from voice import parse_text
 from hydration_ai import recommend, OllamaProvider
@@ -18,14 +19,10 @@ ROOT = Path(__file__).resolve().parent
 MAX_BODY = 4096
 
 
-def connect(path):
-    db = sqlite3.connect(path, timeout=5)
-    db.row_factory = sqlite3.Row
-    db.execute('PRAGMA foreign_keys = ON')
-    return db
-
-
 def migrate(path):
+    if isinstance(path, Target) and path.url:
+        verify_postgres(path)
+        return
     with closing(connect(path)) as db, db:
         version = db.execute('PRAGMA user_version').fetchone()[0]
         if version > 7: raise RuntimeError('database schema newer than server')
@@ -49,7 +46,7 @@ def migrate(path):
             version = 6
         if version == 6:
             db.executescript((ROOT / 'migrations/007_advice.sql').read_text(encoding='utf-8'))
-        db.execute('INSERT OR IGNORE INTO devices(id) VALUES (?)', ('node-1',))
+        db.execute('INSERT INTO devices(id) VALUES (?) ON CONFLICT (id) DO NOTHING', ('node-1',))
 
 
 def validate(data):
@@ -66,7 +63,7 @@ def queue_notification(db, key, kind, text, provider, now):
     if kind in ('low_water','fault','offline'):
         last=db.execute('SELECT MAX(created_at) AS last FROM notification_jobs WHERE kind=?',(kind,)).fetchone()['last']
         if last is not None and now-last < 300: return
-    db.execute('INSERT OR IGNORE INTO notification_jobs(id,kind,text,status,next_attempt,created_at,provider) VALUES (?,?,?,\'pending\',?,?,?)',
+    db.execute('INSERT INTO notification_jobs(id,kind,text,status,next_attempt,created_at,provider) VALUES (?,?,?,\'pending\',?,?,?) ON CONFLICT (id) DO NOTHING',
                (key,kind,text,now,now,provider))
 
 
@@ -124,8 +121,8 @@ class Handler(BaseHTTPRequestHandler):
             if data['level']=='dry' and (not old_level or old_level['value']!='dry'):
                 text = 'แก้ว: ระดับน้ำต่ำ โปรดตรวจขวดน้ำ' + (' (ข้อมูลจำลอง)' if data.get('source') == 'simulated' else '')
                 queue_notification(db, 'low:%s:%s' % (data['session'],data['seq']), 'low_water', text, self.server.provider_name, now)
-            db.execute("INSERT OR REPLACE INTO alert_state VALUES ('level',?)",(data['level'],))
-            db.execute("INSERT OR REPLACE INTO alert_state VALUES ('offline','0')")
+            db.execute("INSERT INTO alert_state VALUES ('level',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",(data['level'],))
+            db.execute("INSERT INTO alert_state VALUES ('offline','0') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
         self.reply(201, {'status': 'stored'})
 
     def add_event(self, data):
@@ -141,7 +138,7 @@ class Handler(BaseHTTPRequestHandler):
             db.execute('BEGIN IMMEDIATE')
             old = db.execute('SELECT kind,source,volume_ml FROM events WHERE id=?',(ident,)).fetchone()
             if old:
-                if tuple(old) != (kind, source, volume): return self.reply(409, {'error':'duplicate_conflict'})
+                if (old['kind'], old['source'], old['volume_ml']) != (kind, source, volume): return self.reply(409, {'error':'duplicate_conflict'})
                 return self.reply(200, {'status':'duplicate'})
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)',(ident,kind,source,volume,time.time()))
             if kind == 'fault': queue_notification(db,'fault:'+ident,'fault','แก้ว: พบเหตุขัดข้อง โปรดตรวจอุปกรณ์'+(' (ข้อมูลจำลอง)' if source=='simulated' else ''),self.server.provider_name,time.time())
@@ -151,14 +148,14 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(data,dict) or set(data)!={'interval_minutes','next_due'} or type(data['interval_minutes']) is not int or not 1<=data['interval_minutes']<=1440 or type(data['next_due']) not in (int,float) or not math.isfinite(data['next_due']) or not 0<data['next_due']<time.time()+86400*366:
             return self.reply(400, {'error':'invalid_reminder'})
         with closing(connect(self.server.db_path)) as db, db:
-            db.execute('INSERT OR REPLACE INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,1)',(data['interval_minutes'],data['next_due']))
+            db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,1) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(data['interval_minutes'],data['next_due']))
         return self.reply(200, {'status':'saved'})
 
     def set_goal(self, data):
         if not isinstance(data,dict) or set(data)!={'goal_ml'} or type(data['goal_ml']) is not int or not 100 <= data['goal_ml'] <= 10000:
             return self.reply(400, {'error':'invalid_goal'})
         with closing(connect(self.server.db_path)) as db, db:
-            db.execute("INSERT OR REPLACE INTO settings VALUES ('goal_ml',?)",(data['goal_ml'],))
+            db.execute("INSERT INTO settings VALUES ('goal_ml',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",(data['goal_ml'],))
         return self.reply(200, {'status':'saved'})
 
     def voice(self, data):
@@ -168,7 +165,7 @@ class Handler(BaseHTTPRequestHandler):
         if kind=='reminder':
             minutes=intent['minutes']
             with closing(connect(self.server.db_path)) as db, db:
-                db.execute('INSERT OR REPLACE INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,0)',(minutes,time.time()+minutes*60))
+                db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,0) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(minutes,time.time()+minutes*60))
             return self.reply(200, {'intent':kind,'minutes':minutes,'executed':True,'reply':'ได้เลย จะเตือนอีก %d นาที'%minutes})
         if kind=='level':
             with closing(connect(self.server.db_path)) as db:
@@ -267,7 +264,7 @@ def reminder_loop(server):
                 state=db.execute("SELECT value FROM alert_state WHERE key='offline'").fetchone()
                 if device and device['last_seen'] and now-device['last_seen']>=30 and (not state or state['value']!='1'):
                     queue_notification(db,'offline:'+str(device['last_seen']),'offline','แก้ว: อุปกรณ์ขาดการเชื่อมต่อ'+(' (ข้อมูลจำลอง)' if device['source']=='simulated' else ''),server.provider_name,now)
-                    db.execute("INSERT OR REPLACE INTO alert_state VALUES ('offline','1')")
+                    db.execute("INSERT INTO alert_state VALUES ('offline','1') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
         except sqlite3.Error:
             continue
 
@@ -291,6 +288,7 @@ def delivery_loop(server):
 
 def create_server(host, port, db_path, device_token, admin_token, provider=None):
     if not device_token or not admin_token or device_token == admin_token: raise ValueError('distinct tokens required')
+    db_path = Target.from_environment(db_path)
     migrate(db_path)
     server = KaewServer((host, port), Handler)
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
@@ -311,13 +309,16 @@ def main():
     admin_token = os.environ.get('KAEW_ADMIN_TOKEN', '')
     db_path = os.environ.get('KAEW_DB_PATH', str(ROOT / 'kaew.sqlite3'))
     host = os.environ.get('KAEW_HOST', '127.0.0.1')
-    if host not in ('127.0.0.1', 'localhost', '::1') and os.environ.get('KAEW_DEV_ALLOW_INSECURE_LAN') != '1':
-        raise ValueError('non-loopback HTTP requires KAEW_DEV_ALLOW_INSECURE_LAN=1')
+    edge_https = os.environ.get('KAEW_TRUST_EDGE_HTTPS') == '1'
+    dev_lan = os.environ.get('KAEW_DEV_ALLOW_INSECURE_LAN') == '1'
+    if host not in ('127.0.0.1', 'localhost', '::1') and not (edge_https or dev_lan):
+        raise ValueError('non-loopback bind requires KAEW_TRUST_EDGE_HTTPS=1 behind TLS edge, or KAEW_DEV_ALLOW_INSECURE_LAN=1 for development')
     token=os.environ.get('KAEW_TELEGRAM_TOKEN',''); chat=os.environ.get('KAEW_TELEGRAM_CHAT_ID','')
     if bool(token)!=bool(chat): raise ValueError('both Telegram token and chat ID are required')
     provider=TelegramProvider(token,chat) if token else MockProvider()
-    server = create_server(host, int(os.environ.get('KAEW_PORT', '8080')), db_path, device_token, admin_token, provider)
-    print('Kaew development HTTP on %s:%s (no TLS)' % (host, server.server_port), flush=True)
+    server = create_server(host, int(os.environ.get('KAEW_PORT', os.environ.get('PORT', '8080'))), db_path, device_token, admin_token, provider)
+    mode = 'trusted HTTPS edge; internal HTTP' if edge_https else 'development HTTP; no TLS'
+    print('Kaew on %s:%s (%s)' % (host, server.server_port, mode), flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally: server.server_close()

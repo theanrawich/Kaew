@@ -8,11 +8,11 @@
 
 > **อัปเดตการตัดสินใจ 6 พ.ย. 2026:** ผู้ใช้ตัด flow sensor ออกจากแผนแล้ว ตำแหน่งเผื่อ flow ใน CAD เป็นแบบเก่าที่ยังไม่ได้แก้ ไม่ใช่อุปกรณ์ที่ต้องติดตั้ง ใช้ load cell และเวลาเป็นแนวทางตรวจการจ่ายที่ยังต้องออกแบบและทดสอบ ปรับรายการ BOM/ผัง/แบบเมื่อทำงานต่อ
 
-> **ตรวจสินค้า 6 พ.ย.:** ร้าน load cell ตัวเลือก 1kg/HX711 ระบุขนาด 80×13×13 มม. แต่ CAD ใช้ 80×12.7×12.7 มม. ต้องตรวจและปรับ clearance รวมทั้งรูยึดก่อนผลิต; ข้อมูลปั๊มในหน้าขายขัดกันและสุ่มรุ่น ห้ามใช้ความเร็ว 250 ml/min เป็นค่าที่ยืนยัน รายละเอียดอยู่ใน `KAEW_PARTS_CONFIRMATION.md`.
+> **ตรวจสินค้า 6 พ.ย.:** ร้าน load cell ตัวเลือก 1kg/HX711 ระบุขนาด 80×13×13 มม. แต่ CAD ใช้ 80×12.7×12.7 มม. ต้องตรวจและปรับ clearance รวมทั้งรูยึดก่อนผลิต; ข้อมูลปั๊มในหน้าขายขัดกันและสุ่มรุ่น ห้ามใช้ความเร็ว 250 ml/min เป็นค่าที่ยืนยัน รายละเอียดอยู่ใน `parts-verification.md`.
 
 ## ความคืบหน้า 6 พฤศจิกายน 2026
 
-ชุดแบบล่าสุดสำหรับส่งต่ออยู่ใน `cad/kaew-full-assembly-20261106.zip` แตกไฟล์ลงใน `cad/` หลังแตก snapshot วันที่ 31 ต.ค. ชุดนี้มี FCStd, STEP ทั้งเครื่อง และ STEP/STL ใน `custom-parts-current/`; ภาพประกอบยังเป็นแบบก่อนแก้จุดยึด ไฟล์ ZIP เดิมวันที่ 31 ต.ค. เก็บไว้เป็นประวัติ
+ชุดแบบล่าสุดสำหรับส่งต่ออยู่ใน `cad/kaew-full-assembly-20261106.zip` แตกไฟล์ลงใน `cad/` ได้โดยตรง ไม่ต้องมี archive เก่า ชุดนี้มี FCStd, STEP ทั้งเครื่อง และ STEP/STL ใน `custom-parts-current/`; ภาพประกอบยังเป็นแบบก่อนแก้จุดยึด ลบ ZIP วันที่ 31 ต.ค. ออกจาก tree แล้ว
 
 ### ตรวจจุดยึดเพิ่มเติม
 
@@ -45,7 +45,7 @@ FreeCAD 1.1.4 ถูกติดตั้งในเครื่องเดิ
 ```powershell
 git clone https://github.com/theanrawich/Kaew.git
 Set-Location Kaew
-Expand-Archive -LiteralPath .\cad\kaew-cad-snapshots-20261031.zip -DestinationPath .\cad -Force
+Expand-Archive -LiteralPath .\cad\kaew-full-assembly-20261106.zip -DestinationPath .\cad -Force
 winget install --id FreeCAD.FreeCAD --exact --version 1.1.4 --source winget
 ```
 
@@ -112,13 +112,13 @@ FreeCAD/STEP เป็น solid ที่ valid, STL เป็น mesh ปิด
 
 ## ไฟล์สำคัญ
 
-- `kaew-bom.json`, `KAEW_SHOPPING_LIST.md`: SKU และงบเดิม
+- `kaew-bom.json`, `docs/SHOPPING_LIST.md`: SKU และงบเดิม
 - `cad/spout-v1/build_spout.py`, `verify_exports.py`, `render_spout.FCMacro`: สร้าง/ตรวจ/เรนเดอร์หัวจ่ายเดี่ยว
 - `cad/full-assembly-v1/build_assembly.py`: source ชุดประกอบล่าสุด
 - `cad/full-assembly-v1/check_fit.py`: diagnostic ล่าสุด
 - `cad/full-assembly-v1/DESIGN.md`: brief และแผนตรวจ
 - `cad/full-assembly-v1/component-register.json/.csv`, `routes.json`, `fit-diagnostic.json`: ผลจาก snapshot ก่อน patch ล่าสุด
-- `cad/kaew-cad-snapshots-20261031.zip`: FCStd/STEP/STL/ภาพสำหรับเปิดต่อ
+- `cad/kaew-full-assembly-20261106.zip`: FCStd/STEP/STL/ภาพสำหรับเปิดต่อ
 
 ## ประโยคสำหรับบอก Codex บนอีกเครื่อง
 

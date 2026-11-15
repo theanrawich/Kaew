@@ -4,9 +4,6 @@
 #if __has_include("cloud_config.local.h")
 #include "cloud_config.local.h"
 #endif
-#ifndef KAEW_CLOUD_ENABLED
-#define KAEW_CLOUD_ENABLED 0
-#endif
 #ifndef KAEW_WIFI_SSID
 #define KAEW_WIFI_SSID ""
 #endif
@@ -28,4 +25,10 @@
 // Minimum spacing between persistent sample writes, in milliseconds.
 #ifndef KAEW_DURABLE_MIN_MS
 #define KAEW_DURABLE_MIN_MS 1000
+#endif
+
+// C++ constant expression: string contents cannot be tested by the preprocessor.
+// A local header or build flag can explicitly override this, including forcing off.
+#ifndef KAEW_CLOUD_ENABLED
+#define KAEW_CLOUD_ENABLED (KAEW_CLOUD_URL[0] != '\0' && KAEW_CLOUD_TOKEN[0] != '\0')
 #endif

@@ -1,31 +1,94 @@
-# Kaew local telemetry checkpoint
+# Kaew telemetry cloud — M5 checkpoint
 
-This is an early local-development service, **not a production cloud deployment**. It binds to `127.0.0.1` by default, stores data in SQLite, serves a basic dashboard and requires separate bearer tokens for device writes and admin reads. It implements one provisioned device (`node-1`), not general device enrollment. The built-in server has no TLS, rate limits or production identity management; do not expose it to the Internet or put real credentials into the repository. Optional LAN HTTP requires explicit `KAEW_HOST` and `KAEW_DEV_ALLOW_INSECURE_LAN=1` and transmits bearer tokens without encryption; use only an isolated development network.
+One Python 3.11 Render web service serves both the API and dashboard over HTTPS. Hosted storage is Supabase Postgres selected by `DATABASE_URL`; with that variable unset/empty, local development uses stdlib-only SQLite. The service serves a dashboard with separate device-write and admin-read bearer tokens. It provisions only `node-1`. This is a small course checkpoint service, not a hardened production cloud: no production identity management or rate limiting. Run exactly one web-service instance per database (including the notification scheduler). Hosting configuration is ready; **no service has been deployed or tested against hardware**.
 
-Requires Python 3.11+ and Node.js 20+. In PowerShell terminal 1, generate two different long random tokens and keep them private:
+## Local run
 
-```powershell
-$env:KAEW_DEVICE_TOKEN = 'replace-with-a-long-random-device-token'
-$env:KAEW_ADMIN_TOKEN = 'replace-with-a-different-long-random-admin-token'
+From the repository root, generate two different long random tokens privately. Bash example (values stay out of command history):
+
+```bash
+read -rsp 'Device token: ' KAEW_DEVICE_TOKEN; echo
+read -rsp 'Admin token: ' KAEW_ADMIN_TOKEN; echo
+export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
 python cloud/server.py
 ```
 
-In terminal 2 use the same device token and run the simulated node → UART codec → gateway adapter → HTTP ingestion path:
+Use `python3` if your system has no `python` alias. The server reads process environment, not `.env` automatically. `cloud/.env.example` lists placeholders; never commit your `.env`, database or tokens. Open `http://127.0.0.1:8080/` and enter the admin token; it stays in page memory until reload. The default database is `cloud/kaew.sqlite3` (ignored). Leave `DATABASE_URL` unset for SQLite; psycopg is neither imported nor required in this mode. Existing local SQLite data is not automatically copied to Postgres.
 
-```powershell
-$env:KAEW_DEVICE_TOKEN = 'the-same-device-token'
-node cloud/simulate.mjs
+| Variable | Behavior |
+| --- | --- |
+| `KAEW_DEVICE_TOKEN`, `KAEW_ADMIN_TOKEN` | Required, nonempty, distinct; no default credentials. Device token writes telemetry; admin token reads history and controls app settings. |
+| `KAEW_HOST` | Default `127.0.0.1`. Hosted services use `0.0.0.0`. |
+| `KAEW_PORT` | Overrides platform `PORT`; otherwise `PORT` or `8080`. Leave unset on Render. |
+| `KAEW_TRUST_EDGE_HTTPS=1` | Allows public bind behind a TLS-terminating platform. It does not add TLS to Python or trust arbitrary forwarding headers. Only use when external traffic reaches a verified HTTPS edge and the backend HTTP port stays private. |
+| `KAEW_DEV_ALLOW_INSECURE_LAN=1` | Separate development-only opt-in for LAN HTTP, exposing bearer tokens in plaintext. Not the hosted deployment path. |
+| `DATABASE_URL` | **Required secret for hosted Render/Fly**, copied privately from Supabase with `sslmode=require`. If empty/unset, select local SQLite. Never commit the URL, password or Supabase keys. |
+| `KAEW_DB_PATH` | Local SQLite filename only; ignored when `DATABASE_URL` selects Postgres. Parent directory must exist and be writable. |
+| `PORT` | Provided automatically by Render; do not add a fixed port in Dashboard. |
+| `PYTHON_VERSION` | Blueprint sets `3.11.11`. |
+| `PYTHONDONTWRITEBYTECODE` | Blueprint sets `1`. |
+| `KAEW_OLLAMA_MODEL` | Optional local Ollama advisory model; leave unset for the fallback behavior. Not needed for hosted telemetry. |
+| `KAEW_TELEGRAM_TOKEN`, `KAEW_TELEGRAM_CHAT_ID` | Optional pair; both required to activate Telegram, otherwise mock provider. Configure privately in host environment. |
+
+## Render + Supabase (chosen hosted stack)
+
+The target Supabase project already exists: **`kaew`**, ref **`hhzukhrznuvtwsgipyio`**, region `ap-southeast-1`, organization `emb-sengkeng`, free plan. The ref identifies the target project only; no connection URI is constructed from it. Render is connected on the owner's side. This change does not open either dashboard, retrieve passwords, apply remote SQL, create accounts or deploy. The parent/operator performs these steps later:
+
+1. In that Supabase project, apply **[`cloud/migrations/postgres/001_initial.sql`](migrations/postgres/001_initial.sql)** through the Supabase connector or SQL editor. It creates all nine tables, indexes, telemetry dedup constraint and `node-1`, inside one transaction. `IF NOT EXISTS` allows reapplying this initial schema; it does not upgrade an incompatible existing schema. Tables use epoch-second `DOUBLE PRECISION` times, `BIGINT` UART IDs and `BIGSERIAL` generated IDs. RLS is enabled without browser policies: connect the backend as the table owner; no Supabase browser/service keys are used.
+2. Copy the actual Postgres connection URI from the project's **Connect** dialog privately into Render's **`DATABASE_URL`** secret. Include `sslmode=require`, adding it to any existing query options. Never paste it into source files, Git, logs or chat. Prefer the **Session pooler** for this long-running service and IPv4 compatibility. The **Transaction pooler** also works: the adapter disables automatic prepared statements and uses transaction-scoped locks, not session state. Do not use a Data API URL or Supabase API key as a Postgres URI. Use the project's actual URI/password; none is supplied or guessed here. See [Supabase connection options](https://supabase.com/docs/guides/database/connecting-to-postgres) and [psycopg prepared-statement behavior](https://www.psycopg.org/psycopg3/docs/advanced/prepare.html).
+3. When ready, make this branch available remotely yourself. In the connected Render account, apply the existing root `render.yaml` Blueprint for `theanrawich/Kaew`, selecting **`cleanup-and-cloud`** (or the later reviewed target branch). There is exactly **one web service**, `kaew-cloud`; `/` serves the dashboard and `/api/*` serves the backend. The Blueprint installs `cloud/requirements.txt` and starts `python cloud/server.py`. It does not create a Render database or a separate dashboard service.
+4. Set the three **required secrets**: `DATABASE_URL`, `KAEW_DEVICE_TOKEN` and `KAEW_ADMIN_TOKEN`. Use distinct long random device/admin tokens. New Blueprints prompt for the `sync: false` variables; for an existing service, add/update them in **Environment** because later Blueprint syncs do not replace secret values. Optionally set **both** `KAEW_TELEGRAM_TOKEN` and `KAEW_TELEGRAM_CHAT_ID` there for alerts. They are dashboard-only optionals, not mandatory Blueprint inputs.
+5. Keep Blueprint values `KAEW_HOST=0.0.0.0`, `KAEW_TRUST_EDGE_HTTPS=1`, `PYTHON_VERSION=3.11.11`, `PYTHONDONTWRITEBYTECODE=1`. Let Render supply `PORT`; leave `KAEW_PORT` and `KAEW_DB_PATH` unset on Render. Automatic deploy is disabled. Deliberately deploy the one service from this branch. Startup verifies the Postgres tables/columns and seed device; missing schema fails with the SQL file path. It never runs SQLite PRAGMA/migrations on Postgres and never silently falls back if a configured Postgres connection fails.
+6. Check `https://<service>.onrender.com/api/health`, POST the labeled test sample below with the device token, then open `https://<service>.onrender.com/` and enter the admin token to read it back. Verify readback after a web-service restart: records live in Supabase, not Render's ephemeral disk. Keep backups/exports according to the database plan; persistent hosting alone is not a backup. The unauthenticated health route is a process check, not a continuous database readiness probe.
+
+No Render disk is required for hosted telemetry now. Free web-service sleep/cold starts still pause scheduled reminders and may trigger gateway retries; wake and check the service before recording. Supabase free-plan availability/limits should also be checked before the checkpoint. No hosted deployment or physical end-to-end test has been performed here.
+
+For a subsequent deliberate CLI deploy, install/login yourself if needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
+render login
+# Export RENDER_SERVICE_ID, DATABASE_URL and the two matching tokens privately.
+bash cloud/deploy.sh render
 ```
 
-Open `http://127.0.0.1:8080/` and enter the admin token to see the last 100 persisted samples and online/offline status. The token remains in page memory until reload. The default database is `cloud/kaew.sqlite3` (gitignored); `KAEW_DB_PATH`, `KAEW_PORT`, and `KAEW_CLOUD_URL` can override local defaults. Raw ADC is not a TDS measurement, and a single level switch does not measure volume.
+The helper refuses missing/equal tokens or missing `DATABASE_URL` and never prints their values. It **does not upload or rotate Render secrets**, apply schema, or push local commits: set matching secrets in Dashboard first. It deploys the remote branch configured on the service. Missing CLI prints install/login guidance and exits non-zero. Official references: [Blueprint secret inputs](https://render.com/docs/blueprint-spec), [free instance limits](https://render.com/docs/free), [CLI](https://render.com/docs/cli).
 
-Run the reproducible API, SQLite restart and simulated-pipeline smoke tests:
+## Local Postgres verification and implementation
 
-```powershell
+`cloud/database.py` loads pinned psycopg v3 only when a Postgres target is selected. The adapter converts `?` to `%s` outside literals/comments and uses dictionary rows. Portable `ON CONFLICT` upserts work on both databases. An explicit transaction plus a transaction-level advisory writer lock preserves SQLite's read-before-write dedup/notification behavior for `BEGIN IMMEDIATE` paths. Connection/query failures use the existing retryable database-error family without logging credentials. Short-lived connections and one service instance suit this checkpoint, not a large-scale service.
+
+Local SQLite tests need no dependency install. For a **disposable local** Postgres database, install `python -m pip install -r cloud/requirements.txt`, export `KAEW_TEST_POSTGRES_URL` to its loopback connection URL, and run `python -m unittest discover -s cloud -p 'test_postgres.py' -v`. These opt-in tests apply the schema twice and truncate Kaew tables; never point them at a real project. They reject non-loopback hosts and do not use `DATABASE_URL` to opt in. Without that test variable they skip before importing psycopg.
+
+## Fly / Docker (secondary)
+
+Render + Supabase is the selected path; existing Fly config remains an alternative, not a guaranteed free tier. Apply the same schema first. Export `KAEW_FLY_APP`, **`DATABASE_URL`** and the two distinct tokens privately, then run `bash cloud/deploy.sh fly` after installing/logging in to flyctl and provisioning an authorized app. The helper imports these three secrets over stdin and deploys with `cloud/fly.toml`, one Machine and a remote Docker builder. No Supabase URI belongs in TOML. See [Fly configuration](https://fly.io/docs/reference/configuration/) and [secret import](https://fly.io/docs/flyctl/secrets-import/).
+
+The non-root Docker image includes psycopg from `cloud/requirements.txt`, Python 3.11 and `PYTHONDONTWRITEBYTECODE=1`. Build from repo root with `docker build -f cloud/Dockerfile -t kaew-cloud .`. Supply `DATABASE_URL` and both tokens at runtime behind a TLS edge. Without `DATABASE_URL`, the image falls back to `/data/kaew.sqlite3` for local experiments; retain it with a volume writable by UID 10001. Optional voice/model packages are not installed.
+
+## Verify telemetry and gateway
+
+Set `KAEW_BASE_URL=https://<your-host>` (or `http://127.0.0.1:8080` locally). With the private tokens exported:
+
+```bash
+curl --fail "$KAEW_BASE_URL/api/health"
+curl --fail -X POST "$KAEW_BASE_URL/api/telemetry" \
+  -H "Authorization: Bearer $KAEW_DEVICE_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"device_id":"node-1","session":9001,"seq":1,"level":"unknown","temperature_c":25.0,"tds_adc":65535,"source":"simulated"}'
+curl --fail "$KAEW_BASE_URL/api/telemetry" -H "Authorization: Bearer $KAEW_ADMIN_TOKEN"
+```
+
+This sample is **simulated**, not hardware proof. Expect 201 on first insert and 200 on the same sample retry. Open the base URL, enter the admin token and reload history to find the row. Do not capture tokens in screenshots or shell tracing. An alternative Node.js 20+ simulator is `node cloud/simulate.mjs` with `KAEW_CLOUD_URL` set to the base URL and the device token exported. A raw ADC count is not calibrated TDS, and a single level switch does not measure tank volume.
+
+For real telemetry copy [the local header example](../firmware/include/cloud_config.local.h.example) to ignored `firmware/include/cloud_config.local.h`. Set Wi-Fi, `KAEW_CLOUD_URL` to the **full** `https://<host>/api/telemetry`, the **device** token and the verified public root CA PEM for the host's current certificate chain. URL + token now auto-enable publishing; explicit `KAEW_CLOUD_ENABLED=0` forces it off. A nonempty CA and synchronized clock are still required; no TLS bypass is provided. Flash the gateway as in [firmware instructions](../firmware/README.md). Prove `source=device` arrives from the physical node, changes with measurements and survives dashboard reload; verify hosted service restart persistence in Supabase. See [checkpoint path](../docs/CHECKPOINT_CRITICAL_PATH.md).
+
+Run tests:
+
+```bash
 python -m unittest discover -s cloud -p 'test_*.py' -v
 ```
 
-The simulated gateway adapter saves samples to a bounded SQLite outbox before delivery. Run `python cloud/gateway_push.py --worker` in a separate terminal with the device token and endpoint set for automatic retries with backoff and jitter. Use one worker per outbox. `--flush` performs one manual pass. Delivery is idempotent, and the outbox is removed only after HTTP 200 or 201. Set `KAEW_OUTBOX_PATH` for its local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
+The simulated gateway adapter persists a bounded SQLite outbox before delivery. `python cloud/gateway_push.py --worker` retries with backoff/jitter; use one worker per outbox. `--flush` performs one pass. Entries are removed only after HTTP 200/201. Set `KAEW_OUTBOX_PATH` for the ignored local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
 
 Admin-authenticated `/api/events` records drink or fault events with a `measured`, `estimated`, or `simulated` source; `/api/summary` returns the rolling last 24 hours split by source. `/api/goal` stores a user-selected goal and is not medical guidance. `/api/reminder` stores one repeating reminder. The scheduler creates durable notification jobs for reminders, low-water transitions, fault events and offline transitions. A single delivery worker retries with backoff, marks a job failed after eight attempts, and limits sends to approximately one per second; low-water, fault and offline jobs have a five-minute per-kind cooldown. The default provider is a mock and sends nothing externally.
 
