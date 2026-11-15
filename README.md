@@ -25,7 +25,7 @@ CRC16 ตรวจความเสียหายของข้อมูล �
 | `.work/` | source และ toolchain สำหรับสร้างเว็บ 3D/parts |
 | `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
 | `docs/` | BOM (`kaew-bom.json`), handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
-| `references/`, `output/real-parts/hero.jpg` | ภาพอ้างอิงและภาพอุปกรณ์ |
+| `references/` | ภาพอ้างอิงและภาพอุปกรณ์ |
 
 ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
 
