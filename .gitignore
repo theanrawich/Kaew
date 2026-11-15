@@ -1,50 +1,34 @@
+# Build products and local tools
 node_modules/
-.kaew-toolchain/
-.kaew-pio-venv/
-.kaew-browser/
-.kaew-voice/
-.kaew-tts/
-.kaew-voice-test/
-.kaew-models/
-.kaew-model-cache/
-.pio-core/
+.pio/
 firmware/.pio/
-firmware/test/*.exe
-firmware/include/cloud_config.local.h
-cloud/*.sqlite3*
+.pio-core/
+.kaew-*/
 __pycache__/
 _site/
 *.log
+firmware/test/*.exe
+
+# OS and editors
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
+*.swp
+.vs/
+
+# Private configuration and local databases
 .env
 .env.*
 !.env.example
+!cloud/.env.example
+firmware/include/cloud_config.local.h
+cloud/*.sqlite3*
 
-# Publish the website and its build inputs. Keep coursework, proposals,
-# registration snapshots, and local working documents on this computer.
-/*.md
-!/README.md
-!/KAEW_SHOPPING_LIST.md
-!/CAD_HANDOFF.md
-/docs/
-!/docs/
-/docs/*
-!/docs/EXECUTION.md
-/output/*
-!/output/real-parts/
-/output/real-parts/*
-!/output/real-parts/hero.jpg
-/references/*
-!/references/parts-gallery-20261030.json
-!/references/part-gateway.jpg
-!/references/part-node.jpg
-!/references/pump-250-0.jpg
-!/references/part-display-oled13.jpg
-!/references/part-scale.jpg
-!/references/part-tds.jpg
-!/references/part-level.jpg
-!/references/part-mic.jpg
-!/references/part-temperature.jpg
-!/references/ocean-nova-reference.jpg
-!/references/crystal-1500-reference.jpg
+# Root site products rebuilt from .work sources
+/kaew-3d.html
+/kaew-parts.html
+/cad-viewer.js
+/cad-model.json
+
+# CAD native exports are covered by cad/.gitignore.

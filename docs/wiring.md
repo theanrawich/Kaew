@@ -2,6 +2,17 @@
 
 ตรวจเอกสาร 8 พ.ย. 2026 · **แบบเสนอสำหรับทบทวนเท่านั้น ห้ามใช้เป็นแบบอนุมัติจ่ายไฟหรือสั่งทำสาย** ตัวเลข GPIO ถอดจาก `.work/kaew-wiring-data.cjs` ซึ่งเป็นต้นทางผัง 3D ในเครื่อง; บอร์ดและโมดูลร้านยังไม่ได้วัดหรือยืนยัน revision, power path และ pinout. ขีดจำกัดที่มีหลักฐานของชิปไม่ใช่การรับรองบอร์ด generic ทั้งแผง
 
+## ขาที่ firmware ใช้จริงและขาที่ยังปิด
+
+ตารางด้านล่างเป็น **ข้อเสนอ hardware** จากการทบทวนเดิม ไม่ใช่ค่าที่เปิดใช้ทั้งหมดใน firmware ปัจจุบัน:
+
+- Node: DS18B20 GPIO4; UART TX GPIO25 → S3 RX GPIO1, UART RX GPIO26 ← S3 TX GPIO2 พร้อม common logic ground ที่ตรวจสอบแล้ว
+- Gateway: HX711 DATA GPIO17 / CLOCK GPIO18; UART RX GPIO1 / TX GPIO2
+- Node TDS และ level: `-1` (ยังปิด); gateway pump และ E-stop: `-1` (ยังปิด) ไม่ถือว่า GPIO ที่จองในตารางถูก commission แล้ว
+- I²S ที่เสนอ: microphone GPIO4/5/6 และ amplifier GPIO10/11/12; ปิดโดย default และยังไม่เชื่อม voice pipeline
+
+อ้างอิง [firmware](../firmware/README.md) และ [checkpoint](CHECKPOINT_CRITICAL_PATH.md) ก่อนต่อสาย; ขา UART ที่เพิ่มต้องทวนกับ board revision จริง
+
 ## นิยามจุดร่วม
 
 - `5V_CTL` = output buck ที่ตั้งและวัด 5 V ภายใต้โหลดแล้ว; `GND_CTL` = return ภาคควบคุม; `3V3_G` และ `3V3_N` = output regulator 3.3 V ของ gateway และ node ตามลำดับ หลังตรวจว่าจ่ายกระแสได้พอ ไม่ใช่ GPIO
@@ -49,7 +60,7 @@ GPIO เป็นชื่อสัญญาณ ไม่ใช่หมาย�
 | 5V_CTL / GND_CTL | XKC-Y25 NPN / interface | **HOLD**: ตรวจรุ่น, pinout และแรงดันจริงก่อนต่อ |
 | XKC interface OUT3V3 | Node GPIO27 | **HOLD**: ต้องพิสูจน์รูปแบบ output และออกแบบ interface ก่อน ห้ามป้อน 5–12 V เข้า GPIO |
 
-ESP32 GPIO34 เป็น input-only และ ADC1; [Espressif](https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32/schematic-checklist.html) แนะนำ ADC1 เมื่อใช้ Wi-Fi. Node → gateway ยังเป็น wireless proposal ไม่มีสายสื่อสารหรือ ACK/retry ที่พิสูจน์แล้ว
+ESP32 GPIO34 เป็น input-only และ ADC1; [Espressif](https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32/schematic-checklist.html) แนะนำ ADC1 เมื่อใช้ Wi-Fi. เฟิร์มแวร์ปัจจุบันใช้ UART 20-byte KW frames พร้อม CRC16 และ ACK/retry (ยังไม่ทดสอบกับบอร์ดจริง) ไม่ใช้ wireless proposal เดิม
 
 ## ประเด็นที่การตรวจเอกสารพบ
 
@@ -64,4 +75,4 @@ ESP32 GPIO34 เป็น input-only และ ADC1; [Espressif](https://docs.es
 1. ยืนยัน SKU/revision และภาพสกรีนทั้งสองด้านของทุกบอร์ด; เทียบชื่อขาและวัดระดับ output โดยไม่ต่อ GPIO
 2. ตรวจ power path, กระแสโหลดและภาวะไฟขัดข้อง; คำนวณพิกัดสาย, ฟิวส์และสวิตช์จากโหลดที่วัด/ระบุจริง
 3. จัดทำ schematic กำลังและ safety ที่ตรวจทานได้ พร้อม BOM วงจร; ตรวจ physical stop แบบตัดกำลังจริง และ reset ด้วยคำสั่งใหม่
-4. ใช้ `KAEW_TEST_RECORD_TEMPLATE.md` บันทึก continuity, polarity, sensor timing, stop, การรั่วและการทำงานร่วม; ให้ TA/ผู้สอนตรวจส่วนไฟบ้านตามโจทย์ก่อน demo
+4. ใช้ `TEST_RECORD_TEMPLATE.md` บันทึก continuity, polarity, sensor timing, stop, การรั่วและการทำงานร่วม; ให้ TA/ผู้สอนตรวจส่วนไฟบ้านตามโจทย์ก่อน demo

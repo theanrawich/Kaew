@@ -1,51 +1,77 @@
-# Kaew — เครื่องเติมน้ำอัจฉริยะ
+# Kaew (แก้ว) — AI-assisted Smart Water Dispenser
 
-> **สถานะ 6 พ.ย. 2026: ยังไม่พร้อมซื้อครบชุดหรือผลิตโครง** ผลตรวจความพร้อมละเอียดอยู่ในไฟล์ `KAEW_READINESS_AUDIT_2026-11-06.md` บนเครื่อง รายละเอียดส่วนล่างบางส่วนเป็นข้อมูลเดิม: แผนล่าสุดตัด flow sensor แล้ว และประมาณการล่าสุด 4,153 บาทยังไม่ใช่ราคาซื้อที่ยืนยัน
+Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง, cloud และแบบ CAD
 
-โมเดล 3D แบบโต้ตอบของ Kaew พร้อมภาพอุปกรณ์ ลิงก์ Shopee และงบประมาณตั้งต้น **4,153 บาท** (ประมาณการ 6 พฤศจิกายน 2026)
+สถานะ 15 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway ยังไม่สั่งเริ่มปั๊ม และ AI ยังไม่เป็น closed loop ก่อน branch นี้ cloud รันเฉพาะในเครื่อง ขณะนี้มี config สำหรับ deploy หลัง HTTPS edge แล้ว **ยังไม่ได้ deploy หรือพิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
 
-- **[เปิดแบบ CAD 3D](https://theanrawich.github.io/Kaew/)** — หมุนและซูมชุดประกอบจาก FreeCAD วันที่ 6 พฤศจิกายน 2026
-- **[เปิดโมเดลแนวคิดเดิม](https://theanrawich.github.io/Kaew/kaew-3d.html)** — แยกชิ้นส่วน ดูภายใน/มิติ และจำลองเติมน้ำ
-- **[ดูรูปอุปกรณ์](https://theanrawich.github.io/Kaew/kaew-parts.html)**
-- [รายการซื้อและงบประมาณ](KAEW_SHOPPING_LIST.md) · [ข้อมูล BOM](kaew-bom.json)
-- **[งาน CAD ที่ค้างและวิธีทำต่อบนอีกเครื่อง](CAD_HANDOFF.md)** — FreeCAD, แบบหัวจ่าย และชุดประกอบทั้งเครื่องที่ยังอยู่ระหว่างตรวจระยะ
+ระบบสื่อสารตามเส้นทางนี้:
 
-ในโมเดล กด **ดูสายไฟและขาบอร์ด 3D** เพื่อเปิดผังต่อสาย: สลับ ESP32-S3 / ESP32, เลือกอุปกรณ์หรือสาย, ซูมชื่อขาบอร์ด, หมุนมุมมอง และบันทึกผัง PNG พร้อมสถานะการออกแบบได้ ผังเสนอปรับวันที่ 6 พ.ย. 2026 มี 50 เส้นรวมไฟเลี้ยงและจุดเชื่อมต่อที่ยังรอยืนยัน
-
-โมเดลมีป้ายชิ้นส่วนหลัก 24 จุด พร้อมเส้นชี้และรายการชื่อทั้งหมด เลือก **แยกชิ้นส่วน** เพื่อเห็นครบ หรือ **ดูภายในและทางเดินน้ำ** เพื่อดูเซนเซอร์และบอร์ดภายใน บนจอแคบใช้หมายเลขเทียบกับรายการชื่อ ป้ายติดตามชิ้นส่วนที่เคลื่อนและหลบกันอัตโนมัติ ภาพ PNG ที่บันทึกรวมป้ายและรายการชื่อด้วย กรอบเส้นประเป็นพื้นที่สำรองจากแบบเดิม ไม่ใช่ flow sensor ที่ติดตั้ง ตำแหน่งอุปกรณ์ยังต้องวัดชิ้นงานจริง
-
-ท่อน้ำแสดงในมุมปกติด้วย และเปิด **แสดงเส้นทางน้ำ** เป็นค่าเริ่มต้นเพื่อให้เส้นฟ้าช่วยมองทะลุตัวเครื่องได้ครบ ขวด → ปั๊ม → หัวจ่าย ปิดสวิตช์นี้เพื่อดูเฉพาะท่อสีอ่อนตามการบังจริง ทางผ่านด้านในหัวปั๊มเป็นภาพสื่อทิศทางการไหล ไม่ใช่รูปแบบลูกกลิ้งหรือแนวสายที่ยืนยันจากผู้ผลิต
-
-ผังขา S3 อิง DevKitC-1 ของ Espressif ส่วน ESP32 30 ขาเป็นแม่แบบ DevKit V1 ที่ต้องเทียบสกรีนบอร์ดจากร้าน หัวต่ออุปกรณ์ย่อยจัดเรียงเพื่ออ่านง่าย ไม่ใช่ตำแหน่งรูจริงที่ยืนยันแล้ว GPIO ที่เลือกเป็นข้อเสนอ ยังไม่มี firmware หรือการทดสอบวงจรจริง เส้นประหมายถึงจุดรอยืนยัน เช่น interface ปั๊ม, hardware stop, TDS และ level sensor; วงจรกำลังปั๊มยังไม่มีแบบพร้อมต่อ
-
-![Kaew 3D](output/real-parts/hero.jpg)
-
-## ขอบเขตโมเดล
-
-ต่อยอดรูปทรงเดิมโดยอิงปั๊มที่เลือก (ประมาณ 511 บาท แต่รุ่นยังไม่ยืนยัน), จอ OLED 1.3 นิ้ว SH1106 ราคา 139 บาท, ขวด Crystal 1.5 ลิตร และแก้ว Ocean Nova Rock B06511 ขนาด 300 มล. ใช้หน่วยมิลลิเมตรในแบบ และมีโหมดจำลองการยกแก้ว/จิบ/เติมน้ำ รวมถึงบันทึกภาพ PNG
-
-แก้วมีมิติผู้ผลิตปาก 83 / ฐาน 63 / สูง 90 มม. ส่วนขวด Ø85 × 320 มม. และกล่องปั๊ม 80 × 125 × 40 มม. เป็นค่าประมาณสำหรับจัดวาง ยังต้องวัดชิ้นงานจริง ตัวเครื่องเสนอฐาน 220 × 350 มม. สูงรวม 450 มม. ไฟล์นี้ใช้ดูแนวคิดและสัดส่วน ไม่ใช่แบบพร้อมผลิต
-
-งบ 4,153 บาทรวมค่าประมาณโครง ของประกอบ และเงินสำรอง โดยไม่คิดค่าส่ง Shopee ตามข้อตกลง แผนปัจจุบันไม่มี flow sensor ราคาสินค้า ตัวเลือก สต็อก การควบคุมปั๊มจาก ESP32 และวัสดุสัมผัสน้ำดื่มยังต้องตรวจสอบก่อนซื้อ ระบบ AI/เสียงและฮาร์ดแวร์จริงยังไม่ได้ทดสอบ อ่านรายละเอียดใน [รายการซื้อ](KAEW_SHOPPING_LIST.md)
-
-## เปิดในเครื่อง
-
-เปิด `kaew-3d.html` หรือ `kaew-parts.html` ได้โดยตรง ทั้งสองไฟล์รวมภาพและโค้ดที่ใช้แสดงผลไว้ในตัว หรือใช้ local server:
-
-```sh
-python -m http.server 8765 --bind 127.0.0.1
+```text
+Sensor node (ESP32: temperature; TDS/level ยังปิด)
+  -- UART: 20-byte KW frames, CRC16, ACK/retry -->
+Gateway (ESP32-S3: HX711, safety controller, durable outbox)
+  -- HTTPS bearer telemetry -->
+Cloud (cloud/server.py + SQLite) --> dashboard + optional Telegram
 ```
 
-จากนั้นเปิด `http://127.0.0.1:8765/kaew-3d.html` ต้องใช้เบราว์เซอร์ที่รองรับ WebGL
+CRC16 ตรวจความเสียหายของข้อมูล ไม่ใช่การยืนยันตัวตน UART ส่วน safety ต้องทำงานในเครื่องและมีวงจรหยุดตัดกำลังปั๊มโดยอิสระจาก AI/cloud ข้อมูล ADC ยังไม่ใช่ TDS ที่สอบเทียบ และระดับน้ำแบบจุดเดียวไม่บอกปริมาตรถัง
 
-## แก้ไขและสร้างไฟล์
+| โฟลเดอร์ / ไฟล์ | เนื้อหา |
+| --- | --- |
+| `firmware/` | PlatformIO: `sensor_node`, `gateway`, protocol, safety, outbox และ host tests |
+| `cloud/` | Python stdlib server, SQLite migrations, dashboard, Telegram และ AI/voice experiments |
+| `simulation/` | แบบจำลองและการทดสอบ JavaScript |
+| `.work/` | source และ toolchain สำหรับสร้างเว็บ 3D/parts |
+| `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
+| `docs/` | handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
+| `references/`, `output/real-parts/hero.jpg` | ภาพอ้างอิงและภาพอุปกรณ์ |
 
-ต้องมี Node.js 22 และ npm
+ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
 
-```sh
+```bash
+pio run -d firmware -e sensor_node
+pio run -d firmware -e gateway
+pio run -d firmware -e gateway -t upload --upload-port <GATEWAY_PORT>
+pio run -d firmware -e sensor_node -t upload --upload-port <NODE_PORT>
+```
+
+ทดสอบซอฟต์แวร์จาก root (Node.js 20+, Python 3.11+, g++):
+
+```bash
+node --test simulation/*.test.mjs
+python -m unittest discover -s cloud -p 'test_*.py' -v
+for name in safety scale protocol integration dispense durable_queue audio; do
+  g++ -std=c++17 -Ifirmware/include "firmware/test/${name}_test.cpp" -o "/tmp/kaew-${name}-test" || exit 1
+  "/tmp/kaew-${name}-test" || exit 1
+done
+```
+
+เครื่องที่ไม่มีคำสั่ง `python` ให้ใช้ `python3` แทน คำสั่ง host C++ ตรงกับ [.github/workflows/firmware.yml](.github/workflows/firmware.yml); CI ยัง compile firmware ทั้งสองบอร์ดและ `gateway_cloud_compile`
+
+เริ่ม cloud ในเครื่องด้วย environment variables ที่เป็นส่วนตัว ใช้ device/admin token คนละค่าและสุ่มให้ยาว:
+
+```bash
+read -rsp 'Device token: ' KAEW_DEVICE_TOKEN; echo
+read -rsp 'Admin token: ' KAEW_ADMIN_TOKEN; echo
+export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
+python cloud/server.py
+```
+
+เปิด `http://127.0.0.1:8080/` แล้วกรอก admin token เพื่อดู dashboard ค่าเริ่มต้น bind เฉพาะ loopback และฐานข้อมูลอยู่ที่ `cloud/kaew.sqlite3` (gitignored) ดูตัวแปรใน [cloud/.env.example](cloud/.env.example); server อ่าน environment โดยตรง ไม่โหลด `.env` เอง
+
+สำหรับ hosted HTTPS แนะนำ **Render** ผ่าน [render.yaml](render.yaml); ต้องมีบัญชี Render ที่ login แล้ว เชื่อม GitHub และตั้งสอง token เป็น secret ใน Dashboard ก่อน deploy เครื่องนี้มีเพียง GitHub login จึงยัง deploy ไม่ได้ หลังสร้าง Blueprint และตั้ง CLI/login เองแล้วใช้ `bash cloud/deploy.sh render`; มี Fly เป็นทางเลือกรอง ดูขั้นตอนครบและข้อจำกัด storage ใน [cloud/README.md](cloud/README.md) Free instance ใช้ disk ชั่วคราว ต้องมี persistent volume และ backup หากต้องเก็บ SQLite ข้าม restart
+
+Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://<host>/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
+
+[GitHub Pages](https://theanrawich.github.io/Kaew/) แสดงโมเดลแนวคิดและ [parts gallery](https://theanrawich.github.io/Kaew/kaew-parts.html) จาก sources ใน CI ไม่เก็บ generated HTML/bundle ใน git หน้า CAD มีลิงก์ดาวน์โหลดเมื่อไม่มี mesh ตัว `cad-model.json` เป็น FreeCAD export ในเครื่องจาก `.work/export-cad-colors.py` และไม่เก็บใน git; geometry snapshot ปัจจุบันคือ [zip วันที่ 6 พ.ย.](cad/kaew-full-assembly-20261106.zip) ดู [CAD README](cad/README.md) สำหรับข้อจำกัดของแบบ
+
+สร้างเว็บและตรวจ source ได้ด้วย:
+
+```bash
 npm ci --prefix .work/toolchain
 node .work/build-kaew.cjs
 node .work/make-parts-gallery.cjs
+node .work/build-cad-viewer.cjs
 node .work/check-standalone.cjs
 node .work/check-wiring.cjs
 node .work/check-model-labels.cjs
@@ -53,22 +79,6 @@ node .work/check-water-path.cjs
 node .work/stage-pages.cjs
 ```
 
-- `.work/kaew-viewer.js` — โมเดลและพฤติกรรม Three.js
-- `.work/kaew-template.html` — หน้า HTML/CSS
-- `.work/kaew-panel.js` — แท็บสำรวจ/ลองใช้งาน คีย์บอร์ด และตัวเลือกที่แสดงตามบริบท
-- `.work/kaew-model-parts.cjs` — ชื่อ รายละเอียด หมายเลข และจุดอ้างอิงของชิ้นส่วนหลัก 24 จุด
-- `.work/kaew-model-labels.js` / `.work/kaew-callout-layout.cjs` — เส้นชี้ ป้ายหลบกัน และป้ายในภาพ PNG
-- `.work/kaew-water-circuit.cjs` — ท่อน้ำและเส้นทางช่วยมองทะลุที่ไม่ถูกซ่อนพร้อมกลุ่มวงจรภายใน
-- `.work/kaew-wiring.js` — หน้าผังสาย 3D และการเลือกปลายสาย
-- `.work/kaew-wiring-data.cjs` — รายชื่อขา จุดต่อ คำอธิบาย และแหล่งอ้างอิงของผังเสนอ
-- `kaew-bom.json` — ราคา รายการซื้อ และแหล่งอ้างอิง
-- `references/parts-gallery-20261030.json` — รายการภาพอุปกรณ์
-- `output/real-parts/hero.jpg` — ภาพตัวอย่างโมเดล
+เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [CAD handoff](docs/CAD_HANDOFF.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [execution ledger](docs/EXECUTION.md) · [เป้าหมายผลิตภัณฑ์](docs/product-intent.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
 
-GitHub Actions สร้างไฟล์และ deploy GitHub Pages อัตโนมัติเมื่อ push เข้า `main` โดยเผยแพร่เฉพาะโมเดล แกลเลอรี BOM และรายการซื้อจาก `_site/` หน้าแรกใช้โมเดล 3D
-
-Repository นี้เก็บเว็บ ซอร์สสร้างเว็บ และภาพอุปกรณ์ที่ใช้จริง เอกสารรายวิชา ไฟล์ข้อเสนอ PDF/Word ภาพลงทะเบียน และไฟล์ทำงานชั่วคราวเก็บอยู่ในเครื่อง
-
-## ที่มาภาพและไลบรารี
-
-ภาพขวดอ้างอิง Lotus’s ภาพแก้วอ้างอิง Ocean Glass และภาพอุปกรณ์จากร้านที่ลิงก์ไว้ในรายการซื้อ ใช้เพื่ออ้างอิงชิ้นส่วนของโครงงาน สิทธิ์ในภาพเป็นของเจ้าของต้นทาง ไม่มีการให้สิทธิ์ใหม่แก่ภาพเหล่านั้น Three.js ใช้สัญญาอนุญาต MIT และฝังข้อความอนุญาตไว้ใน HTML ที่สร้างแล้ว
+สมาชิก SengKeng มี 5 คน: **Theanrawich Thungpromsri, Pongsest Ruangwitthayanusorn, Ratchapol Srisongkram, Tanakrit Onjinda และ Suphachok** เกณฑ์ M8 ต้องมี commit จริงจากสมาชิกทุกคน แต่ละคนต้องทำงานและ commit ด้วยบัญชีของตนเอง ไม่สร้างประวัติแทนกัน

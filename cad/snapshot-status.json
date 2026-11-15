@@ -20,5 +20,5 @@
     "cad/full-assembly-v1/kaew-full-assembly-v1.step": "5bb74ced62f1d3558a7b12f8dad7e9136c53ceb8960124b5bf1da984019d644c"
   },
   "archive_sha256": "f8013277d160cb3bd3bd43c6fbc44d1d2f2b092868381641300ebd5bc173bc40",
-  "instructions": "Read CAD_HANDOFF.md; extract archive into cad; rebuild and inspect fresh logs before treating geometry as current."
+  "instructions": "Read docs/CAD_HANDOFF.md; extract archive into cad; rebuild and inspect fresh logs before treating geometry as current."
 }

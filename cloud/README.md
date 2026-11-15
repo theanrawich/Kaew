@@ -1,31 +1,91 @@
-# Kaew local telemetry checkpoint
+# Kaew telemetry cloud — M5 checkpoint
 
-This is an early local-development service, **not a production cloud deployment**. It binds to `127.0.0.1` by default, stores data in SQLite, serves a basic dashboard and requires separate bearer tokens for device writes and admin reads. It implements one provisioned device (`node-1`), not general device enrollment. The built-in server has no TLS, rate limits or production identity management; do not expose it to the Internet or put real credentials into the repository. Optional LAN HTTP requires explicit `KAEW_HOST` and `KAEW_DEV_ALLOW_INSECURE_LAN=1` and transmits bearer tokens without encryption; use only an isolated development network.
+The stdlib-only Python 3.11 service can run locally or behind a platform HTTPS edge. It stores raw telemetry in SQLite and serves a dashboard with separate device-write and admin-read bearer tokens. It provisions only `node-1`. This is a small course checkpoint service, not a hardened production cloud: no production identity management or rate limiting. Run exactly one instance per database. Hosting configuration is ready; **no service has been deployed or tested against hardware**.
 
-Requires Python 3.11+ and Node.js 20+. In PowerShell terminal 1, generate two different long random tokens and keep them private:
+## Local run
 
-```powershell
-$env:KAEW_DEVICE_TOKEN = 'replace-with-a-long-random-device-token'
-$env:KAEW_ADMIN_TOKEN = 'replace-with-a-different-long-random-admin-token'
+From the repository root, generate two different long random tokens privately. Bash example (values stay out of command history):
+
+```bash
+read -rsp 'Device token: ' KAEW_DEVICE_TOKEN; echo
+read -rsp 'Admin token: ' KAEW_ADMIN_TOKEN; echo
+export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
 python cloud/server.py
 ```
 
-In terminal 2 use the same device token and run the simulated node → UART codec → gateway adapter → HTTP ingestion path:
+Use `python3` if your system has no `python` alias. The server reads process environment, not `.env` automatically. `cloud/.env.example` lists placeholders; never commit your `.env`, database or tokens. Open `http://127.0.0.1:8080/` and enter the admin token; it stays in page memory until reload. The default database is `cloud/kaew.sqlite3` (ignored).
 
-```powershell
-$env:KAEW_DEVICE_TOKEN = 'the-same-device-token'
-node cloud/simulate.mjs
+| Variable | Behavior |
+| --- | --- |
+| `KAEW_DEVICE_TOKEN`, `KAEW_ADMIN_TOKEN` | Required, nonempty, distinct; no default credentials. Device token writes telemetry; admin token reads history and controls app settings. |
+| `KAEW_HOST` | Default `127.0.0.1`. Hosted services use `0.0.0.0`. |
+| `KAEW_PORT` | Overrides platform `PORT`; otherwise `PORT` or `8080`. Leave unset on Render. |
+| `KAEW_TRUST_EDGE_HTTPS=1` | Allows public bind behind a TLS-terminating platform. It does not add TLS to Python or trust arbitrary forwarding headers. Only use when external traffic reaches a verified HTTPS edge and the backend HTTP port stays private. |
+| `KAEW_DEV_ALLOW_INSECURE_LAN=1` | Separate development-only opt-in for LAN HTTP, exposing bearer tokens in plaintext. Not the hosted deployment path. |
+| `KAEW_DB_PATH` | SQLite filename; parent directory must exist and be writable. |
+| `KAEW_TELEGRAM_TOKEN`, `KAEW_TELEGRAM_CHAT_ID` | Optional pair; both required to activate Telegram, otherwise mock provider. Configure privately in host environment. |
+
+## Render (primary, free HTTPS)
+
+Required from the owner: a **Render account logged in at https://dashboard.render.com**, permission to connect this GitHub repo, a chosen deploy branch/commit, two distinct private tokens, and later the service URL. GitHub CLI login alone does not authorize Render. No credentials need to be sent in chat.
+
+1. Make this committed branch available on GitHub when you choose to publish it; this task does not push it. In Render choose **New → Blueprint**, select `theanrawich/Kaew`, the branch containing these files, and root `render.yaml`.
+2. Supply `KAEW_DEVICE_TOKEN` and `KAEW_ADMIN_TOKEN` when prompted. They are `sync: false`, so update/rotate them through Dashboard Environment later. The Blueprint uses native Python 3.11, `python cloud/server.py`, `/api/health`, and platform `PORT`. No Docker is required. Automatic deploy is disabled; deploy deliberately.
+3. Wait for health to pass. Copy the assigned `https://<service>.onrender.com` URL; check `/api/health`. The domain is assigned by Render, not promised by this repo.
+4. For subsequent one-command deploys, install/login yourself, export `RENDER_SERVICE_ID` (the `srv-...` ID) and the same device/admin tokens privately, then run `bash cloud/deploy.sh render`. The helper validates local tokens but **does not upload or rotate Render secrets**; set matching values in Dashboard first. It deploys the remote branch configured on the service, not unpushed local code.
+
+Missing CLI setup (the helper prints this and exits non-zero; it never installs or logs in automatically):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
+render login
 ```
 
-Open `http://127.0.0.1:8080/` and enter the admin token to see the last 100 persisted samples and online/offline status. The token remains in page memory until reload. The default database is `cloud/kaew.sqlite3` (gitignored); `KAEW_DB_PATH`, `KAEW_PORT`, and `KAEW_CLOUD_URL` can override local defaults. Raw ADC is not a TDS measurement, and a single level switch does not measure volume.
+Render Free sleeps when idle and **has no persistent disk**. `/tmp/kaew.sqlite3` can disappear on restart/redeploy; do not treat it as durable checkpoint evidence. Export sanitized evidence before restarting. For restart-persistence proof, use a paid instance with a persistent disk mounted at `/var/data`, set `KAEW_DB_PATH=/var/data/kaew.sqlite3`, and back it up with SQLite's backup API. A single instance and a volume do not replace backups. Wake the service and verify health before recording; cold starts may exceed the gateway's request timeout and cause retries. Scheduled Telegram reminders will not run while a free service sleeps.
 
-Run the reproducible API, SQLite restart and simulated-pipeline smoke tests:
+Official references: [Blueprint schema and secret inputs](https://render.com/docs/blueprint-spec), [free instance limits](https://render.com/docs/free), [CLI install/login](https://render.com/docs/cli), [deploy command](https://render.com/docs/cli-reference).
 
-```powershell
+## Fly (secondary)
+
+Fly is an alternative HTTPS host, **not a guaranteed free tier**; account/billing approval may be required. The user must provide a logged-in Fly account, organization/app name and secrets. Install and provision deliberately:
+
+```bash
+curl -L https://fly.io/install.sh | sh
+export PATH="$HOME/.fly/bin:$PATH"
+flyctl auth login
+flyctl apps create <unique-app-name>
+export KAEW_FLY_APP=<unique-app-name>
+# Read/export distinct KAEW_DEVICE_TOKEN and KAEW_ADMIN_TOKEN privately as above.
+bash cloud/deploy.sh fly
+```
+
+The helper imports secrets over stdin and builds from repo root with `cloud/Dockerfile`, `cloud/fly.toml`, a remote builder and one Machine (`--ha=false`). No local Docker is required. The config sets `force_https`, private port 8080, `/api/health` and explicit edge trust. `/tmp/kaew.sqlite3` is ephemeral here too. For durable storage create a Fly volume in the app's region, add `[mounts]` with `source = "kaew_data"` and `destination = "/data"`, and set `KAEW_DB_PATH=/data/kaew.sqlite3`. Ensure the mounted directory is writable by container UID 10001 (volume ownership must be provisioned separately); only one Machine may use this SQLite file. Keep independent backups. See [Fly config](https://fly.io/docs/reference/configuration/) and [secret import](https://fly.io/docs/flyctl/secrets-import/).
+
+The non-root Docker image uses Python 3.11, no voice/model dependencies, and `PYTHONDONTWRITEBYTECODE=1`. Build from repo root with `docker build -f cloud/Dockerfile -t kaew-cloud .`. Publish its internal HTTP port only through a TLS edge; supply both secrets at runtime and mount writable storage if retaining records.
+
+## Verify telemetry and gateway
+
+Set `KAEW_BASE_URL=https://<your-host>` (or `http://127.0.0.1:8080` locally). With the private tokens exported:
+
+```bash
+curl --fail "$KAEW_BASE_URL/api/health"
+curl --fail -X POST "$KAEW_BASE_URL/api/telemetry" \
+  -H "Authorization: Bearer $KAEW_DEVICE_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"device_id":"node-1","session":9001,"seq":1,"level":"unknown","temperature_c":25.0,"tds_adc":65535,"source":"simulated"}'
+curl --fail "$KAEW_BASE_URL/api/telemetry" -H "Authorization: Bearer $KAEW_ADMIN_TOKEN"
+```
+
+This sample is **simulated**, not hardware proof. Expect 201 on first insert and 200 on the same sample retry. Open the base URL, enter the admin token and reload history to find the row. Do not capture tokens in screenshots or shell tracing. An alternative Node.js 20+ simulator is `node cloud/simulate.mjs` with `KAEW_CLOUD_URL` set to the base URL and the device token exported. A raw ADC count is not calibrated TDS, and a single level switch does not measure tank volume.
+
+For real telemetry copy [the local header example](../firmware/include/cloud_config.local.h.example) to ignored `firmware/include/cloud_config.local.h`. Set Wi-Fi, `KAEW_CLOUD_URL` to the **full** `https://<host>/api/telemetry`, the **device** token and the verified public root CA PEM for the host's current certificate chain. URL + token now auto-enable publishing; explicit `KAEW_CLOUD_ENABLED=0` forces it off. A nonempty CA and synchronized clock are still required; no TLS bypass is provided. Flash the gateway as in [firmware instructions](../firmware/README.md). Prove `source=device` arrives from the physical node, changes with measurements and survives dashboard reload; verify service restart persistence only on durable storage. See [checkpoint path](../docs/CHECKPOINT_CRITICAL_PATH.md).
+
+Run tests:
+
+```bash
 python -m unittest discover -s cloud -p 'test_*.py' -v
 ```
 
-The simulated gateway adapter saves samples to a bounded SQLite outbox before delivery. Run `python cloud/gateway_push.py --worker` in a separate terminal with the device token and endpoint set for automatic retries with backoff and jitter. Use one worker per outbox. `--flush` performs one manual pass. Delivery is idempotent, and the outbox is removed only after HTTP 200 or 201. Set `KAEW_OUTBOX_PATH` for its local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
+The simulated gateway adapter persists a bounded SQLite outbox before delivery. `python cloud/gateway_push.py --worker` retries with backoff/jitter; use one worker per outbox. `--flush` performs one pass. Entries are removed only after HTTP 200/201. Set `KAEW_OUTBOX_PATH` for the ignored local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
 
 Admin-authenticated `/api/events` records drink or fault events with a `measured`, `estimated`, or `simulated` source; `/api/summary` returns the rolling last 24 hours split by source. `/api/goal` stores a user-selected goal and is not medical guidance. `/api/reminder` stores one repeating reminder. The scheduler creates durable notification jobs for reminders, low-water transitions, fault events and offline transitions. A single delivery worker retries with backoff, marks a job failed after eight attempts, and limits sends to approximately one per second; low-water, fault and offline jobs have a five-minute per-kind cooldown. The default provider is a mock and sends nothing externally.
 

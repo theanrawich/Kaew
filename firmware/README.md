@@ -17,13 +17,26 @@ g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o firmware/test
 firmware/test/safety_test.exe
 ```
 
-Repeat for `scale_test.cpp`, `protocol_test.cpp`, and `integration_test.cpp`. The integration test uses the same C++ packet, receiver and safety classes as the firmware; the separate browser simulation has not yet been migrated to this wire protocol.
+Repeat for `scale_test.cpp`, `protocol_test.cpp`, `integration_test.cpp`, `dispense_test.cpp`, `durable_queue_test.cpp`, and `audio_test.cpp` (the seven host programs in `.github/workflows/firmware.yml`). The integration test uses the same C++ packet, receiver and safety classes as the firmware; the separate browser simulation has not yet been migrated to this wire protocol.
 
-All limits are illustrative. Cup detection now permits changing weight during the simulated dispensing state, but its filtering, lifecycle and tare handling are not yet validated for actual dispensing. Controller command integration, validated timing/noise limits, driver feedback, brownout and hardware interlocks remain incomplete. No test here demonstrates actual pump shutoff or water safety. See `docs/EXECUTION.md` for the continuation point.
+All limits are illustrative. Cup detection now permits changing weight during the simulated dispensing state, but its filtering, lifecycle and tare handling are not yet validated for actual dispensing. Controller command integration, validated timing/noise limits, driver feedback, brownout and hardware interlocks remain incomplete. No test here demonstrates actual pump shutoff or water safety. See [execution ledger](../docs/EXECUTION.md) for the continuation point.
+
+## Build and flash
+
+```bash
+pio run -d firmware -e sensor_node
+pio run -d firmware -e gateway
+pio run -d firmware -e gateway -t upload --upload-port <GATEWAY_PORT>
+pio run -d firmware -e sensor_node -t upload --upload-port <NODE_PORT>
+```
+
+Verify board revisions and ports before flashing. Host tests do not replace the PlatformIO builds or physical commissioning.
 
 ## Experimental gateway publisher
 
-Publisher configuration defaults to disabled in `include/cloud_config.h`. A private, gitignored `include/cloud_config.local.h` may define `KAEW_CLOUD_ENABLED`, `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`, `KAEW_CLOUD_URL` (the complete `/api/telemetry` URL), `KAEW_CLOUD_TOKEN` and `KAEW_CLOUD_CA` (PEM trust anchor). HTTPS requires a nonempty CA and synchronized clock; no certificate-validation bypass is provided. For an isolated LAN experiment only, `KAEW_ALLOW_DEV_HTTP` can explicitly enable plain HTTP. Never commit credentials or use HTTP on an untrusted network.
+Publisher configuration in `include/cloud_config.h` auto-enables when URL and token are both nonempty. Empty defaults keep it off. Copy `include/cloud_config.local.h.example` to ignored `include/cloud_config.local.h`; explicitly defining `KAEW_CLOUD_ENABLED=0` forces it off even with credentials. A build override of 1 (CI `gateway_cloud_compile`) still compiles without any local header. A private, gitignored `include/cloud_config.local.h` may define `KAEW_CLOUD_ENABLED`, `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`, `KAEW_CLOUD_URL` (the complete `/api/telemetry` URL), `KAEW_CLOUD_TOKEN` and `KAEW_CLOUD_CA` (PEM trust anchor). HTTPS requires a nonempty CA and synchronized clock; no certificate-validation bypass is provided. For an isolated LAN experiment only, `KAEW_ALLOW_DEV_HTTP` can explicitly enable plain HTTP. Never commit credentials or use HTTP on an untrusted network.
+
+For local/server environment setup and Render/Fly HTTPS deployment see [cloud setup](../cloud/README.md). Put the device token (never the admin token) in the local header and use the full hosted `/api/telemetry` URL. Obtain the public CA from the current certificate chain (for ISRG Root X1, the example links the official PEM); it is not a private key. Never commit the populated header.
 
 The publisher uses separate lower-priority persistence and network tasks. Sixteen NVS slots hold versioned UART frames with checksums and ordering metadata. The gateway emits a UART ACK only after the slot write succeeds; after an HTTP success the slot is removed, so interruption after backend acceptance may lead to an idempotent retry. Corrupt slots fail closed and require investigation. On saturation or NVS failure no ACK is sent; the node has bounded retries and may eventually discard a sample, reported by its counters. Finite storage cannot prevent loss during an unlimited outage. `KAEW_DURABLE_MIN_MS` sets minimum spacing between new writes (default 1000 ms); removals also write flash. This is not an endurance estimate or a guarantee against NVS failure. NVS has wear leveling, but erase wear and unstable power still need evaluation for the exact device and partition: [Espressif NVS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_flash.html). Actual power-cut recovery, flash wear, HTTPS, Wi-Fi reconnection, certificates, NTP and timing require hardware testing.
 

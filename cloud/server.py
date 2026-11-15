@@ -1,4 +1,4 @@
-"""Local development telemetry service. Not an Internet-facing production server."""
+"""Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
 import hmac
 from contextlib import closing
 import json
@@ -311,13 +311,16 @@ def main():
     admin_token = os.environ.get('KAEW_ADMIN_TOKEN', '')
     db_path = os.environ.get('KAEW_DB_PATH', str(ROOT / 'kaew.sqlite3'))
     host = os.environ.get('KAEW_HOST', '127.0.0.1')
-    if host not in ('127.0.0.1', 'localhost', '::1') and os.environ.get('KAEW_DEV_ALLOW_INSECURE_LAN') != '1':
-        raise ValueError('non-loopback HTTP requires KAEW_DEV_ALLOW_INSECURE_LAN=1')
+    edge_https = os.environ.get('KAEW_TRUST_EDGE_HTTPS') == '1'
+    dev_lan = os.environ.get('KAEW_DEV_ALLOW_INSECURE_LAN') == '1'
+    if host not in ('127.0.0.1', 'localhost', '::1') and not (edge_https or dev_lan):
+        raise ValueError('non-loopback bind requires KAEW_TRUST_EDGE_HTTPS=1 behind TLS edge, or KAEW_DEV_ALLOW_INSECURE_LAN=1 for development')
     token=os.environ.get('KAEW_TELEGRAM_TOKEN',''); chat=os.environ.get('KAEW_TELEGRAM_CHAT_ID','')
     if bool(token)!=bool(chat): raise ValueError('both Telegram token and chat ID are required')
     provider=TelegramProvider(token,chat) if token else MockProvider()
-    server = create_server(host, int(os.environ.get('KAEW_PORT', '8080')), db_path, device_token, admin_token, provider)
-    print('Kaew development HTTP on %s:%s (no TLS)' % (host, server.server_port), flush=True)
+    server = create_server(host, int(os.environ.get('KAEW_PORT', os.environ.get('PORT', '8080'))), db_path, device_token, admin_token, provider)
+    mode = 'trusted HTTPS edge; internal HTTP' if edge_https else 'development HTTP; no TLS'
+    print('Kaew on %s:%s (%s)' % (host, server.server_port, mode), flush=True)
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally: server.server_close()

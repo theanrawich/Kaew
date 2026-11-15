@@ -1,11 +1,11 @@
 # Kaew CAD working files
 
-Start with [the handoff](../CAD_HANDOFF.md). These are mechanical design proposals, not a manufacturing release.
+Start with [the handoff](../docs/CAD_HANDOFF.md). These are mechanical design proposals, not a manufacturing release.
 
-The newer `kaew-full-assembly-20261106.zip` contains the November 6 assembly and current custom-part exports. Extract it into `cad/` after the older archive. The notes below describe the October 31 snapshot; see the handoff for the latest checks and remaining work.
+`kaew-full-assembly-20261106.zip` is the current geometry snapshot (6 November 2026), including native FreeCAD, STEP/STL and custom-part exports. Extract into `cad/`, preserving the subdirectories. It is self-contained; the older October 31 archive has been removed. Native exports remain ignored by `cad/.gitignore`.
 
-- `spout-v1/`: two-half PETG mast/spout, checked independently; source, original estimate and export-verification report.
-- `full-assembly-v1/`: all 23 BOM rows represented across 156 CAD objects in the last generated snapshot. This snapshot has known interference findings. Builder and checker have subsequent, **unexecuted** edits.
-- `kaew-cad-snapshots-20261031.zip`: native FreeCAD/STEP/STL snapshots, custom-part exports and images. Extract **into this `cad` directory**, preserving the two subdirectories. The archive contains geometry/images only; current Python sources and status documents are stored separately in Git.
+- `spout-v1/`: two-half PETG mast/spout sources, estimate and export verification.
+- `full-assembly-v1/`: assembly builder/checker and diagnostic reports. Sources have subsequent unexecuted edits; rebuild and inspect fresh logs before treating geometry as current. Known interference findings remain.
+- `cad-model.json`: optional local FreeCAD mesh export made by `.work/export-cad-colors.py`, ignored and not stored in git. The Pages CAD viewer offers the zip when no mesh is exported. The conceptual 3D homepage is built independently.
 
-The November 6 snapshot and its hash-linked diagnostics describe the assembly at that revision, not a manufacturing release. On November 8 a supplier listing indicated a 13 × 13 mm load cell rather than the 12.7 × 12.7 mm modeled envelope; the resulting fit proposal is documented in the handoff and has not been rebuilt or checked. Scripts are relative to the repository and can be run from another machine. Install FreeCAD separately; the application/installer is not stored here.
+The November 6 snapshot and hash-linked diagnostics describe that revision. A later supplier listing indicated a 13 × 13 mm load cell rather than the modeled 12.7 × 12.7 mm envelope; the fit proposal has not been rebuilt or checked. See the handoff for remaining work. Install FreeCAD separately; no installer is stored here.

@@ -22,3 +22,5 @@
 toolchain/*
 !toolchain/package.json
 !toolchain/package-lock.json
+
+!build-cad-viewer.cjs

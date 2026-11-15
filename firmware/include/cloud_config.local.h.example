@@ -1,0 +1,12 @@
+#pragma once
+// Copy to cloud_config.local.h (gitignored). Fill in private values locally.
+#define KAEW_WIFI_SSID ""
+#define KAEW_WIFI_PASSWORD ""
+#define KAEW_CLOUD_URL "https://<host>/api/telemetry"
+#define KAEW_CLOUD_TOKEN ""
+// Supply the verified public root CA PEM for your host's current TLS chain.
+// For an ISRG Root X1 chain: https://letsencrypt.org/certs/isrgrootx1.pem
+// Use a C++ raw string literal containing the PEM; never disable validation.
+#define KAEW_CLOUD_CA ""
+// URL + token auto-enable publishing. Uncomment to force it off:
+// #define KAEW_CLOUD_ENABLED 0
