@@ -1,0 +1,4 @@
+BEGIN;
+ALTER TABLE public.advice_log ADD COLUMN IF NOT EXISTS model TEXT;
+ALTER TABLE public.advice_log ADD COLUMN IF NOT EXISTS fallback INTEGER NOT NULL DEFAULT 0 CHECK (fallback IN (0,1));
+COMMIT;

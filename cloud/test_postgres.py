@@ -32,6 +32,9 @@ class PostgresTest(unittest.TestCase):
         schema = (Path(__file__).parent / 'migrations/postgres/001_initial.sql').read_text()
         with psycopg.connect(cls.url, autocommit=True) as db:
             db.execute(schema, prepare=False)
+            upgrade = (Path(__file__).parent / 'migrations/postgres/002_advice_loop.sql').read_text()
+            db.execute(upgrade, prepare=False)
+            db.execute(upgrade, prepare=False)
             db.execute(schema, prepare=False)
 
     def setUp(self):
@@ -40,7 +43,7 @@ class PostgresTest(unittest.TestCase):
             db.execute('TRUNCATE telemetry, events, reminders, notifications, settings, notification_jobs, alert_state, advice_log RESTART IDENTITY')
             db.execute("UPDATE devices SET last_seen=NULL WHERE id='node-1'")
         with patch.dict(os.environ, {'DATABASE_URL': self.url}):
-            self.server = create_server('127.0.0.1', 0, 'unused', 'device-test', 'admin-test')
+            self.server = create_server('127.0.0.1', 0, 'unused', 'device-test', 'admin-test', hydration_provider=None)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.base = 'http://127.0.0.1:%d' % self.server.server_port
@@ -106,6 +109,25 @@ class PostgresTest(unittest.TestCase):
             time.sleep(.05)
         self.assertEqual(jobs[0]['status'], 'delivered')
         self.assertIsNone(self.request('GET', '/api/reminder')[1]['reminder'])
+
+    def test_manual_reminder_writers_share_the_advice_advisory_lock(self):
+        # AI holds this lock from snapshot comparison through its final upsert.
+        # Both manual paths must wait, then apply their newer schedule afterward.
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            with closing(connect(self.target)) as db, db:
+                db.execute('BEGIN IMMEDIATE')
+                futures=[executor.submit(self.request,'POST',path,body) for path,body in (
+                    ('/api/reminder',{'interval_minutes':22,'next_due':time.time()+1320}),
+                    ('/api/voice',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'}))]
+                deadline=time.monotonic()+2
+                waiting=0
+                while time.monotonic()<deadline:
+                    waiting=db.execute("SELECT COUNT(*) AS n FROM pg_locks WHERE locktype='advisory' AND objid=2110356 AND NOT granted").fetchone()['n']
+                    if waiting==2 or any(f.done() for f in futures): break
+                    time.sleep(.02)
+                # Exiting the transaction releases the lock even on assertion failure.
+                self.assertEqual(waiting,2)
+            self.assertEqual([f.result()[0] for f in futures],[200,200])
 
     def test_transaction_rollback(self):
         with closing(connect(self.target)) as db:

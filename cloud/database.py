@@ -16,7 +16,7 @@ TABLE_COLUMNS = {
     'settings': 'key,value',
     'notification_jobs': 'id,kind,text,status,attempts,next_attempt,created_at,delivered_at,provider',
     'alert_state': 'key,value',
-    'advice_log': 'id,created_at,input_json,output_json,simulated',
+    'advice_log': 'id,created_at,input_json,output_json,simulated,model,fallback',
 }
 
 
@@ -111,4 +111,4 @@ def verify_postgres(target):
             if not db.execute("SELECT id FROM devices WHERE id='node-1'").fetchone():
                 raise sqlite3.DatabaseError('missing provisioned device')
         except sqlite3.Error:
-            raise RuntimeError(f'Postgres schema missing or inaccessible; apply {SCHEMA_FILE} first') from None
+            raise RuntimeError(f'Postgres schema missing or inaccessible; apply {SCHEMA_FILE} and cloud/migrations/postgres/002_advice_loop.sql first') from None
