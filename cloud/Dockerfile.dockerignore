@@ -5,7 +5,3 @@ cloud/.env
 cloud/.env.*
 cloud/*.sqlite3*
 cloud/__pycache__/
-
-# Website sources and generated Pages output are outside the cloud image.
-site/
-_site/

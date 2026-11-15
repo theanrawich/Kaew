@@ -1,5 +1,5 @@
-import * as THREE from '../.work/toolchain/node_modules/three/build/three.module.js';
-import {OrbitControls} from '../.work/toolchain/node_modules/three/examples/jsm/controls/OrbitControls.js';
+import * as THREE from './node_modules/three/build/three.module.js';
+import {OrbitControls} from './node_modules/three/examples/jsm/controls/OrbitControls.js';
 import {createWireSimulation} from './wire-simulation.mjs';
 import {encodeFrame} from './wire-codec.mjs';
 import {createLocalPipeline} from './telemetry.mjs';

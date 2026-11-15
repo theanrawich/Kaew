@@ -5,7 +5,6 @@ firmware/.pio/
 .pio-core/
 .kaew-*/
 __pycache__/
-_site/
 *.log
 firmware/test/*.exe
 
@@ -24,11 +23,5 @@ Thumbs.db
 !cloud/.env.example
 firmware/include/cloud_config.local.h
 cloud/*.sqlite3*
-
-# Site products rebuilt from .work sources
-/site/kaew-3d.html
-/site/kaew-parts.html
-/site/cad-viewer.js
-/site/cad-model.json
 
 # CAD native exports are covered by cad/.gitignore.
