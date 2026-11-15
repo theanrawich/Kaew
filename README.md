@@ -2,7 +2,7 @@
 
 Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง, cloud และแบบ CAD
 
-สถานะ 15 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway ยังไม่สั่งเริ่มปั๊ม และ AI ยังไม่เป็น closed loop ก่อน branch นี้ cloud รันเฉพาะในเครื่อง ขณะนี้มี config สำหรับ deploy หลัง HTTPS edge แล้ว **ยังไม่ได้ deploy หรือพิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
+สถานะ 15 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway ยังไม่สั่งเริ่มปั๊ม และ AI ยังไม่เป็น closed loop Cloud เปิดใช้งานแล้วที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
 
 ระบบสื่อสารตามเส้นทางนี้:
 
@@ -61,17 +61,9 @@ python cloud/server.py
 
 Hosted stack ที่เลือกคือ **Render web service เดียว** ให้บริการทั้ง API และ dashboard ผ่าน HTTPS และเก็บข้อมูลที่ **Supabase Postgres** โดยใช้ secret `DATABASE_URL` เมื่อไม่ตั้งตัวแปรนี้จะใช้ SQLite local ตาม `KAEW_DB_PATH` ต่อไป ไม่ต้องติดตั้ง psycopg สำหรับการพัฒนา SQLite
 
-โครงการ Supabase เป้าหมายมีแล้ว: **kaew** (`hhzukhrznuvtwsgipyio`, `ap-southeast-1`, `emb-sengkeng`, free plan) ขั้นตอนที่ผู้ดูแล/parent จะทำภายหลัง:
+Cloud API และ dashboard เปิดใช้งานแล้วที่ <https://kaew-cloud.onrender.com> โดย POST telemetry ไปที่ `https://kaew-cloud.onrender.com/api/telemetry` ใช้ device token; dashboard ใช้ admin token แยกกัน งาน checkpoint นี้ไม่ต้อง deploy หรือแก้ Render/Supabase อีก ดู [cloud/README.md](cloud/README.md) สำหรับ local setup และข้อมูลดูแลระบบ ข้อมูล hosted อยู่ใน Supabase แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
 
-1. ใช้ Supabase connector หรือ SQL editor apply [schema](cloud/migrations/postgres/001_initial.sql) ให้โครงการเป้าหมาย
-2. คัดลอก Postgres URI จริงจาก Connect dialog (แนะนำ Session pooler; Transaction pooler รองรับเช่นกัน) ไปใส่ Render secret `DATABASE_URL` พร้อม `sslmode=require` ห้ามเก็บ URI/password ใน git
-3. Apply [render.yaml](render.yaml) จาก branch นี้ใน Render ที่เชื่อมไว้แล้ว ตั้ง secret ที่จำเป็น `DATABASE_URL`, `KAEW_DEVICE_TOKEN`, `KAEW_ADMIN_TOKEN` โดยสอง token ต้องยาวและต่างกัน; Telegram เป็นตัวเลือก ใช้ `KAEW_TELEGRAM_TOKEN` และ `KAEW_TELEGRAM_CHAT_ID` คู่กัน
-4. คง `KAEW_HOST=0.0.0.0`, `KAEW_TRUST_EDGE_HTTPS=1`, `PYTHON_VERSION=3.11.11`, `PYTHONDONTWRITEBYTECODE=1` ตาม Blueprint ให้ Render กำหนด `PORT` ไม่ตั้ง `KAEW_PORT`/`KAEW_DB_PATH` บน host
-5. ผู้ดูแล deploy service เดียว แล้วตรวจ `https://<service>.onrender.com/api/health`, POST `/api/telemetry` ด้วย device token และเปิด `/` ด้วย admin token เพื่ออ่านข้อมูลกลับ
-
-ดูคำสั่งทดสอบและขั้นตอนละเอียดใน [cloud/README.md](cloud/README.md) และตัวแปรใน [cloud/.env.example](cloud/.env.example) ตัวช่วย `bash cloud/deploy.sh render` ใช้ได้เมื่อผู้ดูแลตั้ง schema, secrets และ CLI/login เรียบร้อยแล้ว; ไม่ส่ง secrets ให้ Render แทน Dashboard และไม่ push code มี Fly เป็นทางเลือกรองโดยใช้ `DATABASE_URL` เช่นกัน งานนี้ยังไม่ได้ apply schema ระยะไกลหรือ deploy และไม่ได้ขอหรือค้นหา password ข้อมูล hosted อยู่ใน Supabase จึงไม่พึ่ง disk ชั่วคราวของ Render แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
-
-Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://<host>/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
+Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://kaew-cloud.onrender.com/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** สำหรับ checkpoint ได้เตรียม local header แล้วโดย Wi-Fi SSID/password ยังว่าง ให้กรอกในเครื่องก่อน build แล้ว flash gateway ก่อน node ตาม [ขั้นตอน firmware](firmware/README.md#build-and-flash) ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
 
 [GitHub Pages](https://theanrawich.github.io/Kaew/) แสดงโมเดลแนวคิดและ [parts gallery](https://theanrawich.github.io/Kaew/kaew-parts.html) จาก sources ใน CI ไม่เก็บ generated HTML/bundle ใน git หน้า CAD มีลิงก์ดาวน์โหลดเมื่อไม่มี mesh ตัว `cad-model.json` เป็น FreeCAD export ในเครื่องจาก `.work/export-cad-colors.py` และไม่เก็บใน git; geometry snapshot ปัจจุบันคือ [zip วันที่ 6 พ.ย.](cad/kaew-full-assembly-20261106.zip) ดู [CAD README](cad/README.md) สำหรับข้อจำกัดของแบบ
 

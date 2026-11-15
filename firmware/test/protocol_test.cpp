@@ -35,5 +35,18 @@ int main() {
   assert(wrap.accept(w, 1)==Receive::Accepted); w.seq=0;
   assert(wrap.accept(w, 2)==Receive::Accepted); w.seq=0xffffffffu;
   assert(wrap.accept(w, 3)==Receive::Old);
+  // A full corrupt frame followed immediately by valid data must resynchronize.
+  FrameParser recovery; encode(p, false, b); b[18]^=1;
+  for (auto byte : b) assert(!recovery.push(byte, decoded, ack));
+  encode(p, false, b); done=false;
+  for (auto byte : b) done = recovery.push(byte, decoded, ack) || done;
+  assert(done && !ack && decoded.session==p.session && decoded.seq==p.seq);
+  // Duplicate retries cannot keep a wet tank fresh, including millis wraparound.
+  Receiver age; Packet wet{1, 100, 0, INT16_MIN, UINT16_MAX, 1};
+  const uint32_t receivedAt=0xffffff00u;
+  assert(age.accept(wet, receivedAt)==Receive::Accepted);
+  assert(age.fresh(receivedAt+4999u));
+  assert(age.accept(wet, receivedAt+5000u)==Receive::Duplicate);
+  assert(!age.fresh(receivedAt+5000u));
   return 0;
 }
