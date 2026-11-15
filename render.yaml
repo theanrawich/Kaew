@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     autoDeployTrigger: "off"
-    buildCommand: python --version
+    buildCommand: pip install -r cloud/requirements.txt
     startCommand: python cloud/server.py
     healthCheckPath: /api/health
     envVars:
@@ -16,8 +16,8 @@ services:
         value: 0.0.0.0
       - key: KAEW_TRUST_EDGE_HTTPS
         value: "1"
-      - key: KAEW_DB_PATH
-        value: /tmp/kaew.sqlite3
+      - key: DATABASE_URL
+        sync: false
       - key: KAEW_DEVICE_TOKEN
         sync: false
       - key: KAEW_ADMIN_TOKEN

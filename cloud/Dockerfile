@@ -7,6 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     KAEW_DB_PATH=/data/kaew.sqlite3
 WORKDIR /app
 RUN useradd --uid 10001 --create-home kaew && mkdir /data && chown kaew:kaew /data
+COPY cloud/requirements.txt /app/cloud/requirements.txt
+RUN pip install --no-cache-dir -r cloud/requirements.txt
 COPY --chown=kaew:kaew cloud/ /app/cloud/
 USER kaew
 EXPOSE 8080

@@ -1,0 +1,2 @@
+# Only needed when DATABASE_URL selects Postgres. SQLite local dev is stdlib-only.
+psycopg[binary]==3.3.9

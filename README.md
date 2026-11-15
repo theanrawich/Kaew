@@ -11,7 +11,7 @@ Sensor node (ESP32: temperature; TDS/level ยังปิด)
   -- UART: 20-byte KW frames, CRC16, ACK/retry -->
 Gateway (ESP32-S3: HX711, safety controller, durable outbox)
   -- HTTPS bearer telemetry -->
-Cloud (cloud/server.py + SQLite) --> dashboard + optional Telegram
+Cloud (cloud/server.py + Supabase Postgres; local: SQLite) --> dashboard + optional Telegram
 ```
 
 CRC16 ตรวจความเสียหายของข้อมูล ไม่ใช่การยืนยันตัวตน UART ส่วน safety ต้องทำงานในเครื่องและมีวงจรหยุดตัดกำลังปั๊มโดยอิสระจาก AI/cloud ข้อมูล ADC ยังไม่ใช่ TDS ที่สอบเทียบ และระดับน้ำแบบจุดเดียวไม่บอกปริมาตรถัง
@@ -19,7 +19,7 @@ CRC16 ตรวจความเสียหายของข้อมูล �
 | โฟลเดอร์ / ไฟล์ | เนื้อหา |
 | --- | --- |
 | `firmware/` | PlatformIO: `sensor_node`, `gateway`, protocol, safety, outbox และ host tests |
-| `cloud/` | Python stdlib server, SQLite migrations, dashboard, Telegram และ AI/voice experiments |
+| `cloud/` | Python server, SQLite/Postgres migrations, dashboard, Telegram และ AI/voice experiments |
 | `simulation/` | แบบจำลองและการทดสอบ JavaScript |
 | `.work/` | source และ toolchain สำหรับสร้างเว็บ 3D/parts |
 | `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
@@ -59,7 +59,17 @@ python cloud/server.py
 
 เปิด `http://127.0.0.1:8080/` แล้วกรอก admin token เพื่อดู dashboard ค่าเริ่มต้น bind เฉพาะ loopback และฐานข้อมูลอยู่ที่ `cloud/kaew.sqlite3` (gitignored) ดูตัวแปรใน [cloud/.env.example](cloud/.env.example); server อ่าน environment โดยตรง ไม่โหลด `.env` เอง
 
-สำหรับ hosted HTTPS แนะนำ **Render** ผ่าน [render.yaml](render.yaml); ต้องมีบัญชี Render ที่ login แล้ว เชื่อม GitHub และตั้งสอง token เป็น secret ใน Dashboard ก่อน deploy เครื่องนี้มีเพียง GitHub login จึงยัง deploy ไม่ได้ หลังสร้าง Blueprint และตั้ง CLI/login เองแล้วใช้ `bash cloud/deploy.sh render`; มี Fly เป็นทางเลือกรอง ดูขั้นตอนครบและข้อจำกัด storage ใน [cloud/README.md](cloud/README.md) Free instance ใช้ disk ชั่วคราว ต้องมี persistent volume และ backup หากต้องเก็บ SQLite ข้าม restart
+Hosted stack ที่เลือกคือ **Render web service เดียว** ให้บริการทั้ง API และ dashboard ผ่าน HTTPS และเก็บข้อมูลที่ **Supabase Postgres** โดยใช้ secret `DATABASE_URL` เมื่อไม่ตั้งตัวแปรนี้จะใช้ SQLite local ตาม `KAEW_DB_PATH` ต่อไป ไม่ต้องติดตั้ง psycopg สำหรับการพัฒนา SQLite
+
+โครงการ Supabase เป้าหมายมีแล้ว: **kaew** (`hhzukhrznuvtwsgipyio`, `ap-southeast-1`, `emb-sengkeng`, free plan) ขั้นตอนที่ผู้ดูแล/parent จะทำภายหลัง:
+
+1. ใช้ Supabase connector หรือ SQL editor apply [schema](cloud/migrations/postgres/001_initial.sql) ให้โครงการเป้าหมาย
+2. คัดลอก Postgres URI จริงจาก Connect dialog (แนะนำ Session pooler; Transaction pooler รองรับเช่นกัน) ไปใส่ Render secret `DATABASE_URL` พร้อม `sslmode=require` ห้ามเก็บ URI/password ใน git
+3. Apply [render.yaml](render.yaml) จาก branch นี้ใน Render ที่เชื่อมไว้แล้ว ตั้ง secret ที่จำเป็น `DATABASE_URL`, `KAEW_DEVICE_TOKEN`, `KAEW_ADMIN_TOKEN` โดยสอง token ต้องยาวและต่างกัน; Telegram เป็นตัวเลือก ใช้ `KAEW_TELEGRAM_TOKEN` และ `KAEW_TELEGRAM_CHAT_ID` คู่กัน
+4. คง `KAEW_HOST=0.0.0.0`, `KAEW_TRUST_EDGE_HTTPS=1`, `PYTHON_VERSION=3.11.11`, `PYTHONDONTWRITEBYTECODE=1` ตาม Blueprint ให้ Render กำหนด `PORT` ไม่ตั้ง `KAEW_PORT`/`KAEW_DB_PATH` บน host
+5. ผู้ดูแล deploy service เดียว แล้วตรวจ `https://<service>.onrender.com/api/health`, POST `/api/telemetry` ด้วย device token และเปิด `/` ด้วย admin token เพื่ออ่านข้อมูลกลับ
+
+ดูคำสั่งทดสอบและขั้นตอนละเอียดใน [cloud/README.md](cloud/README.md) และตัวแปรใน [cloud/.env.example](cloud/.env.example) ตัวช่วย `bash cloud/deploy.sh render` ใช้ได้เมื่อผู้ดูแลตั้ง schema, secrets และ CLI/login เรียบร้อยแล้ว; ไม่ส่ง secrets ให้ Render แทน Dashboard และไม่ push code มี Fly เป็นทางเลือกรองโดยใช้ `DATABASE_URL` เช่นกัน งานนี้ยังไม่ได้ apply schema ระยะไกลหรือ deploy และไม่ได้ขอหรือค้นหา password ข้อมูล hosted อยู่ใน Supabase จึงไม่พึ่ง disk ชั่วคราวของ Render แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
 
 Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://<host>/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
 

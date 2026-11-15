@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run intentionally after account/service setup. Never echo secrets or enable xtrace.
+# Run intentionally after Supabase schema + Render/Fly service setup. Never echo secrets or enable xtrace.
 set +x
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
@@ -12,8 +12,9 @@ Render CLI missing. Install and log in yourself:
   curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
   render login
 Then create a Blueprint from render.yaml at https://dashboard.render.com/blueprints
-Select the intended Git branch and enter distinct device/admin secrets in Render.
-Export RENDER_SERVICE_ID and the same two tokens privately; rerun bash cloud/deploy.sh render.
+Apply cloud/migrations/postgres/001_initial.sql to the target Supabase project first.
+Select the intended Git branch and set DATABASE_URL plus distinct device/admin secrets in Render.
+Export RENDER_SERVICE_ID, DATABASE_URL and the same two tokens privately; rerun bash cloud/deploy.sh render.
 HELP
       exit 1
     fi
@@ -26,7 +27,7 @@ Fly CLI missing. Install and log in yourself:
   export PATH="$HOME/.fly/bin:$PATH"
   flyctl auth login
   flyctl apps create <unique-app-name>
-Export KAEW_FLY_APP and two distinct private tokens; rerun bash cloud/deploy.sh fly.
+Apply the Postgres schema; export KAEW_FLY_APP, DATABASE_URL and two distinct private tokens; rerun bash cloud/deploy.sh fly.
 Fly may require billing; see cloud/README.md before creating resources.
 HELP
       exit 1
@@ -38,17 +39,21 @@ if [[ -z ${KAEW_DEVICE_TOKEN:-} || -z ${KAEW_ADMIN_TOKEN:-} || ${KAEW_DEVICE_TOK
   echo 'Set distinct nonempty KAEW_DEVICE_TOKEN and KAEW_ADMIN_TOKEN privately first.' >&2
   exit 1
 fi
+if [[ -z ${DATABASE_URL:-} ]]; then
+  echo 'Set DATABASE_URL privately from Supabase with sslmode=require; apply the schema first.' >&2
+  exit 1
+fi
 # Reject newlines before sending KEY=VALUE records to the Fly secret importer.
-if [[ $KAEW_DEVICE_TOKEN == *$'\n'* || $KAEW_ADMIN_TOKEN == *$'\n'* ]]; then
-  echo 'Tokens must be single-line values.' >&2; exit 1
+if [[ $DATABASE_URL == *$'\n'* || $KAEW_DEVICE_TOKEN == *$'\n'* || $KAEW_ADMIN_TOKEN == *$'\n'* ]]; then
+  echo 'Database URL and tokens must be single-line values.' >&2; exit 1
 fi
 if [[ $platform == render ]]; then
   : "${RENDER_SERVICE_ID:?Set RENDER_SERVICE_ID from the prepared Blueprint service}"
-  # Render secrets must already be set in Dashboard; this triggers the configured remote branch.
+  # DATABASE_URL and both Render tokens must already be set in Dashboard; this triggers the configured remote branch.
   exec render deploys create "$RENDER_SERVICE_ID" --wait --confirm
 else
   : "${KAEW_FLY_APP:?Set KAEW_FLY_APP to your existing app name}"
-  printf 'KAEW_DEVICE_TOKEN=%s\nKAEW_ADMIN_TOKEN=%s\n' "$KAEW_DEVICE_TOKEN" "$KAEW_ADMIN_TOKEN" |
+  printf 'KAEW_DEVICE_TOKEN=%s\nKAEW_ADMIN_TOKEN=%s\nDATABASE_URL=%s\n' "$KAEW_DEVICE_TOKEN" "$KAEW_ADMIN_TOKEN" "$DATABASE_URL" |
     flyctl secrets import --app "$KAEW_FLY_APP" --stage
   exec flyctl deploy . --config cloud/fly.toml --app "$KAEW_FLY_APP" --remote-only --ha=false
 fi
