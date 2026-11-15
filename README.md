@@ -21,9 +21,10 @@ CRC16 ตรวจความเสียหายของข้อมูล �
 | `firmware/` | PlatformIO: `sensor_node`, `gateway`, protocol, safety, outbox และ host tests |
 | `cloud/` | Python server, SQLite/Postgres migrations, dashboard, Telegram และ AI/voice experiments |
 | `simulation/` | แบบจำลองและการทดสอบ JavaScript |
+| `site/` | หน้าเว็บและข้อมูลปั๊ม; generated HTML/bundle (gitignored) |
 | `.work/` | source และ toolchain สำหรับสร้างเว็บ 3D/parts |
 | `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
-| `docs/` | handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
+| `docs/` | BOM (`kaew-bom.json`), handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
 | `references/`, `output/real-parts/hero.jpg` | ภาพอ้างอิงและภาพอุปกรณ์ |
 
 ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
@@ -65,7 +66,7 @@ Cloud API และ dashboard เปิดใช้งานแล้วที�
 
 Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://kaew-cloud.onrender.com/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** สำหรับ checkpoint ได้เตรียม local header แล้วโดย Wi-Fi SSID/password ยังว่าง ให้กรอกในเครื่องก่อน build แล้ว flash gateway ก่อน node ตาม [ขั้นตอน firmware](firmware/README.md#build-and-flash) ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
 
-[GitHub Pages](https://theanrawich.github.io/Kaew/) แสดงโมเดลแนวคิดและ [parts gallery](https://theanrawich.github.io/Kaew/kaew-parts.html) จาก sources ใน CI ไม่เก็บ generated HTML/bundle ใน git หน้า CAD มีลิงก์ดาวน์โหลดเมื่อไม่มี mesh ตัว `cad-model.json` เป็น FreeCAD export ในเครื่องจาก `.work/export-cad-colors.py` และไม่เก็บใน git; geometry snapshot ปัจจุบันคือ [zip วันที่ 6 พ.ย.](cad/kaew-full-assembly-20261106.zip) ดู [CAD README](cad/README.md) สำหรับข้อจำกัดของแบบ
+[GitHub Pages](https://theanrawich.github.io/Kaew/) แสดงโมเดลแนวคิดและ [parts gallery](https://theanrawich.github.io/Kaew/kaew-parts.html) จาก sources ใน CI ไม่เก็บ generated HTML/bundle ใน git หน้า CAD มีลิงก์ดาวน์โหลดเมื่อไม่มี mesh ตัว `site/cad-model.json` เป็น FreeCAD export ในเครื่องจาก `.work/export-cad-colors.py` และไม่เก็บใน git; geometry snapshot ปัจจุบันคือ [zip วันที่ 6 พ.ย.](cad/kaew-full-assembly-20261106.zip) ดู [CAD README](cad/README.md) สำหรับข้อจำกัดของแบบ
 
 สร้างเว็บและตรวจ source ได้ด้วย:
 
@@ -80,6 +81,8 @@ node .work/check-model-labels.cjs
 node .work/check-water-path.cjs
 node .work/stage-pages.cjs
 ```
+
+เปิดเว็บในเครื่องจาก `site/kaew-3d.html` หลัง build หรือ serve repo root; `_site/` คือไฟล์เผยแพร่ที่คง URL เดิม
 
 เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [CAD handoff](docs/CAD_HANDOFF.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [execution ledger](docs/EXECUTION.md) · [เป้าหมายผลิตภัณฑ์](docs/product-intent.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
 

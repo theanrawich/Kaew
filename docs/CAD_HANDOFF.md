@@ -99,7 +99,7 @@ FreeCAD/STEP เป็น solid ที่ valid, STL เป็น mesh ปิด
 
 ## กติกาสเปกและขอบเขต
 
-- ยึดสินค้าและลิงก์จาก `kaew-bom.json`; ปั๊ม 504 บาท, OLED SH1106 1.3 นิ้ว 139 บาท, ขวด Crystal 1.5L, แก้ว Ocean Nova Rock B06511
+- ยึดสินค้าและลิงก์จาก `docs/kaew-bom.json`; ปั๊ม 504 บาท, OLED SH1106 1.3 นิ้ว 139 บาท, ขวด Crystal 1.5L, แก้ว Ocean Nova Rock B06511
 - ขนาดแก้วปาก83/ฐาน63/สูง90 มม. มาจากผู้ผลิต ส่วนขวด Ø85×320 และกล่องปั๊ม 80×125×40/สูงรวม72 ยังเป็น estimate จากงานเดิม ไม่มี drawing ยืนยันจากร้าน ผู้ใช้อนุญาตให้ยึด spec ไม่ได้ทำให้ estimate กลายเป็นมิติผู้ผลิต
 - ESP32-S3 reference 25.4×62.74 มม. มี 22 ขาต่อแถว รุ่นภาพร้านไม่มีรูมุม ให้ใช้ edge cradle ไม่สร้างรูบน PCB โดยไม่มีหลักฐาน ESP32 30 ขาและโมดูล generic ต้องรักษาสถานะ revision unconfirmed
 - XY-3606 ใช้กรอบอ้างอิง 63×27 มม. ต้องรวมปลั๊ก/สาย ไม่ใช้ขนาดบอร์ดเล็ก 26 มม. ที่จะทำให้ประเมินพื้นที่ผิด
@@ -112,7 +112,7 @@ FreeCAD/STEP เป็น solid ที่ valid, STL เป็น mesh ปิด
 
 ## ไฟล์สำคัญ
 
-- `kaew-bom.json`, `docs/SHOPPING_LIST.md`: SKU และงบเดิม
+- `docs/kaew-bom.json`, `docs/SHOPPING_LIST.md`: SKU และงบเดิม
 - `cad/spout-v1/build_spout.py`, `verify_exports.py`, `render_spout.FCMacro`: สร้าง/ตรวจ/เรนเดอร์หัวจ่ายเดี่ยว
 - `cad/full-assembly-v1/build_assembly.py`: source ชุดประกอบล่าสุด
 - `cad/full-assembly-v1/check_fit.py`: diagnostic ล่าสุด

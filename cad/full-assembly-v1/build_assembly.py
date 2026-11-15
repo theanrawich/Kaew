@@ -13,7 +13,7 @@ ROOT=OUT.parent.parent
 STL=OUT/'custom-parts-current'
 STL.mkdir(parents=True,exist_ok=True)
 V=App.Vector
-BOM=json.loads((ROOT/'kaew-bom.json').read_text(encoding='utf-8-sig'))
+BOM=json.loads((ROOT/'docs/kaew-bom.json').read_text(encoding='utf-8-sig'))
 REG={r['id']:{'id':r['id'],'label':r['label'],'purchase_quantity':r['qty'],
               'source':r.get('url') or 'Kaew mechanical design',
               'status':'supplier_variant_unconfirmed','objects':[],'notes':r.get('note','')}
