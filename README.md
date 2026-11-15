@@ -23,7 +23,6 @@ CRC16 ตรวจความเสียหายของข้อมูล �
 | `simulation/` | แบบจำลองและการทดสอบ JavaScript |
 | `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
 | `docs/` | BOM (`kaew-bom.json`), handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
-| `references/` | ภาพอ้างอิงและภาพอุปกรณ์ |
 
 ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
 
