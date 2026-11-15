@@ -11,8 +11,6 @@ const files = [
   ['cad/kaew-full-assembly-20261106.zip', 'cad/kaew-full-assembly-20261106.zip'],
   ['site/kaew-3d.html', 'kaew-3d.html'],
   ['site/kaew-parts.html', 'kaew-parts.html'],
-  ['site/pump-options.html', 'pump-options.html'],
-  ['site/pump-options.json', 'pump-options.json'],
   ['docs/kaew-bom.json', 'kaew-bom.json'],
   ['docs/SHOPPING_LIST.md', 'docs/SHOPPING_LIST.md'],
   ['docs/parts-verification.md', 'docs/parts-verification.md'],
@@ -29,10 +27,6 @@ for (const [source, target] of files) {
       .replace('href="kaew-3d.html"', 'href="index.html"')
       .replaceAll('href="../cad/', 'href="cad/');
     fs.writeFileSync(path.join(destination, target), html);
-  } else if (source === 'docs/SHOPPING_LIST.md') {
-    const markdown = fs.readFileSync(path.join(root, source), 'utf8')
-      .replaceAll('../site/pump-options.', '../pump-options.');
-    fs.writeFileSync(path.join(destination, target), markdown);
   } else if (source === 'docs/parts-verification.md') {
     const markdown = fs.readFileSync(path.join(root, source), 'utf8')
       .replaceAll('`docs/kaew-bom.json`', '`kaew-bom.json`');
