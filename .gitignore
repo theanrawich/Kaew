@@ -25,10 +25,10 @@ Thumbs.db
 firmware/include/cloud_config.local.h
 cloud/*.sqlite3*
 
-# Root site products rebuilt from .work sources
-/kaew-3d.html
-/kaew-parts.html
-/cad-viewer.js
-/cad-model.json
+# Site products rebuilt from .work sources
+/site/kaew-3d.html
+/site/kaew-parts.html
+/site/cad-viewer.js
+/site/cad-model.json
 
 # CAD native exports are covered by cad/.gitignore.

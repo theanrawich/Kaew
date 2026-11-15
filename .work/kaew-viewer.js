@@ -5,7 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import bottlePhoto from '../references/crystal-1500-reference.jpg';
 import pumpPhoto from '../references/pump-250-0.jpg';
 import oledPhoto from '../references/part-display-oled13.jpg';
-import bom from '../kaew-bom.json';
+import bom from '../docs/kaew-bom.json';
 import { mountWiringViewer } from './kaew-wiring.js';
 import { mountControlPanel } from './kaew-panel.js';
 import modelParts from './kaew-model-parts.cjs';
