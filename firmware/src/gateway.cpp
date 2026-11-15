@@ -81,8 +81,10 @@ void loop() {
       } else Serial.println("calibration rejected or storage failed");
     }
   }
-  if (scale.is_ready()) {
-    long raw = scale.read();
+  const bool scaleReady = scale.is_ready();
+  long raw = 0; // Only meaningful when hx711_ready=1 in this loop.
+  if (scaleReady) {
+    raw = scale.read();
     inputs.calibrated = validCalibration(calibration);
     if (inputs.calibrated && filter.push(toGrams(calibration, raw))) {
       inputs.weightG = filter.weight(); inputs.scaleValid = controller.pumping() || filter.stable();
@@ -90,14 +92,14 @@ void loop() {
       inputs.cupPresent = controller.pumping() ? cup.updateDispensing(true, inputs.weightG) : cup.update(inputs.scaleValid, inputs.weightG);
     } else { inputs.scaleValid = false; inputs.cupPresent = false; }
     if (!inputs.cupPresent) cupTare.clear();
-    if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {
-      float volume = 0; bool volumeKnown = cupTare.volume(inputs.cupPresent, inputs.weightG, volume);
-      Serial.printf("hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=off\n",
-        raw, inputs.calibrated, inputs.weightG, inputs.scaleValid, inputs.cupPresent, volumeKnown, volume,
-        receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0, static_cast<unsigned long>(accepted),
-        static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected), static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()));
-      lastPrint = inputs.nowMs;
-    }
+  }
+  if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {
+    float volume = 0; bool volumeKnown = cupTare.volume(inputs.cupPresent, inputs.weightG, volume);
+    Serial.printf("hx711_ready=%d hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=off\n",
+      scaleReady, raw, inputs.calibrated, inputs.weightG, inputs.scaleValid, inputs.cupPresent, volumeKnown, volume,
+      receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0, static_cast<unsigned long>(accepted),
+      static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected), static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()));
+    lastPrint = inputs.nowMs;
   }
   controller.update(inputs);
   if (PUMP_PIN >= 0) digitalWrite(PUMP_PIN, controller.pumping() ? HIGH : LOW);

@@ -4,11 +4,11 @@ These two programs are incomplete and **must not be used to operate a pump**. Pi
 
 The node reads DS18B20. TDS input is disabled and reports the unknown sentinel 65535; a disconnected temperature sensor is invalid. The level interface remains disabled and reports unknown. Node and gateway exchange 20-byte, versioned UART frames with CRC16, boot session, sequence, ACK and bounded retries. The sender buffers one pending sample, drops it after four transmissions without ACK, then resumes with fresh data. Gateway refuses stale data after five seconds and does not refresh freshness on duplicates. CRC does **not** authenticate a peer; the UART is a trusted internal connection and must not be exposed as an untrusted control interface. There are no pump-control messages. A different boot session is accepted only after the prior session becomes stale; a random session ID is not replay protection.
 
-Provisional UART pins: node TX GPIO25 → gateway RX GPIO1, node RX GPIO26 ← gateway TX GPIO2, with a verified common 3.3 V logic reference. Pin availability, ground/power topology and cable routing must be checked against actual board revisions before wiring. UART avoids the shared-channel constraint between ESP-NOW and gateway Wi-Fi; see the [Espressif FAQ](https://docs.espressif.com/projects/esp-faq/en/latest/esp-faq-en-master.pdf). It is not physically tested.
+Provisional UART pins: node TX GPIO25 → gateway RX GPIO1, node RX GPIO26 ← gateway TX GPIO2, with a verified common GND reference. Power both boards off before wiring; check the power topology and ground voltage difference with a meter before joining GND. Use 3.3 V UART logic only (GPIO is not 5 V tolerant); do not join the boards’ power rails. Pin availability, ground/power topology and cable routing must be checked against actual board revisions before wiring. UART avoids the shared-channel constraint between ESP-NOW and gateway Wi-Fi; see the [Espressif FAQ](https://docs.espressif.com/projects/esp-faq/en/latest/esp-faq-en-master.pdf). It is not physically tested.
 
 Gateway loads a versioned, checksum-protected HX711 calibration from NVS. For bench commissioning only, observe an unloaded raw value and a stable raw value with a known mass, then send `CAL <unloaded_raw> <loaded_raw> <known_mass_g>` over the gateway serial console. Verify with independent known masses before relying on it. With a stable empty cup present, `TARE` sets a volatile cup tare; volume uses the approximation 1 g/mL. Removal, instability, recalibration or reboot clears tare. This is preliminary filtering and cup detection with illustrative thresholds, not validated control. NVS corruption fails closed; actual write, interruption and reboot behavior needs hardware testing.
 
-Install PlatformIO Core and run `pio run -d firmware`. The pinned platform and libraries are in `platformio.ini`. The S3 board definition is a candidate for N16R8; verify the received board and flash/PSRAM configuration before flashing.
+Install PlatformIO Core (`python3 -m pip install platformio==6.2.0` in a virtual environment if required) and run `pio run -d firmware`. The pinned platform and libraries are in `platformio.ini`. The S3 board definition is a candidate for N16R8; verify the received board and flash/PSRAM configuration before flashing.
 
 The portable controller and protocol can be exercised on a host with:
 
@@ -17,26 +17,45 @@ g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o firmware/test
 firmware/test/safety_test.exe
 ```
 
-Repeat for `scale_test.cpp`, `protocol_test.cpp`, `integration_test.cpp`, `dispense_test.cpp`, `durable_queue_test.cpp`, and `audio_test.cpp` (the seven host programs in `.github/workflows/firmware.yml`). The integration test uses the same C++ packet, receiver and safety classes as the firmware; the separate browser simulation has not yet been migrated to this wire protocol.
+Repeat for `scale_test.cpp`, `protocol_test.cpp`, `integration_test.cpp`, `dispense_test.cpp`, `durable_queue_test.cpp`, and `audio_test.cpp` (the seven host programs in `.github/workflows/firmware.yml`). Run `bash firmware/test/cloud_config_test.sh` for the six-case configuration matrix. The protocol test also checks corrupt-frame recovery and freshness across clock wraparound; integration covers missing, unknown, dry, malformed and stale tank data. The integration test uses the same C++ packet, receiver and safety classes as the firmware; the separate browser simulation has not yet been migrated to this wire protocol.
 
 All limits are illustrative. Cup detection now permits changing weight during the simulated dispensing state, but its filtering, lifecycle and tare handling are not yet validated for actual dispensing. Controller command integration, validated timing/noise limits, driver feedback, brownout and hardware interlocks remain incomplete. No test here demonstrates actual pump shutoff or water safety. See [execution ledger](../docs/EXECUTION.md) for the continuation point.
 
 ## Build and flash
 
+The cloud is live at <https://kaew-cloud.onrender.com>; the physical node → UART → gateway → HTTPS path is still unproven. Keep the pump disconnected throughout this temperature-only checkpoint.
+
+1. Verify board revisions, exposed UART pins, supply/ground topology and serial ports. Wire TX/RX/GND as above with both boards powered off. Verify the DS18B20 pinout and its 4.7 kΩ DQ pull-up to 3V3; do not infer probe wire colors.
+2. In the gitignored `firmware/include/cloud_config.local.h`, fill **only your local Wi-Fi SSID/password placeholders** before building. The checkpoint setup supplies the full live telemetry URL, device token and ISRG Root X1 PEM. Keep credentials private; never paste tokens into chat. URL + token auto-enable the publisher without a forced enable flag. The gateway needs Wi-Fi internet access and NTP time synchronization for validated HTTPS.
+3. From the repository root, build, then flash **gateway first, node second** (replace each port placeholder):
+
 ```bash
 pio run -d firmware -e sensor_node
 pio run -d firmware -e gateway
+pio run -d firmware -e gateway_cloud_compile
 pio run -d firmware -e gateway -t upload --upload-port <GATEWAY_PORT>
 pio run -d firmware -e sensor_node -t upload --upload-port <NODE_PORT>
 ```
 
-Verify board revisions and ports before flashing. Host tests do not replace the PlatformIO builds or physical commissioning.
+`gateway_cloud_compile` verifies enabled publisher/audio compilation; flash the normal `gateway` environment for this checkpoint. Host tests do not replace the PlatformIO builds or physical commissioning.
+
+4. Open separate serial terminals at 115200 (exit a monitor with Ctrl-C before uploading to the same port):
+
+```bash
+pio device monitor -d firmware -e gateway --port <GATEWAY_PORT> --baud 115200
+pio device monitor -d firmware -e sensor_node --port <NODE_PORT> --baud 115200
+```
+
+Node `tx` and `ack` should advance without sustained `dropped` growth. Gateway prints every second even without HX711: expect `hx711_ready=0`, increasing `rx`, `link_fresh=1`, `level=0`, and `pump=off`. `hx711_raw` is meaningful only when `hx711_ready=1`; scale fields are not validated measurements when the scale is missing. `dup` may rise on retries; `rejected`, `cloud_reject` and `cloud_error` expose receiver, enqueue/storage failures, but are **not HTTP-success counters**. UART ACK confirms durable local storage, not cloud delivery. With empty Wi-Fi placeholders ACKs can initially advance until the finite outbox fills; this does not prove HTTPS works.
+
+5. Open <https://kaew-cloud.onrender.com/> and authenticate privately using the existing admin dashboard credential (never put that credential in firmware). Confirm new rows show `source=device`, advancing sequence, plausible temperature responding to gentle probe warming, level `unknown`, and TDS `—` (API `65535`). Dashboard refresh is every 5 s; the protected `/api/telemetry` response also contains session IDs if needed. A disconnected temperature probe should yield `—` (API `null`). Queued arrival time does not prove a current measurement.
+6. Disconnect UART: gateway `link_fresh` must become 0 after 5 s and level display remain unknown. Reconnect and confirm new sequence values and dashboard rows. After a node reboot, allow the prior session’s 5 s freshness window to expire. Briefly interrupt Wi-Fi and confirm replay after reconnection; record duration/loss. The 16-slot queue and bounded node retries cannot cover unlimited outages. Power-cut recovery and actual TLS/NTP/Wi-Fi behavior still require board testing. No step authorizes pump operation.
 
 ## Experimental gateway publisher
 
 Publisher configuration in `include/cloud_config.h` auto-enables when URL and token are both nonempty. Empty defaults keep it off. Copy `include/cloud_config.local.h.example` to ignored `include/cloud_config.local.h`; explicitly defining `KAEW_CLOUD_ENABLED=0` forces it off even with credentials. A build override of 1 (CI `gateway_cloud_compile`) still compiles without any local header. A private, gitignored `include/cloud_config.local.h` may define `KAEW_CLOUD_ENABLED`, `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`, `KAEW_CLOUD_URL` (the complete `/api/telemetry` URL), `KAEW_CLOUD_TOKEN` and `KAEW_CLOUD_CA` (PEM trust anchor). HTTPS requires a nonempty CA and synchronized clock; no certificate-validation bypass is provided. For an isolated LAN experiment only, `KAEW_ALLOW_DEV_HTTP` can explicitly enable plain HTTP. Never commit credentials or use HTTP on an untrusted network.
 
-For local/server environment setup and Render/Fly HTTPS deployment see [cloud setup](../cloud/README.md). Put the device token (never the admin token) in the local header and use the full hosted `/api/telemetry` URL. Obtain the public CA from the current certificate chain (for ISRG Root X1, the example links the official PEM); it is not a private key. Never commit the populated header.
+The existing live endpoint is `https://kaew-cloud.onrender.com/api/telemetry`; no redeployment is needed for this checkpoint. For local/server environment setup see [cloud setup](../cloud/README.md). Put the device token (never the admin token) in the local header and use the full hosted `/api/telemetry` URL. Obtain the public CA from the current certificate chain (for ISRG Root X1, the example links the official PEM); it is not a private key. Never commit the populated header.
 
 The publisher uses separate lower-priority persistence and network tasks. Sixteen NVS slots hold versioned UART frames with checksums and ordering metadata. The gateway emits a UART ACK only after the slot write succeeds; after an HTTP success the slot is removed, so interruption after backend acceptance may lead to an idempotent retry. Corrupt slots fail closed and require investigation. On saturation or NVS failure no ACK is sent; the node has bounded retries and may eventually discard a sample, reported by its counters. Finite storage cannot prevent loss during an unlimited outage. `KAEW_DURABLE_MIN_MS` sets minimum spacing between new writes (default 1000 ms); removals also write flash. This is not an endurance estimate or a guarantee against NVS failure. NVS has wear leveling, but erase wear and unstable power still need evaluation for the exact device and partition: [Espressif NVS](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/storage/nvs_flash.html). Actual power-cut recovery, flash wear, HTTPS, Wi-Fi reconnection, certificates, NTP and timing require hardware testing.
 
