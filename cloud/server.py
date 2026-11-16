@@ -303,7 +303,7 @@ class Handler(BaseHTTPRequestHandler):
                 items.sort(key=lambda x:x['created_at'],reverse=True)
                 return self.reply(200, {'items':items[:100]})
             if path == '/api/reminder':
-                row = db.execute('SELECT interval_minutes,next_due FROM reminders WHERE id=1').fetchone()
+                row = db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
                 return self.reply(200, {'reminder':dict(row) if row else None})
             if path == '/api/summary':
                 start = time.time()-86400

@@ -200,6 +200,17 @@ class BackendTest(unittest.TestCase):
             self.assertEqual(body['items'][0]['received_at'], 2005)
         self.assertEqual(len(self.request('GET', '/api/events?limit=3', 'admin-secret')[1]['items']), 3)
 
+    def test_reminder_get_includes_repeat_flag(self):
+        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
+        self.assertEqual(self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()+60})[0],200)
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['repeat_enabled'],1)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE reminders SET repeat_enabled=0')
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['repeat_enabled'],0)
+
+
     def test_existing_database_migrates_without_losing_telemetry(self):
         path=os.path.join(self.directory.name,'old.sqlite3')
         with closing(sqlite3.connect(path)) as db, db:
