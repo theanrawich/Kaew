@@ -15,7 +15,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parent
 MAX_BODY = 4096
@@ -273,7 +273,29 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/goal':
                 row=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
                 return self.reply(200, {'goal_ml': row['value'] if row else None})
-            if path == '/api/events': return self.reply(200, {'items':[dict(x) for x in db.execute('SELECT * FROM events ORDER BY received_at DESC LIMIT 100')]})
+            if path == '/api/events':
+                query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                try:
+                    if any(len(query[key]) != 1 for key in ('since', 'limit') if key in query):
+                        raise ValueError()
+                    since = float(query['since'][0]) if 'since' in query else None
+                    # Unix epoch through year 9999; reject unusable timestamps.
+                    if since is not None and (not math.isfinite(since) or not 0 <= since <= 253402300799):
+                        raise ValueError()
+                    limit = int(query['limit'][0]) if 'limit' in query else (2000 if since is not None else 100)
+                    if limit < 1:
+                        raise ValueError()
+                    limit = min(limit, 2000)
+                except (ValueError, OverflowError):
+                    return self.reply(400, {'error': 'invalid_events_query'})
+                sql = 'SELECT * FROM events'
+                params = []
+                if since is not None:
+                    sql += ' WHERE received_at >= ?'
+                    params.append(since)
+                sql += ' ORDER BY received_at DESC LIMIT ?'
+                params.append(limit)
+                return self.reply(200, {'items': [dict(x) for x in db.execute(sql, params)]})
             if path == '/api/notifications':
                 items=[dict(x) for x in db.execute('SELECT * FROM notification_jobs ORDER BY created_at DESC LIMIT 100')]
                 items += [{'id':'legacy:'+str(x['id']),'kind':'reminder','provider':x['provider'],
