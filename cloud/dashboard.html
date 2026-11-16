@@ -1,17 +1,230 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kaew telemetry</title><style>
-body{font:16px system-ui;background:#edf4f2;color:#183b39;margin:0;padding:2rem}main{max-width:960px;margin:auto}h1{font-size:2rem}section{background:white;border-radius:14px;padding:1.2rem;margin:1rem 0;box-shadow:0 6px 24px #1232}input,button{font:inherit;padding:.6rem;border:1px solid #9db9b2;border-radius:6px}button{background:#135d51;color:white;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.55rem;border-bottom:1px solid #e1eae7}small{color:#526c67}.scroll{overflow:auto}
-</style></head><body><main><h1>Kaew telemetry</h1><p>ข้อมูลเซนเซอร์ที่บันทึกจริงในฐานข้อมูลทดลอง · ไม่ใช่เครื่องมือประเมินความปลอดภัยของน้ำ</p>
-<section><label>Admin token <input id="token" type="password" autocomplete="off"></label> <button id="connect">เชื่อมต่อ</button><p id="message">ยังไม่ได้เชื่อมต่อ</p><p id="status"></p></section>
-<section><h2>ข้อมูลย้อนหลัง</h2><small>100 รายการล่าสุด · ADC เป็นค่าดิบ · ระดับน้ำเป็นสถานะจุดเดียว</small><div class="scroll"><table><thead><tr><th>เวลารับ</th><th>แหล่ง</th><th>ระดับ</th><th>อุณหภูมิ °C</th><th>ADC ดิบ</th><th>ลำดับ</th></tr></thead><tbody id="rows"></tbody></table></div></section>
-<section><h2>การดื่มและเหตุการณ์</h2><p id="drinking">ยังไม่มีข้อมูล</p><label>เป้าหมายที่กำหนดเอง (มล./วัน) <input id="goal" type="number" min="100" max="10000"></label> <button id="save-goal">บันทึกเป้าหมาย</button><p id="goal-status"></p><ul id="events"></ul></section>
-<section><h2>ตั้งเวลาเตือน</h2><label>ทุก <input id="minutes" type="number" min="1" max="1440" value="30"> นาที</label> <button id="save-reminder">บันทึก</button><p id="reminder"></p><p><small>สถานะ mock เป็นการทดสอบในระบบ ไม่ใช่การส่งจริง</small></p><ul id="notifications"></ul></section>
-<section><h2>AI เตือนครั้งถัดไป</h2><p id="ai-advice">ยังไม่มีคำแนะนำ</p><p><small>ปริมาณน้ำเป็นเพียงคำแนะนำ · AI ไม่ควบคุมปั๊ม · ไม่ใช่คำแนะนำทางการแพทย์</small></p><button id="run-advice">ให้ AI ตั้งเวลาใหม่</button></section>
+<title>Kaew telemetry</title><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+:root{font-family:"Space Grotesk",system-ui,sans-serif;color:#000;background:#fffbee}
+*{box-sizing:border-box}
+body{margin:0;padding:40px 24px 56px}
+main{max-width:1120px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+header{grid-column:1/-1;border:4px solid #000;background:#ffe500;box-shadow:6px 6px 0 #000;padding:28px}
+.eyebrow{display:inline-block;margin:0 0 12px;padding:5px 10px;background:#000;color:#fff;font-size:.8rem;font-weight:700;letter-spacing:.12em}
+h1{font-size:clamp(2.3rem,6vw,4.5rem);line-height:1.08;letter-spacing:-.055em;margin:0 0 16px;font-weight:700}
+header p:last-child{max-width:760px;margin:0;line-height:1.7;font-weight:600}
+section{min-width:0;background:#fff;border:3px solid #000;border-radius:4px;padding:24px;box-shadow:6px 6px 0 #000}
+.connection,.history,.advice-card{grid-column:1/-1}
+h2{font-size:1.35rem;line-height:1.5;margin:0 0 16px;font-weight:700}
+.section-tag{display:inline-block;border:3px solid #000;padding:3px 10px;margin:0 0 16px;background:#ff78c8;font-size:.75rem;font-weight:700;letter-spacing:.08em}
+.connection{background:#56e5f5}
+.drinking-card .section-tag{background:#c3f53c}
+.reminder-card .section-tag{background:#ffe500}
+.advice-card{background:#ff78c8}
+.advice-card .section-tag{background:#fffbee}
+.controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:16px}
+label{display:flex;flex:1 1 240px;flex-direction:column;gap:8px;font-weight:700;line-height:1.6;min-width:0}
+input,button{font:inherit;min-height:48px;border:3px solid #000;border-radius:3px;padding:10px 14px;color:#000}
+input{width:100%;min-width:0;background:#fffbee}
+button{background:#ffe500;font-weight:700;cursor:pointer;box-shadow:4px 4px 0 #000;transition:transform .12s,box-shadow .12s;max-width:100%;white-space:normal}
+button:hover{transform:translate(1px,1px);box-shadow:3px 3px 0 #000}
+button:active{transform:translate(4px,4px);box-shadow:0 0 0 #000}
+button:disabled{cursor:wait;background:#ddd;box-shadow:2px 2px 0 #000}
+:focus-visible{outline:3px solid #000;outline-offset:5px}
+input:focus-visible{background:#fff;outline-style:dashed}
+p,li{line-height:1.7;overflow-wrap:anywhere}
+p{margin:16px 0 0}
+small{display:block;font-size:.875rem;line-height:1.7;color:#242424}
+#message,#drinking,#ai-advice{font-weight:700}
+#status:empty,#goal-status:empty,#reminder:empty,ul:empty{display:none}
+.scroll{overflow-x:auto;margin-top:20px;border:3px solid #000;background:#fffbee}
+table{width:100%;min-width:680px;border-collapse:collapse;font-size:.925rem}
+th,td{text-align:left;padding:14px 16px;border-bottom:2px solid #000}
+th{background:#ffe500;font-weight:700;white-space:nowrap}
+th+th,td+td{border-left:2px solid #000}
+tbody tr:nth-child(even){background:#f1f1e8}
+tbody tr:last-child td{border-bottom:0}
+ul{padding-left:24px;margin-bottom:0}
+li+li{margin-top:8px}
+#save-goal{background:#c3f53c}
+#run-advice{background:#56e5f5;margin-top:20px}
+.interval-field{display:flex;align-items:center;gap:12px;width:100%}
+.interval-field input{flex:1 1 auto}
+@media(max-width:700px){body{padding:20px 18px 36px}main{grid-template-columns:minmax(0,1fr);gap:22px}header,section{padding:20px}header,.connection,.history,.advice-card{grid-column:1}.controls{flex-direction:column;align-items:stretch;gap:14px}label{flex:0 1 auto;width:100%}button{width:100%}h2{font-size:1.2rem}}
+
+main{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.chart,.chart-layout,.number-tiles{width:100%;max-width:100%;min-width:0}
+.chart{margin-top:20px;background:#fffbee;border:3px solid #000;padding:12px}
+.chart svg{display:block;width:100%;max-width:100%;height:auto;font-family:inherit;font-weight:700}
+.chart-layout{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}.chart-layout .chart{margin-top:0}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px;font-size:.8rem;font-weight:700}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.swatch{width:16px;height:16px;border:3px solid #000;background:var(--fill);display:inline-block}
+.empty{padding:24px 8px;font-weight:700;text-align:center}
+details{margin-top:24px;min-width:0}summary{cursor:pointer;font-weight:700;border:3px solid #000;background:#ffe500;padding:12px;box-shadow:3px 3px 0 #000}
+.number-tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px}
+.number-tile{min-width:0;border:3px solid #000;background:#fffbee;padding:16px;box-shadow:4px 4px 0 #000;font-weight:700}
+.number-tile strong,#countdown{display:block;font-size:clamp(1.8rem,5vw,3rem);line-height:1.2;overflow-wrap:anywhere}
+.number-tile:first-child{background:#ffe500}.number-tile:last-child{background:#56e5f5}
+.countdown-track{height:30px;border:3px solid #000;background:#fffbee;margin-top:16px}
+.countdown-fill{height:100%;width:0;background:#c3f53c;border-right:3px solid #000}
+@media(max-width:700px){main{grid-template-columns:minmax(0,1fr)}.number-tiles{grid-template-columns:minmax(0,1fr)}.chart{padding:6px}}
+
+
+.chip-list{display:flex;flex-wrap:wrap;gap:10px;list-style:none;padding:0 4px 4px 0;margin:16px 0 0;max-width:100%;min-width:0}
+.chip-list .chip{display:flex;flex-direction:column;justify-content:center;gap:4px;flex:0 1 112px;min-width:0;max-width:100%;margin:0;border:3px solid #000;border-radius:0;box-shadow:3px 3px 0 #000;background:#eee;padding:8px 10px;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.chip[data-source="measured"],.chip[data-status="delivered"]{background:#c3f53c}
+.chip[data-source="estimated"]{background:#56e5f5}
+.chip[data-source="simulated"]{background:#ff78c8}
+.chip[data-status="pending"]{background:#ffe500}
+.chip[data-kind="fault"],.chip[data-status="failed"],.chip[data-status="error"]{background:#ff5a5a}
+.chip-value{font-size:1.45rem;line-height:1.2}.chip-unit{font-size:.8rem}
+.chip-cue,.chip time{font-size:.75rem;line-height:1.4}
+.chip-cue{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.chip-history .chip-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(112px,100%),1fr))}
+.chip-history[hidden]{display:none}
+.chip-history summary{min-height:48px;overflow-wrap:anywhere}
+
+
+.drinking-card,.reminder-card{display:flex;flex-direction:column;min-width:0;min-height:0}
+.drinking-card>*,.reminder-card>*{flex-shrink:0}
+.drinking-card>.section-tag,.reminder-card>.section-tag{align-self:flex-start}
+.reminder-upcoming{margin-top:16px}
+.reminder-upcoming h3,.notification-panel h3{font-size:1rem;margin:0 0 8px}
+.upcoming-list{display:flex;flex-wrap:wrap;gap:10px;list-style:none;padding:0;margin:0}
+.upcoming-list li{flex:1 1 110px;min-width:0;margin:0;padding:8px;border:3px solid #000;background:#ffe500;box-shadow:3px 3px 0 #000;font-weight:700}
+.upcoming-list time{display:block;font-size:1.2rem}
+.notification-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+.notification-stat{min-width:0;padding:8px;border:3px solid #000;background:#eee;font-weight:700;overflow-wrap:anywhere}
+.notification-stat strong{display:block;font-size:1.5rem}
+.notification-stat small{font-size:.8rem}
+.notification-panel{display:flex;flex-direction:column;flex:1 0 310px;min-height:310px;width:100%;margin-top:20px;padding:12px;border:3px solid #000;background:#fffbee}
+.notification-panel .legend{margin:0 0 8px;gap:6px 12px}
+#notification-chart{position:relative;flex:1;min-height:210px;width:100%}
+#notification-chart svg{position:absolute;inset:0;width:100%;height:100%;font-family:inherit;font-weight:700}
+.notification-panel>small{margin-top:6px}
+@media(max-width:700px){.notification-panel{flex:0 0 auto}.notification-stats{gap:6px}.notification-stat{padding:6px}#notification-chart{flex:none;height:230px}}
+
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style></head><body><main><header><p class="eyebrow">KAEW / CLOUD DASHBOARD</p><h1>Kaew telemetry</h1><p>ข้อมูลเซนเซอร์ที่บันทึกจริงในฐานข้อมูลทดลอง · ไม่ใช่เครื่องมือประเมินความปลอดภัยของน้ำ</p></header>
+<section class="connection"><div class="controls"><label>Admin token <input id="token" type="password" autocomplete="off"></label> <button id="connect">เชื่อมต่อ</button></div><p id="message">ยังไม่ได้เชื่อมต่อ</p><p id="status"></p></section>
+<section class="history"><span class="section-tag">01 / TELEMETRY</span><h2>ข้อมูลย้อนหลัง</h2><small>100 รายการล่าสุด · ADC เป็นค่าดิบ · ระดับน้ำเป็นสถานะจุดเดียว</small><div id="telemetry-chart" class="chart" role="img" aria-label="Temperature and ADC over time"></div><div class="legend"><span><i class="swatch" style="--fill:#ffe500"></i>Temp °C (ซ้าย)</span><span><i class="swatch" style="--fill:#c3f53c"></i>ADC (ขวา)</span><span><i class="swatch" style="--fill:#56e5f5"></i>wet</span><span><i class="swatch" style="--fill:#ff78c8"></i>dry</span><span><i class="swatch" style="--fill:#bbb"></i>unknown</span></div><details><summary>ข้อมูลดิบ / Raw data</summary><div class="scroll" tabindex="0" role="region" aria-label="ข้อมูลย้อนหลัง"><table><thead><tr><th>เวลารับ</th><th>แหล่ง</th><th>ระดับ</th><th>อุณหภูมิ °C</th><th>ADC ดิบ</th><th>ลำดับ</th></tr></thead><tbody id="rows"></tbody></table></div></details></section>
+<section class="drinking-card"><span class="section-tag">02 / HYDRATION</span><h2>การดื่มและเหตุการณ์</h2><p id="drinking">ยังไม่มีข้อมูล</p><div class="controls"><label>เป้าหมายที่กำหนดเอง (มล./วัน) <input id="goal" type="number" min="100" max="10000"></label> <button id="save-goal">บันทึกเป้าหมาย</button></div><p id="goal-status"></p><div class="chart-layout"><div id="today-chart" class="chart" role="img" aria-label="Today’s drink volume and daily goal"></div><div id="hydration-chart" class="chart" role="img" aria-label="Drink volume by source for the last seven local days"></div></div><div class="legend"><span><i class="swatch" style="--fill:#c3f53c"></i>วัดจริง / measured</span><span><i class="swatch" style="--fill:#56e5f5"></i>ประมาณ / estimated</span><span><i class="swatch" style="--fill:#ff78c8"></i>จำลอง / simulated</span></div><ul id="events-recent" class="chip-list" aria-label="เหตุการณ์ล่าสุด / Latest events"></ul><details id="events-history" class="chip-history" hidden><summary>ดูทั้งหมด / All events</summary><ul id="events" class="chip-list" aria-label="All events"></ul></details></section>
+<section class="reminder-card"><span class="section-tag">03 / REMINDERS</span><h2>ตั้งเวลาเตือน</h2><div class="controls"><label class="interval-label">ทุก <span class="interval-field"><input id="minutes" type="number" min="1" max="1440" value="30"> นาที</span></label> <button id="save-reminder">บันทึก</button></div><p id="reminder"></p><div class="chart" aria-label="เวลาที่เหลือก่อนเตือนครั้งถัดไป"><strong id="countdown">ยังไม่ได้ตั้งเตือน</strong><div class="countdown-track" aria-hidden="true"><div id="countdown-fill" class="countdown-fill"></div></div><small>แถบแสดงเวลาที่ผ่านไปในรอบเตือน</small></div><div class="reminder-upcoming"><h3>Upcoming / เวลาเตือนถัดไป</h3><ul id="reminder-upcoming" class="upcoming-list"></ul><small>Projected from current interval / คำนวณจากรอบเตือนปัจจุบัน</small></div><div id="notification-stats" class="notification-stats" aria-label="Loaded notification statistics"></div><div class="notification-panel"><h3>Notifications / 7 วันล่าสุด</h3><div class="legend"><span><i class="swatch" style="--fill:#c3f53c"></i>Delivered</span><span><i class="swatch" style="--fill:#ffe500"></i>Pending</span><span><i class="swatch" style="--fill:#ff5a5a"></i>Failed / error</span><span><i class="swatch" style="--fill:#ddd"></i>Other / mock</span></div><div id="notification-chart" role="img" aria-label="Notifications per local day"></div><small id="notification-window"></small><small>Loaded notifications · local calendar days / เฉพาะข้อมูลที่โหลด</small></div><p><small>สถานะ mock เป็นการทดสอบในระบบ ไม่ใช่การส่งจริง</small></p><ul id="notifications-recent" class="chip-list" aria-label="การแจ้งเตือนล่าสุด / Latest notifications"></ul><details id="notifications-history" class="chip-history" hidden><summary>ดูทั้งหมด / All notifications</summary><ul id="notifications" class="chip-list" aria-label="All notifications"></ul></details></section>
+<section class="advice-card"><span class="section-tag">04 / AI ADVICE</span><h2>AI เตือนครั้งถัดไป</h2><div class="number-tiles"><div class="number-tile"><strong id="advice-minutes">—</strong>นาที / Next reminder</div><div class="number-tile"><strong id="advice-volume">—</strong>มล. / Suggested</div></div><p id="ai-advice">ยังไม่มีคำแนะนำ</p><p><small>ปริมาณน้ำเป็นเพียงคำแนะนำ · AI ไม่ควบคุมปั๊ม · ไม่ใช่คำแนะนำทางการแพทย์</small></p><button id="run-advice">ให้ AI ตั้งเวลาใหม่</button></section>
 </main><script>
-let token=''; async function refresh(){if(!token)return;try{const headers={Authorization:'Bearer '+token};const paths=['status','telemetry','events','summary','notifications','reminder','advice'];const responses=await Promise.all(paths.map(p=>fetch('/api/'+p,{headers})));if(responses.some(r=>!r.ok))throw Error('เข้าสู่ระบบไม่สำเร็จ');const [s,t,e,summary,notes,rem,ai]=await Promise.all(responses.map(r=>r.json()));document.querySelector('#status').textContent=s.device.id+' · '+(s.device.online?'ออนไลน์':'ออฟไลน์');const rows=document.querySelector('#rows');rows.replaceChildren(...t.items.map(item=>{const tr=document.createElement('tr');for(const value of [new Date(item.received_at*1000).toLocaleString(),item.source,item.level,item.temperature_c??'—',(item.tds_adc===65535?'—':item.tds_adc),item.seq]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}return tr}));document.querySelector('#drinking').textContent='24 ชั่วโมงล่าสุด · วัดจริง '+(summary.by_source.measured||0)+' มล. · ประมาณ '+(summary.by_source.estimated||0)+' มล. · จำลอง '+(summary.by_source.simulated||0)+' มล.';document.querySelector('#events').replaceChildren(...e.items.map(item=>{const li=document.createElement('li');li.textContent=item.kind+' · '+item.source+' · '+(item.volume_ml??'—')+' มล.';return li}));document.querySelector('#reminder').textContent=rem.reminder?'เตือนครั้งถัดไป '+new Date(rem.reminder.next_due*1000).toLocaleString():'ยังไม่ได้ตั้งเตือน';document.querySelector('#notifications').replaceChildren(...notes.items.map(item=>{const li=document.createElement('li');li.textContent=item.provider+' · '+item.status+' · '+new Date(item.created_at*1000).toLocaleString();return li}));const a=ai.advice;document.querySelector('#ai-advice').textContent=a?.next_reminder_minutes?('อีก '+a.next_reminder_minutes+' นาที · แนะนำ '+a.suggested_ml+' มล. · '+a.reason+' · '+(a.fallback?'ค่าเริ่มต้น (fallback)':'โมเดล')+(a.model?' · '+a.model:'')+' · '+new Date(a.timestamp*1000).toLocaleString()+(a.scheduled===false?' · มีเวลาเตือนใหม่กว่า จึงไม่ได้เปลี่ยนเวลา':'')):'ยังไม่มีคำแนะนำ';document.querySelector('#message').textContent='เชื่อมต่อแล้ว';}catch(e){document.querySelector('#message').textContent='เชื่อมต่อไม่ได้: '+e.message;}}
+
+let confirmedGoal=null;
+const chartData={telemetry:[],events:[],notifications:[],reminder:null,advice:null};
+const palette={measured:'#c3f53c',estimated:'#56e5f5',simulated:'#ff78c8'};
+const numberLabel=n=>Number(n.toFixed(1)).toLocaleString();
+function svgText(x,y,value,anchor='middle'){return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="13" fill="#000">${value}</text>`}
+function svgFrame(width,height,content){return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" aria-hidden="true">${content}</svg>`}
+function line(x1,y1,x2,y2,color='#000',width=3){return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}"/>`}
+function renderTelemetry(){
+ const target=document.querySelector('#telemetry-chart');
+ const points=chartData.telemetry.filter(p=>Number.isFinite(p.received_at)).slice().sort((a,b)=>a.received_at-b.received_at);
+ const temp=p=>Number.isFinite(p.temperature_c),adc=p=>Number.isFinite(p.tds_adc)&&p.tds_adc!==65535;
+ if(!points.some(p=>temp(p)||adc(p))){target.innerHTML='<div class="empty">ยังไม่มีข้อมูลสำหรับกราฟ / No plottable data</div>';return}
+ const lo=points[0].received_at,hi=points.at(-1).received_at;
+ const x=t=>60+(hi===lo?350:(t-lo)/(hi-lo)*700);
+ const temps=points.filter(temp).map(p=>p.temperature_c);
+ const tmin=Math.min(0,...temps),tmax=Math.max(tmin+1,...temps),amax=Math.max(1,...points.filter(adc).map(p=>p.tds_adc));
+ const ty=v=>220-(v-tmin)/(tmax-tmin)*170,ay=v=>220-v/amax*170;
+ let content=svgText(60,24,'Temp °C','start')+svgText(760,24,'ADC','end');
+ for(let i=0;i<=4;i++){const y=220-i*42.5;content+=line(60,y,760,y,'#bbb')+svgText(51,y+5,numberLabel(tmin+(tmax-tmin)*i/4),'end')+svgText(769,y+5,numberLabel(amax*i/4),'start')}
+ function series(valid,field,scale,color){let path='',active=false,markers='';for(const p of points){if(!valid(p)){active=false;continue}const px=x(p.received_at),py=scale(p[field]);path+=`${active?'L':'M'}${px},${py} `;active=true;markers+=`<circle cx="${px}" cy="${py}" r="4" fill="${color}" stroke="#000" stroke-width="3"/>`}return `<path d="${path}" fill="none" stroke="#000" stroke-width="7"/><path d="${path}" fill="none" stroke="${color}" stroke-width="3"/>`+markers}
+ content+=series(temp,'temperature_c',ty,'#ffe500')+series(adc,'tds_adc',ay,'#c3f53c');
+ points.forEach((p,i)=>{const left=i===0?60:x(p.received_at),right=i===points.length-1?760:x(points[i+1].received_at);content+=`<rect x="${left}" y="240" width="${Math.max(0,right-left)}" height="16" fill="${p.level==='wet'?'#56e5f5':p.level==='dry'?'#ff78c8':'#bbb'}" stroke="#000" stroke-width="3"/>`});
+ for(let i=0;i<3;i++){const time=lo+(hi-lo)*i/2;content+=svgText(60+i*350,285,new Date(time*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),i===0?'start':i===2?'end':'middle')}
+ target.innerHTML=svgFrame(840,300,content);
+ target.setAttribute?.('aria-label',`Temperature and ADC over time, ${points.length} samples. Raw values in ข้อมูลดิบ.`);
+}
+function localDay(date){return [date.getFullYear(),date.getMonth(),date.getDate()].join('-')}
+function renderHydration(){
+ const now=new Date(),days=Array.from({length:7},(_,i)=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6+i);return {date:d,key:localDay(d),measured:0,estimated:0,simulated:0}});
+ for(const e of chartData.events){if(e.kind!=='drink'||!Number.isFinite(e.received_at)||!Number.isFinite(e.volume_ml)||e.volume_ml<0||!Object.hasOwn(palette,e.source))continue;const day=days.find(d=>d.key===localDay(new Date(e.received_at*1000)));if(day)day[e.source]+=e.volume_ml}
+ const goal=Number.isFinite(confirmedGoal)&&confirmedGoal>0?confirmedGoal:0;
+ const total=d=>d.measured+d.estimated+d.simulated,today=total(days[6]),max=Math.max(1,goal,...days.map(total));
+ let bars=svgText(45,20,'มล. / ml','start');
+ for(let i=0;i<=4;i++){const y=210-i*42;bars+=line(45,y,455,y,'#bbb')+svgText(39,y+4,numberLabel(max*i/4),'end')}
+ days.forEach((d,i)=>{let y=210;const x=53+i*57;for(const source of Object.keys(palette)){const height=d[source]/max*168;y-=height;if(height)bars+=`<rect x="${x}" y="${y}" width="32" height="${height}" fill="${palette[source]}" stroke="#000" stroke-width="3"/>`}bars+=svgText(x+16,235,`${d.date.getDate()}/${d.date.getMonth()+1}`)});
+ if(goal){const y=210-goal/max*168;bars+=line(45,y,455,y,'#ffe500',9)+line(45,y,455,y)+svgText(453,y-8,'Goal '+numberLabel(goal),'end')}
+ document.querySelector('#hydration-chart').innerHTML=svgFrame(480,255,bars);
+ document.querySelector('#hydration-chart').setAttribute?.('aria-label',days.map(d=>`${d.date.toLocaleDateString()}: measured ${d.measured}, estimated ${d.estimated}, simulated ${d.simulated} ml`).join('; '));
+ const circumference=2*Math.PI*82,ratio=goal?Math.min(1,today/goal):0;
+ const ring=`<circle cx="150" cy="120" r="82" fill="#fffbee" stroke="#000" stroke-width="4"/><circle cx="150" cy="120" r="74" fill="none" stroke="#000" stroke-width="4"/>`+(goal?`<circle cx="150" cy="120" r="82" fill="none" stroke="#c3f53c" stroke-width="12" stroke-dasharray="${circumference*ratio} ${circumference}" transform="rotate(-90 150 120)"/>`:'')+svgText(150,95,'Today / วันนี้')+`<text x="150" y="127" text-anchor="middle" font-size="28">${numberLabel(today)} ml</text>`+svgText(150,153,goal?`Goal ${numberLabel(goal)} ml · ${Math.round(today/goal*100)}%`:'ยังไม่ได้ตั้งเป้าหมาย');
+ const target=document.querySelector('#today-chart');target.innerHTML=svgFrame(300,230,ring);target.setAttribute?.('aria-label',`Today ${today} ml${goal?`, goal ${goal} ml, ${Math.round(today/goal*100)}%`:''}`);
+}
+function renderReminder(){
+ const rem=chartData.reminder,valid=rem&&Number.isFinite(rem.next_due)&&Number.isFinite(rem.interval_minutes)&&rem.interval_minutes>0;
+ const remaining=valid?Math.max(0,Math.ceil((rem.next_due-Date.now()/1000)/60)):0;
+ document.querySelector('#countdown').textContent=valid?(remaining>=60?`${Math.floor(remaining/60)} ชม. ${remaining%60} นาที`:`${remaining} นาที`):'ยังไม่ได้ตั้งเตือน';
+ document.querySelector('#countdown-fill').style.width=valid?`${Math.max(0,Math.min(100,(1-(rem.next_due-Date.now()/1000)/(rem.interval_minutes*60))*100))}%`:'0%';
+}
+function renderNotifications(){
+ const now=new Date(),days=Array.from({length:7},(_,i)=>{const date=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6+i);return {date,key:localDay(date),delivered:0,pending:0,failed:0,other:0}});
+ const colors={delivered:'#c3f53c',pending:'#ffe500',failed:'#ff5a5a',other:'#ddd'};
+ for(const item of chartData.notifications){
+  if(!Number.isFinite(item.created_at))continue;
+  const date=new Date(item.created_at*1000);if(!Number.isFinite(date.getTime()))continue;
+  const day=days.find(d=>d.key===localDay(date));if(!day)continue;
+  const status=item.status==='delivered'?'delivered':item.status==='pending'?'pending':item.status==='failed'||item.status==='error'?'failed':'other';day[status]++;
+ }
+ const total=d=>d.delivered+d.pending+d.failed+d.other,count=days.reduce((n,d)=>n+total(d),0),failed=days.reduce((n,d)=>n+d.failed,0);
+ const stats=[['Delivered today',days[6].delivered],['Pending · loaded',chartData.notifications.filter(n=>n.status==='pending').length],['7-day fail %',count?`${Math.round(failed/count*100)}%`:'—']];
+ document.querySelector('#notification-stats').replaceChildren(...stats.map(([label,value])=>{const tile=chipText('div','notification-stat','');tile.append(chipText('strong','',value),chipText('small','',label));return tile}));
+ const target=document.querySelector('#notification-chart'),width=Math.max(280,target.clientWidth),height=Math.max(210,target.clientHeight),left=44,right=width-12,bottom=height-32,top=30,plot=bottom-top,max=Math.max(1,...days.map(total)),step=(right-left)/7,barWidth=Math.min(38,step*.65);
+ let content='';
+ for(let i=0;i<=2;i++){const tick=Math.round(max*i/2);if(i===1&&(tick===0||tick===max))continue;const y=bottom-tick/max*plot;content+=line(left,y,right,y,'#bbb')+svgText(left-7,y+4,tick,'end')}
+ days.forEach((day,i)=>{const x=left+step*(i+.5);let y=bottom;for(const status of Object.keys(colors)){const h=day[status]/max*plot;y-=h;if(h)content+=`<rect x="${x-barWidth/2}" y="${y}" width="${barWidth}" height="${h}" fill="${colors[status]}" stroke="#000" stroke-width="3"/>`}content+=svgText(x,height-10,`${day.date.getDate()}/${day.date.getMonth()+1}`);if(total(day))content+=svgText(x,y-8,total(day))});
+ target.innerHTML=svgFrame(width,height,content);
+ target.setAttribute('aria-label',days.map(d=>`${d.date.toLocaleDateString()}: delivered ${d.delivered}, pending ${d.pending}, failed or error ${d.failed}, other ${d.other}`).join('; '));
+ document.querySelector('#notification-window').textContent=count?`${count} notifications in window`:'No notifications in the last 7 days / ยังไม่มีการแจ้งเตือนในช่วงนี้';
+}
+function renderUpcoming(){
+ const rem=chartData.reminder,list=document.querySelector('#reminder-upcoming');
+ const valid=rem&&Number.isFinite(rem.next_due)&&Number.isFinite(rem.interval_minutes)&&rem.interval_minutes>0;
+ const dates=valid?Array.from({length:rem.repeat_enabled?3:1},(_,i)=>rem.next_due+i*rem.interval_minutes*60):[];
+ if(!valid||dates.some(epoch=>!Number.isFinite(new Date(epoch*1000).getTime()))){list.replaceChildren(chipText('li','','ยังไม่ได้ตั้งเตือน / No reminder set'));return}
+ list.replaceChildren(...dates.map(epoch=>{const item=chipText('li','',''),date=new Date(epoch*1000);item.append(chipTime(epoch),chipText('small','',date.toLocaleDateString([],{day:'numeric',month:'short'})));return item}));
+}
+function renderCharts(){renderNotifications();renderUpcoming();renderTelemetry();renderHydration();renderReminder();document.querySelector('#advice-minutes').textContent=chartData.advice?.next_reminder_minutes??'—';document.querySelector('#advice-volume').textContent=chartData.advice?.suggested_ml??'—'}
+
+function chipText(tag,className,value){
+ const node=document.createElement(tag);node.className=className;node.textContent=value;if(className==='chip-cue')node.title=value;return node;
+}
+function chipTime(epoch){
+ const time=document.createElement('time'),date=new Date(epoch*1000);
+ time.textContent=Number.isFinite(epoch)&&Number.isFinite(date.getTime())?date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'—';
+ if(Number.isFinite(epoch)&&Number.isFinite(date.getTime())){time.dateTime=date.toISOString();time.title=date.toLocaleString()}
+ return time;
+}
+function eventChip(item){
+ const chip=document.createElement('li');chip.className='chip';chip.dataset.source=item.source;chip.dataset.kind=item.kind;
+ if(item.kind==='fault'){
+  chip.append(chipText('strong','chip-value','!'),chipText('span','chip-cue','Fault / ขัดข้อง'));
+ }else if(item.kind==='drink'){
+  const volume=chipText('strong','chip-value',item.volume_ml??'—');
+  volume.append(chipText('span','chip-unit',' มล.'));chip.append(volume);
+ }else{chip.append(chipText('strong','chip-cue',item.kind??'Event'))}
+ chip.append(chipText('span','chip-cue',item.source??'unknown'),chipTime(item.received_at));
+ return chip;
+}
+function notificationChip(item){
+ const chip=document.createElement('li');chip.className='chip';chip.dataset.status=item.status;
+ chip.append(chipText('strong','chip-cue',item.status??'unknown'),chipText('span','chip-cue',item.provider??'unknown'),chipTime(item.created_at));
+ return chip;
+}
+function renderChipLists(id,items,makeChip){
+ document.querySelector('#'+id).replaceChildren(...items.map(makeChip));
+ document.querySelector('#'+id+'-recent').replaceChildren(...items.slice(0,8).map(makeChip));
+ const details=document.querySelector('#'+id+'-history');details.hidden=items.length<=8;
+ if(details.hidden)details.open=false;
+}
+
+let token=''; async function refresh(){if(!token)return;try{const headers={Authorization:'Bearer '+token};const paths=['status','telemetry','events','summary','notifications','reminder','advice'];const now=new Date(),since=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime()/1000;const responses=await Promise.all([...paths.map(p=>fetch('/api/'+p+(p==='events'?'?since='+since:''),{headers})),fetch('/api/events',{headers})]);if(responses.some(r=>!r.ok))throw Error('เข้าสู่ระบบไม่สำเร็จ');const [s,t,e,summary,notes,rem,ai,recentEvents]=await Promise.all(responses.map(r=>r.json()));document.querySelector('#status').textContent=s.device.id+' · '+(s.device.online?'ออนไลน์':'ออฟไลน์');const rows=document.querySelector('#rows');rows.replaceChildren(...t.items.map(item=>{const tr=document.createElement('tr');for(const value of [new Date(item.received_at*1000).toLocaleString(),item.source,item.level,item.temperature_c??'—',(item.tds_adc===65535?'—':item.tds_adc),item.seq]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}return tr}));document.querySelector('#drinking').textContent='24 ชั่วโมงล่าสุด · วัดจริง '+(summary.by_source.measured||0)+' มล. · ประมาณ '+(summary.by_source.estimated||0)+' มล. · จำลอง '+(summary.by_source.simulated||0)+' มล.';renderChipLists('events',recentEvents.items,eventChip);document.querySelector('#reminder').textContent=rem.reminder?'เตือนครั้งถัดไป '+new Date(rem.reminder.next_due*1000).toLocaleString():'ยังไม่ได้ตั้งเตือน';renderChipLists('notifications',notes.items,notificationChip);const a=ai.advice;document.querySelector('#ai-advice').textContent=a?.next_reminder_minutes?('อีก '+a.next_reminder_minutes+' นาที · แนะนำ '+a.suggested_ml+' มล. · '+a.reason+' · '+(a.fallback?'ค่าเริ่มต้น (fallback)':'โมเดล')+(a.model?' · '+a.model:'')+' · '+new Date(a.timestamp*1000).toLocaleString()+(a.scheduled===false?' · มีเวลาเตือนใหม่กว่า จึงไม่ได้เปลี่ยนเวลา':'')):'ยังไม่มีคำแนะนำ';document.querySelector('#message').textContent='เชื่อมต่อแล้ว';chartData.telemetry=t.items;chartData.events=e.items;chartData.notifications=notes.items;chartData.reminder=rem.reminder;chartData.advice=a;renderCharts();}catch(e){document.querySelector('#message').textContent='เชื่อมต่อไม่ได้: '+e.message;}}
 document.querySelector('#run-advice').onclick=async()=>{if(!token)return;const button=document.querySelector('#run-advice');button.disabled=true;try{const r=await fetch('/api/advice',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({include_simulated:false})});if(!r.ok)throw Error('ตั้งเวลา AI ไม่สำเร็จ');await refresh()}catch(e){document.querySelector('#message').textContent=e.message}finally{button.disabled=false}};
 document.querySelector('#save-reminder').onclick=async()=>{if(!token)return;const minutes=Number(document.querySelector('#minutes').value);try{const r=await fetch('/api/reminder',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({interval_minutes:minutes,next_due:Date.now()/1000+minutes*60})});if(!r.ok)throw Error('ตั้งเวลาไม่สำเร็จ');await refresh()}catch(e){document.querySelector('#message').textContent=e.message}};
-document.querySelector('#save-goal').onclick=async()=>{if(!token)return;try{const r=await fetch('/api/goal',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({goal_ml:Number(document.querySelector('#goal').value)})});if(!r.ok)throw Error('บันทึกเป้าหมายไม่สำเร็จ');document.querySelector('#goal-status').textContent='บันทึกเป้าหมายแล้ว'}catch(e){document.querySelector('#goal-status').textContent=e.message}};
-document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';await refresh();try{const r=await fetch('/api/goal',{headers:{Authorization:'Bearer '+token}});if(r.ok){const g=await r.json();if(g.goal_ml!==null){document.querySelector('#goal').value=g.goal_ml;document.querySelector('#goal-status').textContent='เป้าหมายที่บันทึก: '+g.goal_ml+' มล./วัน'}}}catch{}};setInterval(refresh,5000);
+document.querySelector('#save-goal').onclick=async()=>{if(!token)return;const goal=Number(document.querySelector('#goal').value);try{const r=await fetch('/api/goal',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({goal_ml:goal})});if(!r.ok)throw Error('บันทึกเป้าหมายไม่สำเร็จ');confirmedGoal=goal;document.querySelector('#goal-status').textContent='บันทึกเป้าหมายแล้ว';renderHydration()}catch(e){document.querySelector('#goal-status').textContent=e.message}};
+document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';await refresh();try{const r=await fetch('/api/goal',{headers:{Authorization:'Bearer '+token}});if(r.ok){const g=await r.json();confirmedGoal=g.goal_ml??null;if(g.goal_ml!==null){document.querySelector('#goal').value=g.goal_ml;document.querySelector('#goal-status').textContent='เป้าหมายที่บันทึก: '+g.goal_ml+' มล./วัน'}renderHydration()}}catch{}};setInterval(refresh,5000);
+renderCharts();
+if(typeof ResizeObserver!=='undefined'){const chartObserver=new ResizeObserver(()=>renderCharts());document.querySelectorAll('section').forEach(section=>chartObserver.observe(section))}
 </script></body></html>

@@ -162,6 +162,55 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(len(records['items']),1)
         self.assertEqual(records['items'][0]['provider'],'mock')
 
+    def test_events_since_includes_drinks_outside_latest_100(self):
+        older = time.time() - 6 * 86400 + .25
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO events VALUES (?,?,?,?,?)', ('older-drink', 'drink', 'measured', 777, older))
+            db.execute('INSERT INTO events VALUES (?,?,?,?,?)', ('outside-window', 'drink', 'measured', 999, older - 1))
+            db.executemany('INSERT INTO events VALUES (?,?,?,?,?)',
+                           [('recent-%d' % i, 'fault', 'simulated', None, older + i + 1) for i in range(125)])
+        status, body = self.request('GET', '/api/events', 'admin-secret')
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body['items']), 100)
+        self.assertNotIn('older-drink', [e['id'] for e in body['items']])
+        path = '/api/events?since=%s' % older
+        status, body = self.request('GET', path, 'admin-secret')
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body['items']), 126)
+        self.assertEqual(body['items'][-1]['id'], 'older-drink')
+        self.assertEqual(body['items'][-1]['volume_ml'], 777)
+        self.assertEqual(self.request('GET', path)[0], 401)
+        self.assertEqual(self.request('GET', path, 'device-secret')[0], 401)
+
+    def test_events_queries_are_validated_and_bounded(self):
+        for query in ('since=nope', 'since=nan', 'since=inf', 'since=-1', 'since=1e100', 'since=',
+                      'limit=0', 'limit=-1', 'limit=1.5', 'limit=nope', 'limit=inf', 'limit=',
+                      'since=1&since=2', 'limit=1&limit=2'):
+            with self.subTest(query=query):
+                status, body = self.request('GET', '/api/events?' + query, 'admin-secret')
+                self.assertEqual(status, 400)
+                self.assertIn('error', body)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.executemany('INSERT INTO events VALUES (?,?,?,?,?)',
+                           [('bounded-%d' % i, 'drink', 'measured', 10, i + 1) for i in range(2005)])
+        for query in ('since=0', 'limit=999999', 'since=0&limit=2001'):
+            status, body = self.request('GET', '/api/events?' + query, 'admin-secret')
+            self.assertEqual(status, 200)
+            self.assertEqual(len(body['items']), 2000)
+            self.assertEqual(body['items'][0]['received_at'], 2005)
+        self.assertEqual(len(self.request('GET', '/api/events?limit=3', 'admin-secret')[1]['items']), 3)
+
+    def test_reminder_get_includes_repeat_flag(self):
+        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
+        self.assertEqual(self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()+60})[0],200)
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['repeat_enabled'],1)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE reminders SET repeat_enabled=0')
+        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertEqual(rem['repeat_enabled'],0)
+
+
     def test_existing_database_migrates_without_losing_telemetry(self):
         path=os.path.join(self.directory.name,'old.sqlite3')
         with closing(sqlite3.connect(path)) as db, db:
