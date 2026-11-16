@@ -258,7 +258,7 @@ class Handler(BaseHTTPRequestHandler):
             body = (ROOT / 'dashboard.html').read_bytes()
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Cache-Control', 'no-store'); self.send_header('Content-Length', str(len(body)))
-            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'")
+            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
         if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})

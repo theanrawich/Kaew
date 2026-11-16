@@ -1,13 +1,60 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kaew telemetry</title><style>
-body{font:16px system-ui;background:#edf4f2;color:#183b39;margin:0;padding:2rem}main{max-width:960px;margin:auto}h1{font-size:2rem}section{background:white;border-radius:14px;padding:1.2rem;margin:1rem 0;box-shadow:0 6px 24px #1232}input,button{font:inherit;padding:.6rem;border:1px solid #9db9b2;border-radius:6px}button{background:#135d51;color:white;cursor:pointer}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:.55rem;border-bottom:1px solid #e1eae7}small{color:#526c67}.scroll{overflow:auto}
-</style></head><body><main><h1>Kaew telemetry</h1><p>ข้อมูลเซนเซอร์ที่บันทึกจริงในฐานข้อมูลทดลอง · ไม่ใช่เครื่องมือประเมินความปลอดภัยของน้ำ</p>
-<section><label>Admin token <input id="token" type="password" autocomplete="off"></label> <button id="connect">เชื่อมต่อ</button><p id="message">ยังไม่ได้เชื่อมต่อ</p><p id="status"></p></section>
-<section><h2>ข้อมูลย้อนหลัง</h2><small>100 รายการล่าสุด · ADC เป็นค่าดิบ · ระดับน้ำเป็นสถานะจุดเดียว</small><div class="scroll"><table><thead><tr><th>เวลารับ</th><th>แหล่ง</th><th>ระดับ</th><th>อุณหภูมิ °C</th><th>ADC ดิบ</th><th>ลำดับ</th></tr></thead><tbody id="rows"></tbody></table></div></section>
-<section><h2>การดื่มและเหตุการณ์</h2><p id="drinking">ยังไม่มีข้อมูล</p><label>เป้าหมายที่กำหนดเอง (มล./วัน) <input id="goal" type="number" min="100" max="10000"></label> <button id="save-goal">บันทึกเป้าหมาย</button><p id="goal-status"></p><ul id="events"></ul></section>
-<section><h2>ตั้งเวลาเตือน</h2><label>ทุก <input id="minutes" type="number" min="1" max="1440" value="30"> นาที</label> <button id="save-reminder">บันทึก</button><p id="reminder"></p><p><small>สถานะ mock เป็นการทดสอบในระบบ ไม่ใช่การส่งจริง</small></p><ul id="notifications"></ul></section>
-<section><h2>AI เตือนครั้งถัดไป</h2><p id="ai-advice">ยังไม่มีคำแนะนำ</p><p><small>ปริมาณน้ำเป็นเพียงคำแนะนำ · AI ไม่ควบคุมปั๊ม · ไม่ใช่คำแนะนำทางการแพทย์</small></p><button id="run-advice">ให้ AI ตั้งเวลาใหม่</button></section>
+<title>Kaew telemetry</title><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&amp;display=swap" rel="stylesheet">
+<style>
+:root{font-family:"Space Grotesk",system-ui,sans-serif;color:#000;background:#fffbee}
+*{box-sizing:border-box}
+body{margin:0;padding:40px 24px 56px}
+main{max-width:1120px;margin:auto;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+header{grid-column:1/-1;border:4px solid #000;background:#ffe500;box-shadow:6px 6px 0 #000;padding:28px}
+.eyebrow{display:inline-block;margin:0 0 12px;padding:5px 10px;background:#000;color:#fff;font-size:.8rem;font-weight:700;letter-spacing:.12em}
+h1{font-size:clamp(2.3rem,6vw,4.5rem);line-height:1.08;letter-spacing:-.055em;margin:0 0 16px;font-weight:700}
+header p:last-child{max-width:760px;margin:0;line-height:1.7;font-weight:600}
+section{min-width:0;background:#fff;border:3px solid #000;border-radius:4px;padding:24px;box-shadow:6px 6px 0 #000}
+.connection,.history,.advice-card{grid-column:1/-1}
+h2{font-size:1.35rem;line-height:1.5;margin:0 0 16px;font-weight:700}
+.section-tag{display:inline-block;border:3px solid #000;padding:3px 10px;margin:0 0 16px;background:#ff78c8;font-size:.75rem;font-weight:700;letter-spacing:.08em}
+.connection{background:#56e5f5}
+.drinking-card .section-tag{background:#c3f53c}
+.reminder-card .section-tag{background:#ffe500}
+.advice-card{background:#ff78c8}
+.advice-card .section-tag{background:#fffbee}
+.controls{display:flex;align-items:flex-end;flex-wrap:wrap;gap:16px}
+label{display:flex;flex:1 1 240px;flex-direction:column;gap:8px;font-weight:700;line-height:1.6;min-width:0}
+input,button{font:inherit;min-height:48px;border:3px solid #000;border-radius:3px;padding:10px 14px;color:#000}
+input{width:100%;min-width:0;background:#fffbee}
+button{background:#ffe500;font-weight:700;cursor:pointer;box-shadow:4px 4px 0 #000;transition:transform .12s,box-shadow .12s;max-width:100%;white-space:normal}
+button:hover{transform:translate(1px,1px);box-shadow:3px 3px 0 #000}
+button:active{transform:translate(4px,4px);box-shadow:0 0 0 #000}
+button:disabled{cursor:wait;background:#ddd;box-shadow:2px 2px 0 #000}
+:focus-visible{outline:3px solid #000;outline-offset:5px}
+input:focus-visible{background:#fff;outline-style:dashed}
+p,li{line-height:1.7;overflow-wrap:anywhere}
+p{margin:16px 0 0}
+small{display:block;font-size:.875rem;line-height:1.7;color:#242424}
+#message,#drinking,#ai-advice{font-weight:700}
+#status:empty,#goal-status:empty,#reminder:empty,ul:empty{display:none}
+.scroll{overflow-x:auto;margin-top:20px;border:3px solid #000;background:#fffbee}
+table{width:100%;min-width:680px;border-collapse:collapse;font-size:.925rem}
+th,td{text-align:left;padding:14px 16px;border-bottom:2px solid #000}
+th{background:#ffe500;font-weight:700;white-space:nowrap}
+th+th,td+td{border-left:2px solid #000}
+tbody tr:nth-child(even){background:#f1f1e8}
+tbody tr:last-child td{border-bottom:0}
+ul{padding-left:24px;margin-bottom:0}
+li+li{margin-top:8px}
+#save-goal{background:#c3f53c}
+#run-advice{background:#56e5f5;margin-top:20px}
+.interval-field{display:flex;align-items:center;gap:12px;width:100%}
+.interval-field input{flex:1 1 auto}
+@media(max-width:700px){body{padding:20px 18px 36px}main{grid-template-columns:minmax(0,1fr);gap:22px}header,section{padding:20px}header,.connection,.history,.advice-card{grid-column:1}.controls{flex-direction:column;align-items:stretch;gap:14px}label{flex:0 1 auto;width:100%}button{width:100%}h2{font-size:1.2rem}}
+@media(prefers-reduced-motion:reduce){button{transition:none}}
+</style></head><body><main><header><p class="eyebrow">KAEW / CLOUD DASHBOARD</p><h1>Kaew telemetry</h1><p>ข้อมูลเซนเซอร์ที่บันทึกจริงในฐานข้อมูลทดลอง · ไม่ใช่เครื่องมือประเมินความปลอดภัยของน้ำ</p></header>
+<section class="connection"><div class="controls"><label>Admin token <input id="token" type="password" autocomplete="off"></label> <button id="connect">เชื่อมต่อ</button></div><p id="message">ยังไม่ได้เชื่อมต่อ</p><p id="status"></p></section>
+<section class="history"><span class="section-tag">01 / TELEMETRY</span><h2>ข้อมูลย้อนหลัง</h2><small>100 รายการล่าสุด · ADC เป็นค่าดิบ · ระดับน้ำเป็นสถานะจุดเดียว</small><div class="scroll" tabindex="0" role="region" aria-label="ข้อมูลย้อนหลัง"><table><thead><tr><th>เวลารับ</th><th>แหล่ง</th><th>ระดับ</th><th>อุณหภูมิ °C</th><th>ADC ดิบ</th><th>ลำดับ</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+<section class="drinking-card"><span class="section-tag">02 / HYDRATION</span><h2>การดื่มและเหตุการณ์</h2><p id="drinking">ยังไม่มีข้อมูล</p><div class="controls"><label>เป้าหมายที่กำหนดเอง (มล./วัน) <input id="goal" type="number" min="100" max="10000"></label> <button id="save-goal">บันทึกเป้าหมาย</button></div><p id="goal-status"></p><ul id="events"></ul></section>
+<section class="reminder-card"><span class="section-tag">03 / REMINDERS</span><h2>ตั้งเวลาเตือน</h2><div class="controls"><label class="interval-label">ทุก <span class="interval-field"><input id="minutes" type="number" min="1" max="1440" value="30"> นาที</span></label> <button id="save-reminder">บันทึก</button></div><p id="reminder"></p><p><small>สถานะ mock เป็นการทดสอบในระบบ ไม่ใช่การส่งจริง</small></p><ul id="notifications"></ul></section>
+<section class="advice-card"><span class="section-tag">04 / AI ADVICE</span><h2>AI เตือนครั้งถัดไป</h2><p id="ai-advice">ยังไม่มีคำแนะนำ</p><p><small>ปริมาณน้ำเป็นเพียงคำแนะนำ · AI ไม่ควบคุมปั๊ม · ไม่ใช่คำแนะนำทางการแพทย์</small></p><button id="run-advice">ให้ AI ตั้งเวลาใหม่</button></section>
 </main><script>
 let token=''; async function refresh(){if(!token)return;try{const headers={Authorization:'Bearer '+token};const paths=['status','telemetry','events','summary','notifications','reminder','advice'];const responses=await Promise.all(paths.map(p=>fetch('/api/'+p,{headers})));if(responses.some(r=>!r.ok))throw Error('เข้าสู่ระบบไม่สำเร็จ');const [s,t,e,summary,notes,rem,ai]=await Promise.all(responses.map(r=>r.json()));document.querySelector('#status').textContent=s.device.id+' · '+(s.device.online?'ออนไลน์':'ออฟไลน์');const rows=document.querySelector('#rows');rows.replaceChildren(...t.items.map(item=>{const tr=document.createElement('tr');for(const value of [new Date(item.received_at*1000).toLocaleString(),item.source,item.level,item.temperature_c??'—',(item.tds_adc===65535?'—':item.tds_adc),item.seq]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}return tr}));document.querySelector('#drinking').textContent='24 ชั่วโมงล่าสุด · วัดจริง '+(summary.by_source.measured||0)+' มล. · ประมาณ '+(summary.by_source.estimated||0)+' มล. · จำลอง '+(summary.by_source.simulated||0)+' มล.';document.querySelector('#events').replaceChildren(...e.items.map(item=>{const li=document.createElement('li');li.textContent=item.kind+' · '+item.source+' · '+(item.volume_ml??'—')+' มล.';return li}));document.querySelector('#reminder').textContent=rem.reminder?'เตือนครั้งถัดไป '+new Date(rem.reminder.next_due*1000).toLocaleString():'ยังไม่ได้ตั้งเตือน';document.querySelector('#notifications').replaceChildren(...notes.items.map(item=>{const li=document.createElement('li');li.textContent=item.provider+' · '+item.status+' · '+new Date(item.created_at*1000).toLocaleString();return li}));const a=ai.advice;document.querySelector('#ai-advice').textContent=a?.next_reminder_minutes?('อีก '+a.next_reminder_minutes+' นาที · แนะนำ '+a.suggested_ml+' มล. · '+a.reason+' · '+(a.fallback?'ค่าเริ่มต้น (fallback)':'โมเดล')+(a.model?' · '+a.model:'')+' · '+new Date(a.timestamp*1000).toLocaleString()+(a.scheduled===false?' · มีเวลาเตือนใหม่กว่า จึงไม่ได้เปลี่ยนเวลา':'')):'ยังไม่มีคำแนะนำ';document.querySelector('#message').textContent='เชื่อมต่อแล้ว';}catch(e){document.querySelector('#message').textContent='เชื่อมต่อไม่ได้: '+e.message;}}
 document.querySelector('#run-advice').onclick=async()=>{if(!token)return;const button=document.querySelector('#run-advice');button.disabled=true;try{const r=await fetch('/api/advice',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({include_simulated:false})});if(!r.ok)throw Error('ตั้งเวลา AI ไม่สำเร็จ');await refresh()}catch(e){document.querySelector('#message').textContent=e.message}finally{button.disabled=false}};
