@@ -324,6 +324,32 @@ class BackendTest(unittest.TestCase):
             time.sleep(.05)
         self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
 
+    def kinds(self):
+        return sorted(x['kind'] for x in self.request('GET','/api/notifications','admin-secret')[1]['items'])
+
+    def test_recovery_alert_after_offline(self):
+        self.request('POST','/api/telemetry','device-secret',self.sample)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE devices SET last_seen=? WHERE id=?',(time.time()-60,'node-1'))
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and 'offline' not in self.kinds(): time.sleep(.05)
+        self.request('POST','/api/telemetry','device-secret',dict(self.sample,seq=2))
+        self.assertIn('recovery',self.kinds())
+        self.request('POST','/api/telemetry','device-secret',dict(self.sample,seq=3))
+        self.assertEqual(self.kinds().count('recovery'),1)
+
+    def test_out_of_range_temperature_alerts_once_per_episode(self):
+        post=lambda seq,t:self.request('POST','/api/telemetry','device-secret',dict(self.sample,seq=seq,temperature_c=t))
+        post(1,25.0); self.assertNotIn('sensor_range',self.kinds())
+        post(2,60.0); post(3,61.0)
+        self.assertEqual(self.kinds().count('sensor_range'),1)
+        post(4,25.0)  # back to normal re-arms the alert (cooldown still applies)
+        self.assertEqual(self.kinds().count('sensor_range'),1)
+
+    def test_sensor_error_alert(self):
+        self.request('POST','/api/telemetry','device-secret',dict(self.sample,tds_adc=65535))
+        self.assertIn('sensor_error',self.kinds())
+
     def test_connection_loss_enqueues_only_one_alert(self):
         self.request('POST','/api/telemetry','device-secret',self.sample)
         with closing(sqlite3.connect(self.path)) as db, db:
