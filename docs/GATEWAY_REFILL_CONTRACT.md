@@ -1,10 +1,10 @@
 # Gateway refill contract — Ratchapol / Theanrawich handoff
 
-17 November 2026. Implemented software interface; **physical pump disabled, remote requests always rejected**. This document does not authorize commissioning. Theanrawich's AI/reminder/cloud implementation is unchanged.
+17 November 2026. **Physical pump disabled; unvalidated remote requests remain rejected.** The new opt-in, locally confirmed AI pull adapter is documented in [M4 gateway loop](M4_GATEWAY_AI_LOOP.md). This document does not authorize commissioning. Theanrawich's model/reminder logic is unchanged; the cloud adds only a restricted read-only device projection.
 
 ## Admission boundary
 
-`GatewayDispenser::request(RefillRequest, CommandSource, Inputs, CupTare)` is synchronous, bounded, and called only from the gateway control loop. It never waits for AI, HTTPS or NVS. A future network task must submit a bounded message to this loop; it must not call the controller or GPIO directly or share mutable `Inputs` across tasks.
+`GatewayDispenser::request(RefillRequest, CommandSource, Inputs, CupTare)` is synchronous, bounded, and called only from the gateway control loop. It never waits for AI, HTTPS or NVS. The AI HTTPS worker submits a bounded proposal to this loop; only the locally armed bridge can enter the shared validator. The worker never calls the controller or GPIO directly or shares mutable `Inputs` across tasks.
 
 The current console adapter accepts:
 
@@ -14,11 +14,14 @@ TARE
 REFILL <gateway_boot_session> <request_id> <issued_at_gateway_ms> <target_water_ml>
 STOP
 RESET
+AI_REFILL
 ```
 
 Lines are ASCII, newline-terminated, at most 127 bytes excluding terminator. CR is ignored for CRLF terminals. Overflow/control-byte lines are discarded in full. Unknown commands, extra refill/calibration arguments, integer overflow and nonfinite volumes are rejected. Console processing reads at most 64 bytes per loop; no `readStringUntil()` timeout can delay safety. Only `STOP` and `RESET` are accepted outside Idle, plus refill requests which are explicitly rejected/consumed by the request validator.
 
 `CAL` and `TARE` are local bench operations in Idle. The operator must confirm the platform was unloaded for calibration zero and the cup is EMPTY for tare. Software cannot establish emptiness, cup identity or capacity from weight alone. Never send invented calibration counts. Calibration data includes version/checksum; only it is persisted. Tare, commands, target and request IDs are volatile.
+
+`AI_REFILL` is a separate default-disabled, one-shot local intent for the current tared cup. It never takes a volume or safety flags from the console: the worker fetches a fresh authenticated device advice projection, and the bridge independently validates it before the same refill checks. It requires safe local conditions even before fetching. The default uncommissioned E-stop/driver configuration therefore blocks real operation. See the [full binding/authentication/expiry contract](M4_GATEWAY_AI_LOOP.md).
 
 ## Proposed typed data for the future adapter
 
@@ -38,7 +41,7 @@ Rules enforced by gateway:
 
 | Check | Implemented behavior |
 |---|---|
-| Source | `RemoteAI` always returns `RemoteDisabled`, including valid/authenticated-looking data. |
+| Source | Raw `RemoteAI` always returns `RemoteDisabled`. A locally armed `AiRefillBridge` uses a private shared validator after authenticated pull, context/freshness/provenance checks; it never relabels a remote request as `LocalOperator`. |
 | Local enable | Both commissioned actuator availability and `KAEW_LOCAL_REFILL_ENABLED=1` needed; defaults deny. |
 | Version / boot | Exactly v1 and current nonzero boot; old boot data rejected. Boot token is **not authentication**. |
 | ID | IDs ≤ highest consumed local ID are rejected; no wrap. Rejected busy/unsafe/expired/invalid-volume requests consume their ID. Bad envelope, remote and disabled requests do not. Never queue a rejected start for later. |
@@ -54,13 +57,13 @@ For example, an empty cup of 100 g containing an estimated 50 mL weighs 150 g. A
 
 `STOP` immediately commands off and latches `ManualStop`. Interlock faults latch independently. `RESET` needs all local conditions safe and a nonactive state; it commands no start, clears tare in the application, and requires a new explicit empty-cup `TARE` and higher-ID `REFILL`. Fault clearance never resumes the previous operation.
 
-## Required from Theanrawich before any remote integration
+## Remaining handoff to Theanrawich
 
-1. Keep current AI/reminder behavior advisory. Agree whether a natural-language volume means *add* or *total*; convert only after explicit user confirmation against the current cup. Reject ambiguous instructions.
-2. Specify authenticated device/operator identity, authorization, replay protection, expiry/nonce lifecycle, gateway reboot/cup change invalidation, and bounded message rate/queue. TLS/bearer telemetry credentials and CRC16 are not a ready pump-command authorization protocol.
-3. Exchange the current boot token and establish a trustworthy time mapping. Do not copy an epoch/NTP timestamp into `issuedAtMs`; never re-stamp an old queued AI decision as fresh after reconnection. The transport must retain original decision expiry and discard offline backlog.
+1. Keep cloud decisions advisory; review TOTAL-volume semantics for the confirmed empty/tared cup. Natural-language *add* instructions need a separate reviewed adapter and confirmation, not direct mapping to this target.
+2. Review/deploy the restricted device-token advice view and local authorization boundary in the [M4 design](M4_GATEWAY_AI_LOOP.md). TLS and read authorization do not replace local intent or hardware interlocks; there is still no general pump-command API.
+3. Validate boot/request/cup/nonce echo, decision-age projection and 2-second local deadline on the actual network. No epoch timestamp is copied into `issuedAtMs`, and offline backlog/late replies are never re-stamped as fresh.
 4. Define result/event reporting: proposal ID, requested total, locally accepted target, state/fault/result, gateway boot and timestamp, source, freshness and explicit disabled status. Current cloud publisher still sends **node telemetry only**, not these new dispenser events.
-5. Implement the adapter and separate authorization review after hardware commissioning. Re-run host, parser, offline/replay, authorization and physical interlock tests. Enabling a remote path requires a later reviewed change; no macro here enables it.
+5. Review the implemented adapter and run live model/network/physical tests after commissioning. The opt-in feature flag alone does not authorize commissioning. No production deployment, board flash or physical activation was performed by this implementation task.
 
 ## Required from Suphachok / hardware team
 

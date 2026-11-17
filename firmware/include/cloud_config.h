@@ -27,6 +27,14 @@
 #define KAEW_DURABLE_MIN_MS 1000
 #endif
 
+// Separate opt-in for locally confirmed AI refill. This never commissions GPIO.
+#ifndef KAEW_AI_REFILL_ENABLED
+#define KAEW_AI_REFILL_ENABLED 0
+#endif
+#ifndef KAEW_ADVICE_URL
+#define KAEW_ADVICE_URL ""
+#endif
+
 // C++ constant expression: string contents cannot be tested by the preprocessor.
 // A local header or build flag can explicitly override this, including forcing off.
 #ifndef KAEW_CLOUD_ENABLED

@@ -48,6 +48,7 @@ public:
   DispenseState state() const { return state_; }
   Fault fault() const { return fault_; }
   float targetG() const { return target_; }
+  bool ready(const Inputs &i) const { return state_ == DispenseState::Idle && fault_ == Fault::None && check(i) == Fault::None; }
   // Explicit stop is latched, including while idle. Reset never starts the pump.
   void stop() { state_ = DispenseState::Faulted; if (fault_ == Fault::None) fault_ = Fault::ManualStop; }
   bool start(const Inputs &i, float targetG) {

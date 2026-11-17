@@ -31,3 +31,5 @@ jobs:
         run: pio run -d firmware -e gateway_cloud_compile
       - name: Compile measurement trace builds (pump disabled)
         run: pio run -d firmware -e sensor_node_trace -e gateway_trace
+      - name: Compile locally confirmed AI pull path (pump disabled)
+        run: pio run -d firmware -e gateway_ai_compile
