@@ -24,7 +24,7 @@
 #endif
 
 namespace {
-constexpr int HX_DATA = 17, HX_CLOCK = 18;
+constexpr int HX_DATA = 5, HX_CLOCK = 4;  // HX711 DT=GPIO5, SCK=GPIO4
 constexpr int LINK_RX = 1, LINK_TX = 2;
 HX711 scale;
 struct RawScaleSample { int32_t raw; uint32_t atMs; };

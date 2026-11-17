@@ -17,8 +17,8 @@ class AudioIO {
   }
 public:
   bool begin() {
-    rx_=configure(I2S_NUM_0,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_RX),32,4,5,6,I2S_PIN_NO_CHANGE);
-    tx_=configure(I2S_NUM_1,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_TX),16,10,11,I2S_PIN_NO_CHANGE,12);
+    rx_=configure(I2S_NUM_0,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_RX),32,7,8,6,I2S_PIN_NO_CHANGE);
+    tx_=configure(I2S_NUM_1,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_TX),16,10,11,I2S_PIN_NO_CHANGE,9);
     if(!rx_ || !tx_) { stop(); return false; }
     return rx_ && tx_;
   }
