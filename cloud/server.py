@@ -66,12 +66,39 @@ def validate(data):
 
 
 def queue_notification(db, key, kind, text, provider, now):
-    if kind in ('low_water','fault','offline'):
+    if kind in ('low_water','fault','offline','sensor_range','sensor_error'):
         last=db.execute('SELECT MAX(created_at) AS last FROM notification_jobs WHERE kind=?',(kind,)).fetchone()['last']
         if last is not None and now-last < 300: return
     db.execute('INSERT INTO notification_jobs(id,kind,text,status,next_attempt,created_at,provider) VALUES (?,?,?,\'pending\',?,?,?) ON CONFLICT (id) DO NOTHING',
                (key,kind,text,now,now,provider))
+    
+def _env_float(name, default):
+    try: return float(os.environ.get(name, default))
+    except (TypeError, ValueError): return default
 
+
+def check_sensor_alerts(db, data, now, provider_name):
+    """Edge-triggered alerts: one message when a reading goes bad, one when it recovers."""
+    sim = ' (ข้อมูลจำลอง)' if data.get('source') == 'simulated' else ''
+    key = '%s:%s' % (data['session'], data['seq'])
+    lo, hi = _env_float('KAEW_TEMP_MIN_C', 5.0), _env_float('KAEW_TEMP_MAX_C', 45.0)
+    tds_max = _env_float('KAEW_TDS_ADC_MAX', 0.0)  # 0 = disabled (ADC is uncalibrated)
+    temp, adc = data['temperature_c'], data['tds_adc']
+    state = lambda k: (db.execute('SELECT value FROM alert_state WHERE key=?', (k,)).fetchone() or {'value': '0'})['value']
+    setstate = lambda k, v: db.execute('INSERT INTO alert_state VALUES (?,?) ON CONFLICT (key) DO UPDATE SET value=excluded.value', (k, v))
+    # sensor fault: TDS sentinel 65535 or missing temperature
+    bad = adc == 65535 or temp is None
+    if bad and state('sensor_error') != '1':
+        queue_notification(db, 'sensor_error:' + key, 'sensor_error', 'แก้ว: เซนเซอร์ผิดพลาดหรืออ่านค่าไม่ได้ โปรดตรวจสายเซนเซอร์' + sim, provider_name, now)
+    setstate('sensor_error', '1' if bad else '0')
+    # out-of-range: temperature outside [lo, hi] or TDS above the optional limit
+    out = (temp is not None and not lo <= temp <= hi) or (tds_max > 0 and adc != 65535 and adc > tds_max)
+    if out and state('sensor_range') != '1':
+        parts = []
+        if temp is not None and not lo <= temp <= hi: parts.append('อุณหภูมิน้ำ %.1f °C (เกณฑ์ %g-%g)' % (temp, lo, hi))
+        if tds_max > 0 and adc != 65535 and adc > tds_max: parts.append('ค่า TDS ดิบ %d (เกินเกณฑ์ %g)' % (adc, tds_max))
+        queue_notification(db, 'range:' + key, 'sensor_range', 'แก้ว: ค่าน้ำผิดปกติ ' + ' / '.join(parts) + sim, provider_name, now)
+    setstate('sensor_range', '1' if out else '0')
 
 def reminder_snapshot(db):
     row=db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
@@ -177,7 +204,11 @@ class Handler(BaseHTTPRequestHandler):
                 text = 'แก้ว: ระดับน้ำต่ำ โปรดตรวจขวดน้ำ' + (' (ข้อมูลจำลอง)' if data.get('source') == 'simulated' else '')
                 queue_notification(db, 'low:%s:%s' % (data['session'],data['seq']), 'low_water', text, self.server.provider_name, now)
             db.execute("INSERT INTO alert_state VALUES ('level',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",(data['level'],))
+            was_offline=db.execute("SELECT value FROM alert_state WHERE key='offline'").fetchone()
+            if was_offline and was_offline['value']=='1':
+                queue_notification(db, 'recovery:%s:%s' % (data['session'],data['seq']), 'recovery', 'แก้ว: อุปกรณ์กลับมาเชื่อมต่อแล้ว' + (' (ข้อมูลจำลอง)' if data.get('source') == 'simulated' else ''), self.server.provider_name, now)
             db.execute("INSERT INTO alert_state VALUES ('offline','0') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
+            check_sensor_alerts(db, data, now, self.server.provider_name)
         self.reply(201, {'status': 'stored'})
 
     def add_event(self, data):
