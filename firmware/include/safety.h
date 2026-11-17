@@ -2,12 +2,21 @@
 #include <cmath>
 #include <cstdint>
 
-enum class Fault { None, Estop, CupMissing, TankLow, StaleScale, InvalidScale, Timeout, AbnormalWeight, NoFlow };
+enum class Fault { None, Estop, CupMissing, TankLow, StaleScale, InvalidScale, Timeout, AbnormalWeight, NoFlow, ManualStop, InvalidLimits };
 enum class DispenseState { Idle, Dispensing, Settling, Faulted };
 // Simulation parameters only: calibrate and validate with the actual pump and scale.
 struct SafetyLimits {
   uint32_t timeoutMs=180000, noFlowMs=30000, settleMs=0;
   float minProgressG=3, maxRiseGPerSec=1000, removalG=20, stopMarginG=0;
+  uint32_t scaleStaleMs=2000;
+  bool valid() const {
+    return timeoutMs && timeoutMs < 0x80000000u && noFlowMs && noFlowMs < 0x80000000u &&
+      scaleStaleMs && scaleStaleMs < 0x80000000u && settleMs < 0x80000000u &&
+      std::isfinite(minProgressG) && minProgressG > 0 &&
+      std::isfinite(maxRiseGPerSec) && maxRiseGPerSec > 0 &&
+      std::isfinite(removalG) && removalG > 0 &&
+      std::isfinite(stopMarginG) && stopMarginG >= 0 && stopMarginG < 900;
+  }
 };
 struct Inputs {
   bool cupPresent, tankWet, estopOk, scaleValid, calibrated;
@@ -25,11 +34,12 @@ class SafetyController {
   uint32_t started_ = 0, progressAt_ = 0, lastSampleAt_ = 0, stoppedAt_ = 0;
   SafetyLimits limits_;
   Fault check(const Inputs &i) const {
+    if (!limits_.valid()) return Fault::InvalidLimits;
     if (!i.estopOk) return Fault::Estop;
+    if (uint32_t(i.nowMs - i.scaleAtMs) >= limits_.scaleStaleMs) return Fault::StaleScale;
+    if (!i.scaleValid || !i.calibrated || !std::isfinite(i.weightG) || i.weightG < 0 || i.weightG > 1000) return Fault::InvalidScale;
     if (!i.cupPresent) return Fault::CupMissing;
     if (!i.tankWet) return Fault::TankLow;
-    if (!i.scaleValid || !i.calibrated || !std::isfinite(i.weightG) || i.weightG < 0 || i.weightG > 1000) return Fault::InvalidScale;
-    if (uint32_t(i.nowMs - i.scaleAtMs) >= 2000) return Fault::StaleScale;
     return Fault::None;
   }
 public:
@@ -37,6 +47,9 @@ public:
   bool pumping() const { return state_ == DispenseState::Dispensing; }
   DispenseState state() const { return state_; }
   Fault fault() const { return fault_; }
+  float targetG() const { return target_; }
+  // Explicit stop is latched, including while idle. Reset never starts the pump.
+  void stop() { state_ = DispenseState::Faulted; if (fault_ == Fault::None) fault_ = Fault::ManualStop; }
   bool start(const Inputs &i, float targetG) {
     if (state_ != DispenseState::Idle || fault_ != Fault::None || check(i) != Fault::None || !std::isfinite(targetG) || targetG <= i.weightG + limits_.stopMarginG || targetG > 900) return false;
     target_ = targetG; highestWeight_ = progressWeight_ = lastWeight_ = i.weightG;

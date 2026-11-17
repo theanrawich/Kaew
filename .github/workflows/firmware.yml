@@ -20,24 +20,14 @@ jobs:
       - name: Cloud API and pipeline tests
         run: python -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Host safety tests
-        run: |
-          g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o /tmp/kaew-safety-test
-          /tmp/kaew-safety-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/scale_test.cpp -o /tmp/kaew-scale-test
-          /tmp/kaew-scale-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/protocol_test.cpp -o /tmp/kaew-protocol-test
-          /tmp/kaew-protocol-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/integration_test.cpp -o /tmp/kaew-integration-test
-          /tmp/kaew-integration-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/dispense_test.cpp -o /tmp/kaew-dispense-test
-          /tmp/kaew-dispense-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/durable_queue_test.cpp -o /tmp/kaew-durable-queue-test
-          /tmp/kaew-durable-queue-test
-          g++ -std=c++17 -Ifirmware/include firmware/test/audio_test.cpp -o /tmp/kaew-audio-test
-          /tmp/kaew-audio-test
+        run: python scripts/run_host_tests.py
+      - name: Measurement analysis tests (synthetic unit fixtures only)
+        run: python -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Install PlatformIO
         run: python -m pip install platformio==6.2.0
       - name: Build both firmware targets
         run: pio run -d firmware
       - name: Compile gateway publisher enabled
         run: pio run -d firmware -e gateway_cloud_compile
+      - name: Compile measurement trace builds (pump disabled)
+        run: pio run -d firmware -e sensor_node_trace -e gateway_trace

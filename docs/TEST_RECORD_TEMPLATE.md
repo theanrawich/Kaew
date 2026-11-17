@@ -19,6 +19,23 @@
 
 **กติกาการบันทึก:** PASS เมื่อผ่านเกณฑ์ที่กำหนดไว้ล่วงหน้าทุกครั้งตามแผน, FAIL เมื่อไม่ผ่าน, BLOCKED เมื่อไม่มีเกณฑ์ อุปกรณ์ หรือหลักฐาน, N/A เฉพาะเมื่อมีเหตุผล ห้ามเปลี่ยนเกณฑ์หลังเห็นผลโดยไม่บันทึก revision และทดสอบซ้ำ บันทึกทั้งผลดิบและเงื่อนไข รวมเหตุที่ยกเลิก
 
+ใช้ [แผนวัดซ้ำ latency/PDR/accuracy/overshoot](PERFORMANCE_TEST_PLAN.md), [CSV ว่าง](measurements/) และ [แบบฟอร์ม run index](measurements/test-runs.csv) สำหรับงานของ Arm ตัวเลขใน unit tests เป็น synthetic ไม่ใช่ผลทดลอง
+
+แบบบันทึกต่อหนึ่ง test/run (คัดลอกเติมจริง):
+
+| ช่อง | ค่า |
+|---|---|
+| Test ID / objective | |
+| Setup / เครื่องมือ / uncertainty | |
+| Procedure revision / จำนวน repetitions | |
+| Expected result / tolerance ที่ตกลงก่อนทดสอบ | |
+| Actual result | ยังไม่ทดสอบ |
+| PASS / FAIL / BLOCKED พร้อมเหตุผล | BLOCKED จนมีอุปกรณ์และเกณฑ์ |
+| Raw CSV / waveform / video / evidence location | |
+| n / mean / min / max / sample SD / range / หน่วย | ยังไม่มี measurements |
+| Firmware commit / diff hash / build config / calibration ID | |
+| ผู้ทดสอบ / วันที่ / ผู้ตรวจ | |
+
 ## 1. ก่อนจ่ายไฟและตรวจแหล่งจ่าย
 
 | ID | วิธีตรวจและหลักฐาน | เกณฑ์ผ่าน | ผล/หลักฐาน |
