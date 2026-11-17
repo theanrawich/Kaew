@@ -18,7 +18,7 @@ jobs:
       - name: Simulator tests
         run: node --test simulation/*.test.mjs
       - name: Cloud API and pipeline tests
-        run: python -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
+        run: python -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Host safety tests
         run: python scripts/run_host_tests.py
       - name: Measurement analysis tests (synthetic unit fixtures only)
