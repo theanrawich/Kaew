@@ -22,6 +22,18 @@ def wav_fixture(silent=False):
 
 
 class AudioTest(unittest.TestCase):
+    def test_typhoon_sends_documented_model_and_original_wav(self):
+        transport = MagicMock(return_value=json.dumps({'text': ' สวัสดี '}).encode())
+        audio = wav_fixture()
+        asr = audio_service.TyphoonASR('test-typhoon', transport=transport)
+        self.assertEqual(asr.transcribe(audio), 'สวัสดี')
+        url, headers, body = transport.call_args.args
+        self.assertEqual(url, 'https://api.opentyphoon.ai/v1/audio/transcriptions')
+        self.assertEqual(headers['Authorization'], 'Bearer test-typhoon')
+        self.assertIn(b'name="model"\r\n\r\ntyphoon-asr-realtime\r\n', body)
+        self.assertIn(audio, body)
+        self.assertNotIn(b'name="temperature"', body)
+
     def test_groq_multipart_and_validation(self):
         calls=[]
         def transport(url,headers,body):
