@@ -2,7 +2,7 @@
 
 > เก็บเกณฑ์และแผนวัดจากการทบทวน 8 พ.ย. 2026; ช่องสถานะเดิมด้านล่างเป็น baseline ณ วันนั้น สถานะซอฟต์แวร์ปัจจุบันดู [README](../README.md) และ [checkpoint](CHECKPOINT_CRITICAL_PATH.md). ยังไม่มีหลักฐานทดสอบฮาร์ดแวร์จริง
 
-เพิ่ม 17 พ.ย.: [ผลงาน gateway/testing ของ Arm](RATCHAPOL_GATEWAY_REPORT.md), [software validation ที่รันจริง](validation/software-2026-11-17.md), [แผน ≥3 metrics และ raw templates](PERFORMANCE_TEST_PLAN.md) และ [AI command handoff](GATEWAY_REFILL_CONTRACT.md) ช่วยเตรียมหลักฐาน design/test procedure แต่ยังไม่ถือว่าผ่าน M2/M7 หรือมี physical metrics วัดแล้ว ตาราง baseline ด้านล่างไม่ได้ถูกเปลี่ยนเป็นผลผ่าน
+เพิ่ม 17 พ.ย.: [ผลงาน gateway/testing ของ Arm](M4_GATEWAY_AI_LOOP.md), [software validation ที่รันจริง](validation/software-2026-11-17.md), [แผน ≥3 metrics และ raw templates](PERFORMANCE_TEST_PLAN.md) และ [AI command handoff](GATEWAY_REFILL_CONTRACT.md) ช่วยเตรียมหลักฐาน design/test procedure แต่ยังไม่ถือว่าผ่าน M2/M7 หรือมี physical metrics วัดแล้ว ตาราง baseline ด้านล่างไม่ได้ถูกเปลี่ยนเป็นผลผ่าน
 
 ตรวจ 8 พ.ย. 2026 จาก [โจทย์รายวิชาต้นฉบับ](https://docs.google.com/document/d/1eBUKyIknXkPH_oJqtiS-Vm4aKlzjjkmrdMn4oYDUgSw/edit) และไฟล์โครงการที่มีในเครื่อง เอกสารต้นฉบับมีเวลาแก้ไขล่าสุด 8 พ.ย. 11:30 เวลาไทย การตรวจนี้ไม่ยืนยันประกาศแยกใน MyCourseVille, การส่งงาน หรือการอนุมัติจากผู้สอน และไม่ใช่การให้คะแนนแทนอาจารย์
 

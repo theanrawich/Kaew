@@ -1,6 +1,6 @@
 # M4 gateway AI-loop validation — 17 November 2026 (Asia/Bangkok)
 
-Source branch: `feature/ratchapol-ai-refill-loop`, from `d8d164e` on current main after merged PR #8. This record covers the new locally confirmed AI read/validation path; [PR #8 validation](software-2026-11-17.md) remains a historical snapshot. Source/evidence hashes are in [manifest](m4-ai-loop.json), observed output in [execution log](m4-ai-loop.txt), architecture/contract/limitations in [M4 design](../M4_GATEWAY_AI_LOOP.md).
+Source branch: `feature/ratchapol-ai-refill-loop`, from `d8d164e` on current main after merged PR #8. This record covers the new locally confirmed AI read/validation path; [PR #8 validation](software-2026-11-17.md) remains a historical snapshot. Architecture, contract and limitations are in the [M4 design](../M4_GATEWAY_AI_LOOP.md).
 
 | Executed check | Actual result |
 |---|---|
