@@ -24,10 +24,36 @@ uint64_t levelSquares = 0;
 size_t levelSamples = 0;
 uint32_t lastLevel = 0;
 
-// The INMP441's left-aligned samples need extra gain for this bench test.
+// INMP441 sends 24-bit left-aligned samples: >>16 gives true 16-bit scale
+// (the old >>14 was 4x too hot and clipped). A one-pole DC blocker removes the
+// mic's DC offset, which otherwise reads as constant "noise".
+float dcPrevIn = 0, dcPrevOut = 0;
+void resetDc() { dcPrevIn = dcPrevOut = 0; }
 int16_t toPcm(int32_t raw) {
-  int32_t sample = raw >> 14;
+  float x = static_cast<float>(raw >> 16);
+  float y = x - dcPrevIn + 0.995f * dcPrevOut;
+  dcPrevIn = x; dcPrevOut = y;
+  int32_t sample = static_cast<int32_t>(y);
   return static_cast<int16_t>(sample > 32767 ? 32767 : sample < -32768 ? -32768 : sample);
+}
+
+// Scale the finished clip so its peak sits near 70% full scale (max 8x gain),
+// so quiet speech is audible to STT without clipping loud speech.
+void normalize(uint8_t *pcm, size_t count) {
+  int32_t peak = 0;
+  for (size_t i = 0; i < count; ++i) {
+    int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
+    peak = max(peak, abs(static_cast<int32_t>(v)));
+  }
+  if (peak < 64) return;
+  float gain = min(8.0f, 23000.0f / peak);
+  for (size_t i = 0; i < count; ++i) {
+    int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
+    int32_t o = static_cast<int32_t>(v * gain);
+    o = o > 32767 ? 32767 : o < -32768 ? -32768 : o;
+    pcm[2 * i] = o & 0xff; pcm[2 * i + 1] = (o >> 8) & 0xff;
+  }
+  Serial.printf("peak %ld gain %.1fx\n", static_cast<long>(peak), gain);
 }
 
 // A server error must never echo local credentials onto the console.
@@ -154,6 +180,7 @@ void recordAndSend() {
     i2s_read(I2S_NUM_0, raw, sizeof(raw), &bytes, 0);
   } while (bytes);
   size_t captured = 0;
+  resetDc();
   const uint32_t start = millis();
   while (captured < sampleCount && millis() - start < 5000) {
     size_t wanted = min(size_t(256), sampleCount - captured);
@@ -162,7 +189,7 @@ void recordAndSend() {
     for (size_t i = 0; i < bytes / sizeof(int32_t); ++i)
       put16(wav + 44 + 2 * captured++, static_cast<uint16_t>(toPcm(raw[i])));
   }
-  if (captured == sampleCount) sendWav(wav);
+  if (captured == sampleCount) { normalize(wav + 44, captured); sendWav(wav); }
   else Serial.println("Microphone capture timed out; skipping STT.");
   heap_caps_free(wav);
   levelSquares = 0; levelSamples = 0; lastLevel = millis();
@@ -196,7 +223,7 @@ void loop() {
   }
   if (millis() - lastLevel >= 200) {
     unsigned rms = levelSamples ? static_cast<unsigned>(sqrt(double(levelSquares) / levelSamples)) : 0;
-    char bar[33]; size_t bars = min(size_t(32), size_t(rms / 512));
+    char bar[33]; size_t bars = min(size_t(32), size_t(rms / 128));
     memset(bar, '#', bars); bar[bars] = '\0';
     Serial.printf("mic level %s %u\n", bar, rms);
     levelSquares = 0; levelSamples = 0; lastLevel = millis();
