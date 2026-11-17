@@ -65,7 +65,7 @@ function flush(){
   buffers=[];count=0;
   const body=wav(samples,context.sampleRate);
   if(!body)return;
-  const token=$('token').value;
+  const token=$('token').value.trim().replace(/^"|"$/g,'');
   queue=queue.then(async()=>{
     const response=await fetch('/api/stt',{method:'POST',headers:{'Content-Type':'audio/wav','Authorization':'Bearer '+token},body});
     if(!response.ok)throw new Error('Cloud transcription failed ('+response.status+').');
