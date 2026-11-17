@@ -2,6 +2,15 @@
 
 Status: **IN PROGRESS — not hardware-ready or software-complete**. This tracked ledger supersedes the local copy. Do not infer physical safety, course compliance, or purchase readiness from simulation results.
 
+## Ratchapol gateway/testing continuation — 17 November 2026
+
+- Initial checkout clean at `65a2f0f` on `main`; created `feature/ratchapol-gateway-testing`. Git author name/email unset: changes intentionally uncommitted, no identity changed and no push.
+- Publishing follow-up: after receiving the validation summary, Ratchapol supplied his name/email and explicitly authorized review, commit and feature-branch push. Repository-local Git identity is now `Ratchapol Srisongkram <ratchapol007am@gmail.com>`; the prior uncommitted/no-push note describes the validation snapshot. Publication does not enable physical actuation.
+- Added bounded refill validation/application integration with existing SafetyController, fake-actuator host coverage, direct active-scale checks, isolated HX711 acquisition, explicit recovery and disabled-by-default configurable GPIO. Independent safety receiver prevents outbox backpressure hiding dry/unknown tank data. All physical commissioning and remote actuation remain disabled.
+- Added opt-in pump-disabled packet trace builds/capture tool, analysis of latency/PDR/accuracy/volume, header-only CSVs, performance procedures and team command contract. AI/cloud implementation is unchanged.
+- Executed 8 C++ host programs including 25 new gateway scenarios, 6 cloud config cases, 25 JavaScript tests, 17 measurement/capture Python tests, and cloud suite 79 total (74 passed, 5 optional Postgres skipped). All five firmware environments compiled successfully. See [validation/provenance](validation/software-2026-11-17.md).
+- No board flash, live serial capture, actual HX711 calibration, physical pump/E-stop test or experimental performance values. Hardware tests remain BLOCKED. See [Arm's report](RATCHAPOL_GATEWAY_REPORT.md), [performance plan](PERFORMANCE_TEST_PLAN.md), and [handoff contract](GATEWAY_REFILL_CONTRACT.md) for next actions. Earlier dated sections below are historical context.
+
 ## Current baseline
 
 - Repository has a browser model, parametric CAD studies, a simulation controller and in-memory telemetry demo; no embedded firmware, AI service, cloud backend, or operational voice pipeline was found in tracked files.

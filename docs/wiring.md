@@ -13,6 +13,8 @@
 
 อ้างอิง [firmware](../firmware/README.md) และ [checkpoint](CHECKPOINT_CRITICAL_PATH.md) ก่อนต่อสาย; ขา UART ที่เพิ่มต้องทวนกับ board revision จริง
 
+ปรับปรุง software 17 พ.ย.: interface ปั๊มย้ายไป `firmware/include/pump_gpio.h` โดย default ขา -1, polarity ไม่กำหนด และ commissioning/local refill เป็น 0 เหมือนเดิม เส้นทางคำสั่งทดสอบด้วย fake actuator แล้ว แต่ไม่เปลี่ยนสถานะ HOLD ของ GPIO15/16 หรือวงจรกำลัง ดู [contract/เงื่อนไขก่อนเปิดจริง](GATEWAY_REFILL_CONTRACT.md) Physical stop ต้องตัดกำลังอย่างอิสระ ไม่ใช้ GPIO แทน
+
 ## นิยามจุดร่วม
 
 - `5V_CTL` = output buck ที่ตั้งและวัด 5 V ภายใต้โหลดแล้ว; `GND_CTL` = return ภาคควบคุม; `3V3_G` และ `3V3_N` = output regulator 3.3 V ของ gateway และ node ตามลำดับ หลังตรวจว่าจ่ายกระแสได้พอ ไม่ใช่ GPIO

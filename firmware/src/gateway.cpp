@@ -1,63 +1,164 @@
 #include <Arduino.h>
 #include <HX711.h>
 #include <Preferences.h>
-#include "safety.h"
-#include "scale_processing.h"
+#include <atomic>
+#include <esp_system.h>
+#include "gateway_commands.h"
+#include "pump_gpio.h"
+#include "packet_trace.h"
 #include "wire_protocol.h"
 #include "cloud_publisher.h"
 #include "audio_io.h"
 #ifndef KAEW_AUDIO_ENABLED
 #define KAEW_AUDIO_ENABLED 0
 #endif
+#ifndef KAEW_DISPENSE_TIMEOUT_MS
+#define KAEW_DISPENSE_TIMEOUT_MS 30000
+#endif
+#ifndef KAEW_NO_FLOW_MS
+#define KAEW_NO_FLOW_MS 5000
+#endif
+#ifndef KAEW_SCALE_STALE_MS
+#define KAEW_SCALE_STALE_MS 500
+#endif
 
 namespace {
 constexpr int HX_DATA = 17, HX_CLOCK = 18;
-// These interfaces are intentionally disabled until the exact hardware is verified.
-constexpr int PUMP_PIN = -1;
-constexpr int ESTOP_PIN = -1;
 constexpr int LINK_RX = 1, LINK_TX = 2;
 HX711 scale;
+struct RawScaleSample { int32_t raw; uint32_t atMs; };
+QueueHandle_t scaleSamples = nullptr;
+std::atomic<bool> scaleOverflow{false};
 Preferences preferences;
 Calibration calibration{};
-WeightFilter filter;
-CupDetector cup;
-CupTare cupTare;
+ScaleProcessor scaleInputs;
 FrameParser parser;
 Receiver receiver;
+Receiver safetyReceiver; // Safety data is independent of outbox backpressure.
 CloudPublisher cloud;
 AudioIO audio;
+GpioPump pump;
+CommandLine commands;
+PacketTrace trace;
 uint32_t accepted = 0, duplicates = 0, rejected = 0;
-SafetyController controller;
+SafetyLimits safetyLimits() {
+  SafetyLimits limits;
+  limits.timeoutMs = KAEW_DISPENSE_TIMEOUT_MS;
+  limits.noFlowMs = KAEW_NO_FLOW_MS;
+  limits.scaleStaleMs = KAEW_SCALE_STALE_MS;
+  limits.settleMs = 1000;
+  return limits; // Provisional development limits, not hardware acceptance values.
+}
+GatewayDispenser *dispenser = nullptr;
 Inputs inputs{false, false, false, false, false, 0, 0, 0};
-uint32_t lastPrint = 0;
+uint32_t lastPrint = 0, bootSession = 0;
+
+void acquireScale(void *) {
+  for (;;) {
+    if (scale.is_ready()) {
+      // HX711 0.7.5 read() internally waits again. A disconnect race may
+      // block this acquisition task, but can never block the safety loop.
+      RawScaleSample sample{static_cast<int32_t>(scale.read()), millis()};
+      if (xQueueSend(scaleSamples, &sample, 0) != pdTRUE) scaleOverflow.store(true);
+    }
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+}
+
+bool activeScale() {
+  const auto state = dispenser->safety().state();
+  return state == DispenseState::Dispensing || state == DispenseState::Settling;
+}
+void refreshInputs() {
+  inputs.nowMs = millis();
+  scaleInputs.expire(inputs.nowMs, KAEW_SCALE_STALE_MS);
+  if (scaleOverflow.load()) scaleInputs.accept(8388607, inputs.nowMs, activeScale());
+  inputs.cupPresent = scaleInputs.cupPresent();
+  inputs.scaleValid = scaleInputs.valid() && (activeScale() || scaleInputs.stable());
+  inputs.calibrated = scaleInputs.calibrated();
+  inputs.weightG = scaleInputs.weightG();
+  inputs.scaleAtMs = scaleInputs.sampledAt();
+  inputs.tankWet = safetyReceiver.fresh(inputs.nowMs) && safetyReceiver.latest().level == 1;
+  inputs.estopOk = pump.estopOk();
+}
+void controlTick() {
+  refreshInputs();
+  dispenser->update(inputs); // Apply output BEFORE optional I/O/diagnostics.
+  if (dispenser->safety().state() == DispenseState::Faulted) scaleInputs.clearTare();
+}
+void command(const char *line) {
+  controlTick();
+  if (!strcmp(line, "STOP")) { dispenser->stop(); scaleInputs.clearTare(); return; }
+  if (!strcmp(line, "RESET")) {
+    Serial.println(dispenser->recover(inputs) ? "reset accepted; new TARE and REFILL required" : "reset rejected");
+    scaleInputs.clearTare(); return;
+  }
+  RefillRequest request{};
+  if (parseRefill(line, request)) {
+    const auto result = dispenser->request(request, CommandSource::LocalOperator, inputs, scaleInputs.tare());
+    Serial.printf("refill_result=%u request=%lu target_ml=%.1f\n", unsigned(result),
+                  static_cast<unsigned long>(request.requestId), request.targetWaterMl);
+    return;
+  }
+  if (dispenser->safety().state() != DispenseState::Idle) { Serial.println("command rejected: not idle"); return; }
+  if (!strcmp(line, "TARE")) {
+    Serial.println(scaleInputs.setTare() ? "cup tare set (operator confirms EMPTY cup)" : "cup tare rejected"); return;
+  }
+  Calibration next{};
+  if (parseCalibration(line, next)) {
+    if (preferences.putBytes("cal-v1", &next, sizeof next) == sizeof next) {
+      calibration = next; scaleInputs.calibrate(next); Serial.println("calibration saved; verify with independent masses");
+    } else Serial.println("calibration rejected or storage failed");
+    return;
+  }
+  Serial.println("command rejected: syntax");
+}
 }
 
 void setup() {
-  // An enabled driver must have a hardware pull-down and independent power cut.
-  if (PUMP_PIN >= 0) { digitalWrite(PUMP_PIN, LOW); pinMode(PUMP_PIN, OUTPUT); }
-  if (ESTOP_PIN >= 0) pinMode(ESTOP_PIN, INPUT_PULLUP);
+  pump.begin(); pump.set(false);
+  bootSession = esp_random(); if (!bootSession) bootSession = 1;
+  static GatewayDispenser control(pump, bootSession, KAEW_LOCAL_REFILL_ENABLED, safetyLimits());
+  dispenser = &control;
   Serial.begin(115200);
-  Serial.setTimeout(10);
   Serial1.begin(115200, SERIAL_8N1, LINK_RX, LINK_TX);
   if (preferences.begin("kaew-scale", false) && preferences.getBytesLength("cal-v1") == sizeof calibration)
     preferences.getBytes("cal-v1", &calibration, sizeof calibration);
   if (!validCalibration(calibration)) calibration = Calibration{};
+  scaleInputs.calibrate(calibration);
   scale.begin(HX_DATA, HX_CLOCK);
+  scaleSamples = xQueueCreate(8, sizeof(RawScaleSample));
+  if (!scaleSamples || xTaskCreatePinnedToCore(acquireScale, "kaew-scale", 3072, nullptr, 1, nullptr, 0) != pdPASS)
+    Serial.println("scale acquisition unavailable; dispensing remains blocked");
   cloud.begin();
   if (KAEW_AUDIO_ENABLED && !audio.begin()) Serial.println("audio driver init failed");
 }
 
 void loop() {
-  inputs.nowMs = millis();
+  controlTick(); // Includes E-stop/freshness even if serial input never terminates.
+  bool scaleReady = false;
+  long raw = 0;
+  RawScaleSample sample{};
+  for (unsigned n = 0; n < 8 && scaleSamples && xQueueReceive(scaleSamples, &sample, 0) == pdTRUE; ++n) {
+    scaleReady = true; raw = sample.raw;
+    scaleInputs.accept(sample.raw, sample.atMs, activeScale());
+    controlTick(); // Each queued removal is checked, not overwritten by a later sample.
+  }
+  controlTick(); // Raw cup removal/target crossing is applied in this iteration.
+
+  // Work budgets stop continuous UART/console input starving safety updates.
   Packet persisted{};
-  while (cloud.takeAck(persisted)) {
+  for (unsigned n = 0; n < 8 && cloud.takeAck(persisted); ++n) {
     uint8_t bytes[FRAME_SIZE]; encode(persisted, true, bytes); Serial1.write(bytes, sizeof bytes);
   }
-  while (Serial1.available()) {
+  for (unsigned n = 0; n < 256 && Serial1.available(); ++n) {
     Packet p{}; bool ack = false;
     if (parser.push(static_cast<uint8_t>(Serial1.read()), p, ack) && !ack) {
+      const auto safetyResult = safetyReceiver.accept(p, millis());
+      controlTick(); // Latch low/unknown immediately, even if a wet frame follows.
+      if (safetyResult == Receive::Accepted || safetyResult == Receive::Duplicate) trace.emit("rx", p, millis());
       Receiver previous = receiver;
-      Receive result = receiver.accept(p, inputs.nowMs);
+      Receive result = receiver.accept(p, millis());
       if (result == Receive::Accepted || result == Receive::Duplicate) {
         if (cloud.enabled()) {
           if (!cloud.enqueue(p)) { if (result == Receive::Accepted) receiver = previous; ++rejected; continue; }
@@ -68,40 +169,22 @@ void loop() {
       } else ++rejected;
     }
   }
-  inputs.tankWet = receiver.fresh(inputs.nowMs) && receiver.latest().level == 1;
-  inputs.estopOk = ESTOP_PIN >= 0 && digitalRead(ESTOP_PIN) == HIGH;
-  if (Serial.available() && !controller.pumping()) {
-    String line = Serial.readStringUntil('\n'); long zero, known; float grams;
-    if (line == "TARE") {
-      Serial.println(cupTare.set(inputs.cupPresent, inputs.scaleValid, inputs.weightG) ? "cup tare set (must be empty)" : "cup tare rejected");
-    } else if (sscanf(line.c_str(), "CAL %ld %ld %f", &zero, &known, &grams) == 3) {
-      Calibration next{};
-      if (makeCalibration(zero, known, grams, next) && preferences.putBytes("cal-v1", &next, sizeof next) == sizeof next) {
-        calibration = next; filter = WeightFilter{}; cup = CupDetector{}; cupTare.clear(); Serial.println("calibration saved; verify with known masses");
-      } else Serial.println("calibration rejected or storage failed");
-    }
+  controlTick(); // Includes newly received low/unknown level.
+  for (unsigned n = 0; n < 64 && Serial.available(); ++n) {
+    if (commands.push(static_cast<char>(Serial.read()))) command(commands.text());
   }
-  const bool scaleReady = scale.is_ready();
-  long raw = 0; // Only meaningful when hx711_ready=1 in this loop.
-  if (scaleReady) {
-    raw = scale.read();
-    inputs.calibrated = validCalibration(calibration);
-    if (inputs.calibrated && filter.push(toGrams(calibration, raw))) {
-      inputs.weightG = filter.weight(); inputs.scaleValid = controller.pumping() || filter.stable();
-      inputs.scaleAtMs = inputs.nowMs;
-      inputs.cupPresent = controller.pumping() ? cup.updateDispensing(true, inputs.weightG) : cup.update(inputs.scaleValid, inputs.weightG);
-    } else { inputs.scaleValid = false; inputs.cupPresent = false; }
-    if (!inputs.cupPresent) cupTare.clear();
-  }
-  if (uint32_t(inputs.nowMs - lastPrint) >= 1000) {
-    float volume = 0; bool volumeKnown = cupTare.volume(inputs.cupPresent, inputs.weightG, volume);
-    Serial.printf("hx711_ready=%d hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=off\n",
-      scaleReady, raw, inputs.calibrated, inputs.weightG, inputs.scaleValid, inputs.cupPresent, volumeKnown, volume,
-      receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0, static_cast<unsigned long>(accepted),
-      static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected), static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()));
+  controlTick();
+  if (uint32_t(inputs.nowMs - lastPrint) >= 1000 && Serial.availableForWrite() >= 64) {
+    float volume = 0; bool known = scaleInputs.tare().volume(inputs.cupPresent, inputs.weightG, volume);
+    // Finite diagnostic output can still affect timing; measure on the board.
+    Serial.printf("hx711_ready=%d hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=%s state=%u fault=%u boot=%lu now_ms=%lu trace_dropped=%lu\n",
+      scaleReady, raw, inputs.calibrated, inputs.weightG, scaleInputs.stable(), inputs.cupPresent, known, volume,
+      receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0,
+      static_cast<unsigned long>(accepted), static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected),
+      static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()),
+      dispenser->safety().pumping() ? "on" : "off", unsigned(dispenser->safety().state()), unsigned(dispenser->safety().fault()),
+      static_cast<unsigned long>(bootSession), static_cast<unsigned long>(inputs.nowMs), static_cast<unsigned long>(trace.dropped()));
     lastPrint = inputs.nowMs;
   }
-  controller.update(inputs);
-  if (PUMP_PIN >= 0) digitalWrite(PUMP_PIN, controller.pumping() ? HIGH : LOW);
   delay(5);
 }

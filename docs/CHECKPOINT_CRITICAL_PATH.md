@@ -1,5 +1,7 @@
 # Checkpoint critical path — 20 November 2026
 
+Software update 17 November: [Arm's gateway/testing work](RATCHAPOL_GATEWAY_REPORT.md) and [executed builds/tests](validation/software-2026-11-17.md) are available. The local command integration does not enable physical output or remote refill. Keep the temperature-only checkpoint and disconnected-pump setup below; real board/cloud-path evidence is still pending. [Three-metric plan](PERFORMANCE_TEST_PLAN.md) is ready for later hardware runs.
+
 Status 15 November: **cloud live at https://kaew-cloud.onrender.com; hardware path not physically demonstrated**. The smallest checkpoint demonstration is a genuine DS18B20 temperature measurement on the sensor node, sent over UART to the gateway and published to a separately hosted HTTPS backend and dashboard. It is only a checkpoint subset, not evidence that M1's five sensors or the final dispenser are complete. Never present simulated samples as device readings.
 
 ## Procurement and readiness
