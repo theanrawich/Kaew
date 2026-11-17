@@ -1,5 +1,9 @@
 import base64
 import io
+import json
+import audio_service
+import urllib.error
+from unittest.mock import patch, MagicMock
 import math
 import struct
 import tempfile
@@ -19,6 +23,48 @@ def wav_fixture(silent=False):
 
 
 class AudioTest(unittest.TestCase):
+    def test_groq_multipart_and_validation(self):
+        calls=[]
+        def transport(url,headers,body):
+            calls.append((url,headers,body))
+            return json.dumps({'text':' สวัสดี '}).encode()
+        asr=audio_service.GroqWhisperASR('test-placeholder',transport=transport)
+        self.assertEqual(asr.transcribe(wav_fixture()),'สวัสดี')
+        url,headers,body=calls[0]
+        self.assertEqual(url,'https://api.groq.com/openai/v1/audio/transcriptions')
+        self.assertEqual(headers['Authorization'],'Bearer test-placeholder')
+        for part in (b'name="model"',b'whisper-large-v3-turbo',b'name="language"',b'\r\nth\r\n',
+                     b'filename="audio.wav"',b'audio/wav',wav_fixture(),b'name="temperature"',b'name="response_format"'):
+            self.assertIn(part,body)
+        with self.assertRaises(AudioError): asr.transcribe(wav_fixture(True))
+        self.assertEqual(len(calls),1)
+
+    def test_groq_http_transport_is_bounded_and_disallows_redirects(self):
+        response=MagicMock()
+        response.__enter__.return_value=response
+        response.read.return_value=b'{"text":"hello"}'
+        opener=MagicMock()
+        opener.open.return_value=response
+        with patch('audio_service.urllib.request.build_opener',return_value=opener) as build:
+            self.assertEqual(audio_service.GroqWhisperASR('test-placeholder').transcribe(wav_fixture()),'hello')
+            self.assertIsInstance(build.call_args.args[0],audio_service.NoRedirect)
+            self.assertEqual(opener.open.call_args.kwargs['timeout'],15)
+            response.read.assert_called_once_with(65_537)
+        for error in (urllib.error.HTTPError('https://api.groq.com',401,'denied',{},None),
+                      urllib.error.URLError('offline'),TimeoutError()):
+            with patch('audio_service.urllib.request.build_opener',return_value=opener):
+                opener.open.side_effect=error
+                with self.assertRaisesRegex(AudioError,'^speech recognition failed$'):
+                    audio_service.GroqWhisperASR('test-placeholder').transcribe(wav_fixture())
+
+    def test_groq_bad_responses_and_network_errors(self):
+        for raw in (b'{}',b'not json',b'{"text":null}',b'{"text":" "}',json.dumps({'text':'a'*501}).encode(),b'x'*65537):
+            with self.subTest(raw_size=len(raw)), self.assertRaises(AudioError):
+                audio_service.GroqWhisperASR('test-placeholder',transport=lambda *a:raw).transcribe(wav_fixture())
+        def broken(*args): raise OSError('private provider details')
+        with self.assertRaisesRegex(AudioError,'^speech recognition failed$'):
+            audio_service.GroqWhisperASR('test-placeholder',transport=broken).transcribe(wav_fixture())
+
     def test_wav_is_bounded_and_silence_rejected(self):
         self.assertEqual(validate_wav(wav_fixture())['sample_rate'],16000)
         with self.assertRaises(AudioError): validate_wav(wav_fixture(True))
