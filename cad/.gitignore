@@ -1,8 +1,0 @@
-*.FCStd
-*.FCBak
-*.step
-*.stl
-*.png
-*.mesh.json
-*.log
-__pycache__/
