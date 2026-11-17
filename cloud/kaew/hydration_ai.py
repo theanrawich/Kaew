@@ -4,7 +4,7 @@ import math
 import os
 import urllib.request
 from types import SimpleNamespace
-from notifications import NoRedirect
+from kaew.notifications import NoRedirect
 
 DEFAULT_MODEL = 'openai/gpt-oss-20b'
 ADVICE_SCHEMA = {'type':'object', 'additionalProperties':False,

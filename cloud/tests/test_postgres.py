@@ -15,8 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from unittest.mock import patch
 from urllib.parse import urlsplit
-from database import connect, Target
-from server import create_server
+from kaew.database import connect, Target
+from kaew.server import create_server
 
 
 @unittest.skipUnless(os.environ.get('KAEW_TEST_POSTGRES_URL'), 'optional local Postgres integration database not configured')
@@ -29,10 +29,10 @@ class PostgresTest(unittest.TestCase):
         import psycopg
         cls.driver = psycopg
         # Applying twice validates syntax and fresh-schema idempotency with Postgres.
-        schema = (Path(__file__).parent / 'migrations/postgres/001_initial.sql').read_text()
+        schema = (Path(__file__).resolve().parents[1] / 'migrations/postgres/001_initial.sql').read_text()
         with psycopg.connect(cls.url, autocommit=True) as db:
             db.execute(schema, prepare=False)
-            upgrade = (Path(__file__).parent / 'migrations/postgres/002_advice_loop.sql').read_text()
+            upgrade = (Path(__file__).resolve().parents[1] / 'migrations/postgres/002_advice_loop.sql').read_text()
             db.execute(upgrade, prepare=False)
             db.execute(upgrade, prepare=False)
             db.execute(schema, prepare=False)

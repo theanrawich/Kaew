@@ -2,6 +2,15 @@
 
 One Python 3.11 Render web service serves both the API and dashboard over HTTPS. Hosted storage is Supabase Postgres selected by `DATABASE_URL`; with that variable unset/empty, local development uses stdlib-only SQLite. The service serves a dashboard with separate device-write and admin-read bearer tokens. It provisions only `node-1`. This is a small course checkpoint service, not a hardened production cloud: no production identity management or rate limiting. Run exactly one web-service instance per database (including the notification scheduler). The hosted cloud already exists; this AI change has not been deployed, and physical end-to-end delivery remains unverified.
 
+## Layout
+
+- `server.py`: thin launcher; run `python cloud/server.py` from the repository root or `python server.py` from `cloud/`.
+- `kaew/`: HTTP service, database adapters, notifications, advice and audio/voice services.
+- `static/`: dashboard and speech-to-text pages, served at `/` and `/stt`.
+- `migrations/`: numbered SQLite migrations and explicit Postgres schemas.
+- `tests/`: unittest suite; discover from the repository root with `-s cloud/tests -t cloud`.
+- `tools/`: WAV CLI, simulator, gateway adapter and durable outbox utilities.
+
 ## Local run
 
 From the repository root, generate two different long random tokens privately. Bash example (values stay out of command history):
@@ -48,9 +57,9 @@ No Render disk is required for hosted telemetry now. Free web-service sleep/cold
 
 ## Local Postgres verification and implementation
 
-`cloud/database.py` loads pinned psycopg v3 only when a Postgres target is selected. The adapter converts `?` to `%s` outside literals/comments and uses dictionary rows. Portable `ON CONFLICT` upserts work on both databases. An explicit transaction plus a transaction-level advisory writer lock preserves SQLite's read-before-write dedup/notification behavior for `BEGIN IMMEDIATE` paths. Connection/query failures use the existing retryable database-error family without logging credentials. Short-lived connections and one service instance suit this checkpoint, not a large-scale service.
+`cloud/kaew/database.py` loads pinned psycopg v3 only when a Postgres target is selected. The adapter converts `?` to `%s` outside literals/comments and uses dictionary rows. Portable `ON CONFLICT` upserts work on both databases. An explicit transaction plus a transaction-level advisory writer lock preserves SQLite's read-before-write dedup/notification behavior for `BEGIN IMMEDIATE` paths. Connection/query failures use the existing retryable database-error family without logging credentials. Short-lived connections and one service instance suit this checkpoint, not a large-scale service.
 
-Local SQLite tests need no dependency install. For a **disposable local** Postgres database, install `python -m pip install -r cloud/requirements.txt`, export `KAEW_TEST_POSTGRES_URL` to its loopback connection URL, and run `python -m unittest discover -s cloud -p 'test_postgres.py' -v`. These opt-in tests apply the schema twice and truncate Kaew tables; never point them at a real project. They reject non-loopback hosts and do not use `DATABASE_URL` to opt in. Without that test variable they skip before importing psycopg.
+Local SQLite tests need no dependency install. For a **disposable local** Postgres database, install `python -m pip install -r cloud/requirements.txt`, export `KAEW_TEST_POSTGRES_URL` to its loopback connection URL, and run `python -m unittest discover -s cloud/tests -t cloud -p 'test_postgres.py' -v`. These opt-in tests apply the schema twice and truncate Kaew tables; never point them at a real project. They reject non-loopback hosts and do not use `DATABASE_URL` to opt in. Without that test variable they skip before importing psycopg.
 
 ## Verify telemetry and gateway
 
@@ -64,32 +73,32 @@ curl --fail -X POST "$KAEW_BASE_URL/api/telemetry" \
 curl --fail "$KAEW_BASE_URL/api/telemetry" -H "Authorization: Bearer $KAEW_ADMIN_TOKEN"
 ```
 
-This sample is **simulated**, not hardware proof. Expect 201 on first insert and 200 on the same sample retry. Open the base URL, enter the admin token and reload history to find the row. Do not capture tokens in screenshots or shell tracing. An alternative Node.js 20+ simulator is `node cloud/simulate.mjs` with `KAEW_CLOUD_URL` set to the base URL and the device token exported. A raw ADC count is not calibrated TDS, and a single level switch does not measure tank volume.
+This sample is **simulated**, not hardware proof. Expect 201 on first insert and 200 on the same sample retry. Open the base URL, enter the admin token and reload history to find the row. Do not capture tokens in screenshots or shell tracing. An alternative Node.js 20+ simulator is `node cloud/tools/simulate.mjs` with `KAEW_CLOUD_URL` set to the base URL and the device token exported. Set `KAEW_PYTHON=python3` if your system has no `python` alias. A raw ADC count is not calibrated TDS, and a single level switch does not measure tank volume.
 
 For real telemetry copy [the local header example](../firmware/include/cloud_config.local.h.example) to ignored `firmware/include/cloud_config.local.h`. Set Wi-Fi, `KAEW_CLOUD_URL` to the **full** `https://<host>/api/telemetry`, the **device** token and the verified public root CA PEM for the host's current certificate chain. URL + token now auto-enable publishing; explicit `KAEW_CLOUD_ENABLED=0` forces it off. A nonempty CA and synchronized clock are still required; no TLS bypass is provided. Flash the gateway as in [firmware instructions](../firmware/README.md). Prove `source=device` arrives from the physical node, changes with measurements and survives dashboard reload; verify hosted service restart persistence in Supabase. See [checkpoint path](../docs/CHECKPOINT_CRITICAL_PATH.md).
 
 Run tests:
 
 ```bash
-python -m unittest discover -s cloud -p 'test_*.py' -v
+python -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
 ```
 
-The simulated gateway adapter persists a bounded SQLite outbox before delivery. `python cloud/gateway_push.py --worker` retries with backoff/jitter; use one worker per outbox. `--flush` performs one pass. Entries are removed only after HTTP 200/201. Set `KAEW_OUTBOX_PATH` for the ignored local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
+The simulated gateway adapter persists a bounded SQLite outbox before delivery. `python cloud/tools/gateway_push.py --worker` retries with backoff/jitter; use one worker per outbox. `--flush` performs one pass. Entries are removed only after HTTP 200/201. Set `KAEW_OUTBOX_PATH` for the ignored local database. HTTP failures remain queued, including permanent failures; dead-letter handling and multi-process leasing are not implemented.
 
 Admin-authenticated `/api/events` records drink or fault events with a `measured`, `estimated`, or `simulated` source; `/api/summary` returns the rolling last 24 hours split by source. `/api/goal` stores a user-selected goal and is not medical guidance. `/api/reminder` stores one repeating reminder. The scheduler creates durable notification jobs for reminders, low-water transitions, fault events and offline transitions. A single delivery worker retries with backoff, marks a job failed after eight attempts, and limits sends to approximately one per second; low-water, fault and offline jobs have a five-minute per-kind cooldown. The default provider is a mock and sends nothing externally.
 
 For Telegram, explicitly configure both `KAEW_TELEGRAM_TOKEN` and `KAEW_TELEGRAM_CHAT_ID` in the server process environment. This enables real outgoing notifications to that chat. Never commit or print the token. The adapter uses Telegram's HTTPS `sendMessage` API; integration tests inject a mock transport and **no real Telegram delivery has been verified**. A crash after Telegram accepts a message but before SQLite records success may cause a duplicate on retry. Run only one service instance per database; multi-process notification leasing is not implemented. Existing jobs remain bound to their original provider and are not silently redirected if configuration changes.
 
-The admin-authenticated `/api/voice` endpoint accepts Thai text transcripts, not microphone audio. It handles wake-word-prefixed reminder and level queries, and explicitly declines refill and remote stop: no voice path can operate the pump. Reminders created by voice are one-shot and replace the existing reminder. The most recent level reports an observed switch state and may be delayed; it does not estimate remaining volume. `voice_pipeline.py` allows mock ASR/TTS injection for tests. There is no hardware audio or wake-word integration yet. Calendar-day statistics, production TLS/deployment and physical integration remain outstanding. Firmware actuation remains disabled.
+The admin-authenticated `/api/voice` endpoint accepts Thai text transcripts, not microphone audio. It handles wake-word-prefixed reminder and level queries, and explicitly declines refill and remote stop: no voice path can operate the pump. Reminders created by voice are one-shot and replace the existing reminder. The most recent level reports an observed switch state and may be delayed; it does not estimate remaining volume. There is no hardware audio or wake-word integration yet. Calendar-day statistics, production TLS/deployment and physical integration remain outstanding. Firmware actuation remains disabled.
 
 ## Groq speech-to-text and WAV CLI
 
 The server uses `GroqWhisperASR` for `/api/stt` when `GROQ_API_KEY` is configured. Input must be mono 16-bit PCM 16 kHz WAV, at most 15 seconds, with audible speech. Audio is sent to Groq; the endpoint returns a transcript by default; `?command=1` also processes voice intent through the same logic as `/api/voice`.
 
-`audio_cli.py` sends an explicitly selected WAV to Groq, calls the admin-authenticated `/api/voice` endpoint, and writes Google Cloud Thai TTS speech to a distinct output WAV. It uses only Python's standard library. Export `GROQ_API_KEY`, `KAEW_ADMIN_TOKEN`, and `KAEW_GOOGLE_TTS_TOKEN` privately, then run:
+`tools/audio_cli.py` sends an explicitly selected WAV to Groq, calls the admin-authenticated `/api/voice` endpoint, and writes Google Cloud Thai TTS speech to a distinct output WAV. It uses only Python's standard library. Export `GROQ_API_KEY`, `KAEW_ADMIN_TOKEN`, and `KAEW_GOOGLE_TTS_TOKEN` privately, then run:
 
 ```bash
-python cloud/audio_cli.py input.wav output.wav --url https://<service>.onrender.com
+python cloud/tools/audio_cli.py input.wav output.wav --url https://<service>.onrender.com
 ```
 
 The optional `--model` selects a Groq model id (default `whisper-large-v3-turbo`). Google TTS receives the reply text. Provider credentials and private recordings must remain outside Git. If speech output fails after command processing, the CLI reports `audio_written: false` and does not repeat the command. Tests mock providers; they do not establish live provider availability or recognition accuracy.

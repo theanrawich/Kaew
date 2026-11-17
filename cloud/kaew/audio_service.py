@@ -11,7 +11,7 @@ import secrets
 import urllib.request
 import wave
 from pathlib import Path
-from notifications import NoRedirect
+from kaew.notifications import NoRedirect
 
 
 class AudioError(Exception): pass

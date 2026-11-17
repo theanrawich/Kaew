@@ -3,14 +3,19 @@ import json
 import os
 import sys
 from pathlib import Path
-from outbox import Outbox
-from outbox_worker import OutboxWorker
+
+# Support direct execution from any working directory.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tools.outbox import Outbox
+from tools.outbox_worker import OutboxWorker
 
 
 def main():
     url = os.environ.get('KAEW_CLOUD_URL', 'http://127.0.0.1:8080')
     token = os.environ.get('KAEW_DEVICE_TOKEN', '')
-    path = os.environ.get('KAEW_OUTBOX_PATH', str(Path(__file__).resolve().parent / 'outbox.sqlite3'))
+    path = os.environ.get('KAEW_OUTBOX_PATH', str(Path(__file__).resolve().parents[1] / 'outbox.sqlite3'))
     queue = Outbox(path)
     if '--worker' in sys.argv:
         import time

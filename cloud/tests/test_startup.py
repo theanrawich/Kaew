@@ -2,7 +2,7 @@
 import os
 import unittest
 from unittest.mock import patch
-import server
+from kaew import server
 
 
 class StartupTest(unittest.TestCase):
