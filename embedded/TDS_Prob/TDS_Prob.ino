@@ -1,10 +1,10 @@
-#define TdsSensorPin 
+#define TdsSensorPin 4
 #define VREF 3.3
 #define ADC_RES 4095.0
 #define SCOUNT 30
 #include <DS18B20.h>
 
-DS18B20 ds(8);
+DS18B20 ds(6);
 int analogBuffer[SCOUNT];
 int analogBufferTemp[SCOUNT];
 int analogBufferIndex = 0;

@@ -1,4 +1,4 @@
-#define TdsSensorPin 7  // GPIO34 ใช้ได้กับ ESP32 รุ่นคลาสสิก
+#define TdsSensorPin 4
 #define SCOUNT 30
 
 int voltageBuffer[SCOUNT];

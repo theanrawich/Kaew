@@ -1,6 +1,6 @@
 #include <DS18B20.h>
 
-DS18B20 ds(8);
+DS18B20 ds(6);
 
 void setup() {
   Serial.begin(9600);
