@@ -6,6 +6,7 @@ import json
 import math
 import re
 import struct
+import sys
 import secrets
 import unicodedata
 import urllib.request
@@ -83,7 +84,7 @@ class GroqWhisperASR:
             parts.append(('--'+boundary+'\r\nContent-Disposition: form-data; name="'+name+'"\r\n\r\n'+value+'\r\n').encode())
         parts.append(('--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode()+audio+b'\r\n')
         parts.append(('--'+boundary+'--\r\n').encode())
-        headers={'Authorization':'Bearer '+self.api_key,'Content-Type':'multipart/form-data; boundary='+boundary}
+        headers={'Authorization':'Bearer '+self.api_key,'Content-Type':'multipart/form-data; boundary='+boundary,'User-Agent':'KaewCloud/0.1'}
         try:
             raw=self.transport('https://api.groq.com/openai/v1/audio/transcriptions',headers,b''.join(parts))
             if not isinstance(raw,bytes) or len(raw)>65_536: raise ValueError()
@@ -93,7 +94,9 @@ class GroqWhisperASR:
             text=text.strip()
             if not text or len(text)>500: raise ValueError()
             return text
-        except Exception: raise AudioError('speech recognition failed') from None
+        except Exception as exc:
+            print('groq stt error:',type(exc).__name__,getattr(exc,'code',''),file=sys.stderr)
+            raise AudioError('speech recognition failed') from None
 
 
 class TransformersThaiASR:
