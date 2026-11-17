@@ -165,9 +165,11 @@ and 2,000,000 bytes. The response contains `text` and `model`; add `?command=1`
 to process the transcript through the same command logic as `/api/voice`.
 Missing credentials return 503; recognition failures return 422.
 
-At `/stt`, choose **Groq Whisper (cloud)** and enter the admin token (stored only
-in sessionStorage). Use HTTPS or localhost and allow microphone access. Speech
-is sent to Groq in roughly four-second chunks, including the final chunk on Stop;
-quiet chunks are skipped. Cloud mode uses Thai. Browser Web Speech remains available.
+At `/stt`, enter the admin token (whitespace and surrounding quotes are trimmed;
+it is stored in sessionStorage). This display-only page polls `/api/stt/recent`
+every two seconds and shows ESP32 transcripts newest first with Bangkok times.
+It never requests microphone access. The admin-only endpoint returns
+`{items:[{text,model,at}]}`, where `at` is Unix time. The server keeps only the
+last 50 successful transcriptions in memory; history clears on restart.
 The WAV CLI also accepts `--backend groq`; `--model` is optional for this backend
 and selects the Groq model id. Existing admin and TTS configuration still applies.
