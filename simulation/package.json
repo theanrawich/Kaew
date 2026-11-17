@@ -3,5 +3,8 @@
   "description": "Browser 3D viewer dependency for the Kaew simulator (tests need no install)",
   "dependencies": {
     "three": "^0.180.0"
+  },
+  "scripts": {
+    "test": "node --test *.test.mjs"
   }
 }

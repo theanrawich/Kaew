@@ -1,7 +1,6 @@
 # Build products and local tools
 node_modules/
 .pio/
-firmware/.pio/
 .pio-core/
 .kaew-*/
 __pycache__/
@@ -24,4 +23,7 @@ Thumbs.db
 firmware/include/cloud_config.local.h
 cloud/*.sqlite3*
 
-# CAD native exports are covered by cad/.gitignore.
+# Python tooling and local environments
+.pytest_cache/
+.venv/
+venv/
