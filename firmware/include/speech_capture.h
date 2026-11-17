@@ -33,15 +33,6 @@ class SpeechCapture {
     }
 
     const bool audible = power >= std::fmax(stopFloorPower, noisePower_ * stopNoiseRatioSquared);
-    if (continuing_) {
-      continuing_ = false;
-      if (audible) {
-        std::copy_n(frame, frameSamples, output);
-        captured_ = frameSamples;
-        minSpeechPower_ = maxSpeechPower_ = power;
-        return 0;
-      }
-    }
     if (captured_ > 0) {
       std::copy_n(frame, frameSamples, output + captured_);
       captured_ += frameSamples;
@@ -50,13 +41,14 @@ class SpeechCapture {
       maxSpeechPower_ = std::fmax(maxSpeechPower_, power);
       if (quietFrames_ == endFrames || captured_ == maxSamples) {
         const size_t completed = captured_;
-        const bool reachedLimitWhileAudible = completed == maxSamples && audible;
+        const bool reachedLimit = completed == maxSamples;
         // A step up in steady background can otherwise trigger indefinitely.
-        const bool steadyBackground = reachedLimitWhileAudible &&
+        const bool steadyBackground = reachedLimit && audible &&
                                       maxSpeechPower_ <= minSpeechPower_ * 1.5f;
+        const size_t continuation = reachedLimit && !steadyBackground ? endFrames - quietFrames_ : 0;
         if (steadyBackground) noisePower_ = minSpeechPower_;
         resetUtterance();
-        continuing_ = reachedLimitWhileAudible && !steadyBackground;
+        continuationFrames_ = continuation;
         return completed;
       }
       return 0;
@@ -65,13 +57,16 @@ class SpeechCapture {
     std::copy_n(frame, frameSamples, history_[historyNext_].begin());
     historyNext_ = (historyNext_ + 1) % historyFrames;
     if (historySize_ < historyFrames) ++historySize_;
-    if (power < std::fmax(startFloorPower, noisePower_ * startNoiseRatioSquared)) {
+    if (continuationFrames_ > 0) {
+      --continuationFrames_;
+      if (!audible) return 0;
+      continuationFrames_ = 0;
+    } else if (power < std::fmax(startFloorPower, noisePower_ * startNoiseRatioSquared)) {
       onsetFrames_ = 0;
       // Adapt during background frames and freeze the estimate during speech.
       noisePower_ += (power - noisePower_) * 0.02f;
       return 0;
-    }
-    if (++onsetFrames_ < startFrames) return 0;
+    } else if (++onsetFrames_ < startFrames) return 0;
 
     minSpeechPower_ = maxSpeechPower_ = power;
     size_t oldest = (historyNext_ + historyFrames - historySize_) % historyFrames;
@@ -88,7 +83,7 @@ class SpeechCapture {
 
   void resetUtterance() {
     captured_ = historySize_ = historyNext_ = onsetFrames_ = quietFrames_ = 0;
-    continuing_ = false;
+    continuationFrames_ = 0;
   }
 
  private:
@@ -112,5 +107,5 @@ class SpeechCapture {
   float noisePower_ = 0;
   float minSpeechPower_ = 0;
   float maxSpeechPower_ = 0;
-  bool continuing_ = false;
+  size_t continuationFrames_ = 0;
 };

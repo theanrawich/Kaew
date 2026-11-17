@@ -35,9 +35,10 @@ int main() {
   size_t continuation = 0;
   for (int i = 0; i < 420 && !continuation; ++i) continuation = feed(i % 2 ? 500 : 700);
   assert(continuation == SpeechCapture::maxSamples && clip[0] == -700);
+  assert(feed(100) == 0); // a short pause at the clip boundary
   assert(feed(200) == 0); // below the onset threshold, above the continuation threshold
   for (int i = 0; i < 34; ++i) assert(feed(100) == 0);
-  assert(feed(100) == 36 * SpeechCapture::frameSamples && clip[0] == -200);
+  assert(feed(100) == 37 * SpeechCapture::frameSamples && clip[SpeechCapture::frameSamples] == -200);
   capture = SpeechCapture{};
   for (int i = 0; i < 50; ++i) assert(feed(100) == 0);
   int uploads = 0;
