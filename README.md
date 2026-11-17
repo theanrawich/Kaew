@@ -2,7 +2,7 @@
 
 งาน M4 ต่อจาก PR #8: [gateway ดึงคำแนะนำ AI และตรวจจ่ายผ่าน local safety](docs/M4_GATEWAY_AI_LOOP.md) มี opt-in software path และ fake-hardware integration tests แล้ว ต้องยืนยันในเครื่องหนึ่งครั้งต่อการเติม ปั๊มยัง commissioned = 0 และยังไม่ deploy backend/flash บอร์ดหรือวัดฮาร์ดแวร์ในงานนี้
 
-Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง, cloud และแบบ CAD
+Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง และ cloud
 
 สถานะ 17 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway เชื่อมคำสั่ง refill กับ SafetyController และทดสอบ fake actuator แล้ว แต่ **physical pump และ remote actuation ยังปิดโดย default** ดู [งาน Gateway/การทดสอบของ Arm](docs/RATCHAPOL_GATEWAY_REPORT.md) และ [ผล software validation](docs/validation/software-2026-11-17.md) AI reminder closed loop มีในซอฟต์แวร์แล้ว (สถานะ deploy เดิมไม่ได้ตรวจใหม่ในรอบนี้) ตามบันทึกเดิม Cloud เปิดใช้งานที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
 
@@ -23,7 +23,6 @@ CRC16 ตรวจความเสียหายของข้อมูล �
 | `firmware/` | PlatformIO: `sensor_node`, `gateway`, protocol, safety, outbox และ host tests |
 | `cloud/` | Python server, SQLite/Postgres migrations, dashboard, Telegram และ AI/voice experiments |
 | `simulation/` | แบบจำลองและการทดสอบ JavaScript |
-| `cad/` | CAD Python sources, รายงานตรวจ และ geometry archive |
 | `docs/` | BOM (`kaew-bom.json`), handoff, รายการซื้อ, wiring, บันทึกทดสอบ และ execution ledger |
 
 ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
@@ -63,11 +62,9 @@ Cloud API และ dashboard เปิดใช้งานแล้วที�
 
 Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://kaew-cloud.onrender.com/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** สำหรับ checkpoint ได้เตรียม local header แล้วโดย Wi-Fi SSID/password ยังว่าง ให้กรอกในเครื่องก่อน build แล้ว flash gateway ก่อน node ตาม [ขั้นตอน firmware](firmware/README.md#build-and-flash) ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
 
-geometry snapshot ปัจจุบันคือ [zip วันที่ 6 พ.ย.](cad/kaew-full-assembly-20261106.zip) ดู [CAD README](cad/README.md) สำหรับข้อจำกัดของแบบ
-
 เปิดห้องทดลองจำลอง 3D ในเบราว์เซอร์: `npm ci --prefix simulation` แล้ว serve repo root และเปิด `simulation/index.html` (การทดสอบ `node --test simulation/*.test.mjs` ไม่ต้องติดตั้ง)
 
-เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [CAD handoff](docs/CAD_HANDOFF.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [execution ledger](docs/EXECUTION.md) · [เป้าหมายผลิตภัณฑ์](docs/product-intent.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
+เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [execution ledger](docs/EXECUTION.md) · [เป้าหมายผลิตภัณฑ์](docs/product-intent.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
 
 สมาชิก SengKeng มี 5 คน: **Theanrawich Thungpromsri, Pongsest Ruangwitthayanusorn, Ratchapol Srisongkram, Tanakrit Onjinda และ Suphachok** เกณฑ์ M8 ต้องมี commit จริงจากสมาชิกทุกคน แต่ละคนต้องทำงานและ commit ด้วยบัญชีของตนเอง ไม่สร้างประวัติแทนกัน
 
