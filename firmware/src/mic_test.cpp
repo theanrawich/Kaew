@@ -6,7 +6,6 @@
 #include <driver/i2s.h>
 #include <esp_heap_caps.h>
 #include <cJSON.h>
-#include <cmath>
 #include <time.h>
 #include "cloud_config.h"
 
@@ -16,13 +15,12 @@
 
 namespace {
 constexpr uint32_t sampleRate = 16000;
-constexpr size_t sampleCount = 3 * sampleRate;
+constexpr uint32_t clipSeconds = 5;
+constexpr size_t sampleCount = clipSeconds * sampleRate;
 constexpr size_t wavSize = 44 + sampleCount * sizeof(int16_t);
+constexpr uint32_t captureTimeoutMs = clipSeconds * 1000 + 2000;
 constexpr uint32_t timeoutMs = 20000;
 bool micReady = false;
-uint64_t levelSquares = 0;
-size_t levelSamples = 0;
-uint32_t lastLevel = 0;
 
 // INMP441 sends 24-bit left-aligned samples: >>16 gives true 16-bit scale
 // (the old >>14 was 4x too hot and clipped). A one-pole DC blocker removes the
@@ -124,20 +122,24 @@ void sendWav(uint8_t *wav) {
     return;
   }
   Serial.println("sending...");
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(KAEW_WIFI_SSID, KAEW_WIFI_PASSWORD);
-  uint32_t start = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) delay(20);
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi connection timed out.");
-    return;
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(KAEW_WIFI_SSID, KAEW_WIFI_PASSWORD);
+    const uint32_t start = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) delay(20);
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("WiFi connection timed out.");
+      return;
+    }
   }
-  configTime(0, 0, "pool.ntp.org", "time.google.com");
-  start = millis();
-  while (time(nullptr) < 1700000000 && millis() - start < timeoutMs) delay(20);
   if (time(nullptr) < 1700000000) {
-    Serial.println("TLS clock synchronization timed out.");
-    return;
+    configTime(0, 0, "pool.ntp.org", "time.google.com");
+    const uint32_t start = millis();
+    while (time(nullptr) < 1700000000 && millis() - start < timeoutMs) delay(20);
+    if (time(nullptr) < 1700000000) {
+      Serial.println("TLS clock synchronization timed out.");
+      return;
+    }
   }
   WiFiClientSecure client;
   client.setCACert(KAEW_CLOUD_CA);
@@ -167,12 +169,15 @@ void sendWav(uint8_t *wav) {
 }
 
 void recordAndSend() {
-  if (!micReady) { Serial.println("Microphone initialization failed."); return; }
   uint8_t *wav = static_cast<uint8_t *>(heap_caps_malloc(wavSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-  if (!wav) { Serial.println("PSRAM allocation failed."); return; }
+  if (!wav) {
+    Serial.println("PSRAM allocation failed.");
+    delay(1000);
+    return;
+  }
   wavHeader(wav);
-  Serial.println("recording 3s...");
-  // Discard queued idle samples so this recording starts at the button press.
+  Serial.printf("recording %lus...\n", static_cast<unsigned long>(clipSeconds));
+  // Discard samples queued while the previous clip was being uploaded.
   int32_t raw[256];
   size_t bytes = 0;
   do {
@@ -182,7 +187,7 @@ void recordAndSend() {
   size_t captured = 0;
   resetDc();
   const uint32_t start = millis();
-  while (captured < sampleCount && millis() - start < 5000) {
+  while (captured < sampleCount && millis() - start < captureTimeoutMs) {
     size_t wanted = min(size_t(256), sampleCount - captured);
     bytes = 0;
     if (i2s_read(I2S_NUM_0, raw, wanted * sizeof(int32_t), &bytes, pdMS_TO_TICKS(100)) != ESP_OK) break;
@@ -190,43 +195,21 @@ void recordAndSend() {
       put16(wav + 44 + 2 * captured++, static_cast<uint16_t>(toPcm(raw[i])));
   }
   if (captured == sampleCount) { normalize(wav + 44, captured); sendWav(wav); }
-  else Serial.println("Microphone capture timed out; skipping STT.");
+  else {
+    Serial.println("Microphone capture incomplete; skipping STT.");
+    delay(1000);
+  }
   heap_caps_free(wav);
-  levelSquares = 0; levelSamples = 0; lastLevel = millis();
 }
 } // namespace
 
 void setup() {
   Serial.begin(115200);
-  pinMode(0, INPUT_PULLUP);
   micReady = beginMic();
-  lastLevel = millis();
+  if (!micReady) Serial.println("Microphone initialization failed.");
 }
 
 void loop() {
-  static int lastButton = HIGH, stableButton = HIGH;
-  static uint32_t changedAt = 0;
-  int button = digitalRead(0);
-  if (button != lastButton) { lastButton = button; changedAt = millis(); }
-  if (button != stableButton && millis() - changedAt >= 40) {
-    stableButton = button;
-    if (stableButton == LOW) recordAndSend();
-  }
-  if (micReady) {
-    int32_t raw[256]; size_t bytes = 0;
-    i2s_read(I2S_NUM_0, raw, sizeof(raw), &bytes, 0);
-    for (size_t i = 0; i < bytes / sizeof(int32_t); ++i) {
-      int32_t pcm = toPcm(raw[i]);
-      levelSquares += static_cast<int64_t>(pcm) * pcm;
-      ++levelSamples;
-    }
-  }
-  if (millis() - lastLevel >= 200) {
-    unsigned rms = levelSamples ? static_cast<unsigned>(sqrt(double(levelSquares) / levelSamples)) : 0;
-    char bar[33]; size_t bars = min(size_t(32), size_t(rms / 128));
-    memset(bar, '#', bars); bar[bars] = '\0';
-    Serial.printf("mic level %s %u\n", bar, rms);
-    levelSquares = 0; levelSamples = 0; lastLevel = millis();
-  }
-  delay(1);
+  if (micReady) recordAndSend();
+  else delay(1000);
 }
