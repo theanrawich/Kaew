@@ -85,9 +85,20 @@ cloud URL path and posts to `/api/stt` with verified TLS (WiFi and NTP required)
 pio run -d firmware -e mic_test -t upload && pio device monitor -d firmware -b 115200
 ```
 
-After startup, the test captures consecutive five-second clips of 16 kHz mono
-audio into PSRAM. A separate task uploads WAVs in order and prints transcripts
-at 115200 baud while recording continues. If the buffers fill because uploads
-are slower than capture, the firmware logs and drops the newly completed clip
-and keeps recording. Network operations use 20 s timeouts. This build does not
-initialize gateway controls.
+After reset, wait for `Listening.` before speaking. The firmware discards the
+first 500 ms of samples and measures ambient noise for another 500 ms. Keep the
+usual background noise present during this measurement.
+
+The detector compares 20 ms PCM frame energy against the background level.
+Three consecutive loud frames start a clip, including up to 300 ms of recent
+audio. A 700 ms pause or the 8 s maximum ends the clip. Speech-like background
+noise can trigger this energy detector, so tune it with recordings and the
+actual enclosure and listening distance.
+At the length limit, varying speech can continue in the next clip without a
+fresh onset. A steady level held to the limit is used as an updated noise floor.
+
+The upload task normalizes selected clips with a 7× gain ceiling and sends them
+while recording continues. Serial output pairs duration, pre-gain RMS, peak,
+clipped sample count and the transcript by clip ID. If the queue fills, the
+firmware logs and drops the newly completed clip. Network operations use 20 s
+timeouts. This build does not initialize gateway controls.
