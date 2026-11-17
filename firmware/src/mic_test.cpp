@@ -7,51 +7,68 @@
 #include <esp_heap_caps.h>
 #include <cJSON.h>
 #include <time.h>
+#include <cmath>
+#include <new>
 #include "cloud_config.h"
+#include "audio_processing.h"
+#include "speech_capture.h"
 
 #ifndef KAEW_ADMIN_TOKEN
 #define KAEW_ADMIN_TOKEN ""
 #endif
 
 namespace {
-constexpr uint32_t sampleRate = 16000;
-constexpr uint32_t clipSeconds = 5;
-constexpr size_t sampleCount = clipSeconds * sampleRate;
-constexpr size_t wavSize = 44 + sampleCount * sizeof(int16_t);
-constexpr uint32_t captureTimeoutMs = clipSeconds * 1000 + 2000;
+constexpr uint32_t sampleRate = SpeechCapture::sampleRate;
+constexpr size_t wavHeaderSize = 44;
 constexpr uint32_t timeoutMs = 20000;
-bool micReady = false;
+constexpr size_t bufferCount = 4;
+struct Clip {
+  uint32_t id;
+  size_t samples;
+  uint8_t header[wavHeaderSize];
+  int16_t pcm[SpeechCapture::maxSamples];
+};
+static_assert(offsetof(Clip, pcm) == offsetof(Clip, header) + wavHeaderSize,
+              "WAV header and little-endian PCM must be contiguous");
+
+QueueHandle_t freeClips = nullptr;
+QueueHandle_t readyClips = nullptr;
+Clip *captureBuffer = nullptr;
+SpeechCapture speechCapture;
+uint32_t nextClipId = 0;
+int16_t frame[SpeechCapture::frameSamples];
+size_t frameSize = 0;
 
 // INMP441 sends 24-bit left-aligned samples: >>16 gives true 16-bit scale
 // (the old >>14 was 4x too hot and clipped). A one-pole DC blocker removes the
 // mic's DC offset, which otherwise reads as constant "noise".
 float dcPrevIn = 0, dcPrevOut = 0;
-void resetDc() { dcPrevIn = dcPrevOut = 0; }
 int16_t toPcm(int32_t raw) {
-  float x = static_cast<float>(raw >> 16);
+  float x = static_cast<float>(pcm32to16(raw));
   float y = x - dcPrevIn + 0.995f * dcPrevOut;
   dcPrevIn = x; dcPrevOut = y;
   int32_t sample = static_cast<int32_t>(y);
   return static_cast<int16_t>(sample > 32767 ? 32767 : sample < -32768 ? -32768 : sample);
 }
 
-// Scale the finished clip so its peak sits near 70% full scale (max 8x gain),
-// so quiet speech is audible to STT without clipping loud speech.
-void normalize(uint8_t *pcm, size_t count) {
+void normalize(Clip &clip) {
   int32_t peak = 0;
-  for (size_t i = 0; i < count; ++i) {
-    int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
-    peak = max(peak, abs(static_cast<int32_t>(v)));
+  uint64_t squares = 0;
+  size_t clipped = 0;
+  for (size_t i = 0; i < clip.samples; ++i) {
+    const int32_t sample = clip.pcm[i];
+    peak = max(peak, abs(sample));
+    squares += sample * sample;
+    if (sample == INT16_MIN || sample == INT16_MAX) ++clipped;
   }
-  if (peak < 64) return;
-  float gain = min(8.0f, 23000.0f / peak);
-  for (size_t i = 0; i < count; ++i) {
-    int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
-    int32_t o = static_cast<int32_t>(v * gain);
-    o = o > 32767 ? 32767 : o < -32768 ? -32768 : o;
-    pcm[2 * i] = o & 0xff; pcm[2 * i + 1] = (o >> 8) & 0xff;
-  }
-  Serial.printf("peak %ld gain %.1fx\n", static_cast<long>(peak), gain);
+  const float rms = sqrtf(static_cast<float>(squares) / clip.samples);
+  const float gain = min(7.0f, 23000.0f / max(peak, int32_t{1}));
+  Serial.printf("[clip %lu] peak %ld rms %.1f clipped %u gain %.3fx\n",
+                static_cast<unsigned long>(clip.id), static_cast<long>(peak),
+                rms, static_cast<unsigned>(clipped), gain);
+  // The target peak keeps all normalized samples within the int16_t range.
+  for (size_t i = 0; i < clip.samples; ++i)
+    clip.pcm[i] = static_cast<int16_t>(clip.pcm[i] * gain);
 }
 
 // A server error must never echo local credentials onto the console.
@@ -93,24 +110,29 @@ void put16(uint8_t *p, uint16_t value) {
 void put32(uint8_t *p, uint32_t value) {
   put16(p, value); put16(p + 2, value >> 16);
 }
-void wavHeader(uint8_t *wav) {
-  memset(wav, 0, 44);
-  memcpy(wav, "RIFF", 4); put32(wav + 4, wavSize - 8);
+void wavHeader(uint8_t *wav, size_t pcmBytes) {
+  memset(wav, 0, wavHeaderSize);
+  memcpy(wav, "RIFF", 4); put32(wav + 4, wavHeaderSize + pcmBytes - 8);
   memcpy(wav + 8, "WAVEfmt ", 8); put32(wav + 16, 16);
   put16(wav + 20, 1); put16(wav + 22, 1);
   put32(wav + 24, sampleRate); put32(wav + 28, sampleRate * 2);
   put16(wav + 32, 2); put16(wav + 34, 16);
-  memcpy(wav + 36, "data", 4); put32(wav + 40, sampleCount * 2);
+  memcpy(wav + 36, "data", 4); put32(wav + 40, pcmBytes);
 }
 
-void sendWav(uint8_t *wav) {
+void sendWav(Clip &clip) {
+  const String label = String("[clip ") + clip.id + "] ";
+  const size_t pcmBytes = clip.samples * sizeof(int16_t);
+  wavHeader(clip.header, pcmBytes);
+  // Use the enclosing object representation so the payload spans both arrays.
+  auto *wav = reinterpret_cast<uint8_t *>(&clip) + offsetof(Clip, header);
   if (!KAEW_ADMIN_TOKEN[0]) {
-    Serial.println("KAEW_ADMIN_TOKEN is missing or empty; skipping STT.");
+    Serial.println(label + "KAEW_ADMIN_TOKEN is missing or empty; skipping STT.");
     return;
   }
   String base(KAEW_CLOUD_URL);
   if (!base.startsWith("https://") || !KAEW_CLOUD_CA[0] || !KAEW_WIFI_SSID[0]) {
-    Serial.println("STT requires HTTPS KAEW_CLOUD_URL, KAEW_CLOUD_CA and WiFi configuration.");
+    Serial.println(label + "STT requires HTTPS KAEW_CLOUD_URL, KAEW_CLOUD_CA and WiFi configuration.");
     return;
   }
   int path = base.indexOf('/', 8);
@@ -118,17 +140,17 @@ void sendWav(uint8_t *wav) {
   // Reject ambiguous authorities rather than forwarding the admin token elsewhere.
   if (base.length() <= 8 || base.indexOf('@') >= 0 || base.indexOf('?') >= 0 ||
       base.indexOf('#') >= 0) {
-    Serial.println("Invalid STT base URL.");
+    Serial.println(label + "Invalid STT base URL.");
     return;
   }
-  Serial.println("sending...");
+  Serial.println(label + "sending...");
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.mode(WIFI_STA);
     WiFi.begin(KAEW_WIFI_SSID, KAEW_WIFI_PASSWORD);
     const uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) delay(20);
     if (WiFi.status() != WL_CONNECTED) {
-      Serial.println("WiFi connection timed out.");
+      Serial.println(label + "WiFi connection timed out.");
       return;
     }
   }
@@ -137,7 +159,7 @@ void sendWav(uint8_t *wav) {
     const uint32_t start = millis();
     while (time(nullptr) < 1700000000 && millis() - start < timeoutMs) delay(20);
     if (time(nullptr) < 1700000000) {
-      Serial.println("TLS clock synchronization timed out.");
+      Serial.println(label + "TLS clock synchronization timed out.");
       return;
     }
   }
@@ -150,66 +172,109 @@ void sendWav(uint8_t *wav) {
   http.setTimeout(timeoutMs);
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
   if (!http.begin(client, base + "/api/stt")) {
-    Serial.println("Unable to initialize STT request.");
+    Serial.println(label + "Unable to initialize STT request.");
     return;
   }
   http.addHeader("Authorization", String("Bearer ") + KAEW_ADMIN_TOKEN);
   http.addHeader("Content-Type", "audio/wav");
-  int code = http.POST(wav, wavSize);
+  int code = http.POST(wav, wavHeaderSize + pcmBytes);
   String body = http.getString();
   http.end();
   cJSON *json = cJSON_Parse(body.c_str());
   const cJSON *text = json ? cJSON_GetObjectItemCaseSensitive(json, "text") : nullptr;
   if (code >= 200 && code < 300 && cJSON_IsString(text)) {
-    printSafe(String("text: ") + text->valuestring);
+    printSafe(label + "text: " + text->valuestring);
   } else {
-    printSafe(String("HTTP ") + code + " " + body);
+    printSafe(label + "HTTP " + code + " " + body);
   }
   cJSON_Delete(json);
 }
 
-void recordAndSend() {
-  uint8_t *wav = static_cast<uint8_t *>(heap_caps_malloc(wavSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-  if (!wav) {
-    Serial.println("PSRAM allocation failed.");
-    delay(1000);
+void uploadClips(void *) {
+  for (;;) {
+    Clip *clip = nullptr;
+    if (xQueueReceive(readyClips, &clip, portMAX_DELAY) == pdTRUE) {
+      normalize(*clip);
+      sendWav(*clip);
+      xQueueSend(freeClips, &clip, 0);
+    }
+  }
+}
+
+void queueClip(size_t samples) {
+  captureBuffer->id = ++nextClipId;
+  captureBuffer->samples = samples;
+  Clip *next = nullptr;
+  if (xQueueReceive(freeClips, &next, 0) != pdTRUE) {
+    Serial.printf("[clip %lu] upload backlog full, dropped\n",
+                  static_cast<unsigned long>(captureBuffer->id));
     return;
   }
-  wavHeader(wav);
-  Serial.printf("recording %lus...\n", static_cast<unsigned long>(clipSeconds));
-  // Discard samples queued while the previous clip was being uploaded.
-  int32_t raw[256];
-  size_t bytes = 0;
-  do {
-    bytes = 0;
-    i2s_read(I2S_NUM_0, raw, sizeof(raw), &bytes, 0);
-  } while (bytes);
-  size_t captured = 0;
-  resetDc();
-  const uint32_t start = millis();
-  while (captured < sampleCount && millis() - start < captureTimeoutMs) {
-    size_t wanted = min(size_t(256), sampleCount - captured);
-    bytes = 0;
-    if (i2s_read(I2S_NUM_0, raw, wanted * sizeof(int32_t), &bytes, pdMS_TO_TICKS(100)) != ESP_OK) break;
-    for (size_t i = 0; i < bytes / sizeof(int32_t); ++i)
-      put16(wav + 44 + 2 * captured++, static_cast<uint16_t>(toPcm(raw[i])));
+  Serial.printf("[clip %lu] captured %u ms\n",
+                static_cast<unsigned long>(captureBuffer->id),
+                static_cast<unsigned>(samples * 1000 / sampleRate));
+  xQueueSend(readyClips, &captureBuffer, 0);
+  captureBuffer = next;
+}
+
+bool startCapture() {
+  auto *storage = static_cast<uint8_t *>(
+      heap_caps_malloc(bufferCount * sizeof(Clip), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  freeClips = xQueueCreate(bufferCount, sizeof(Clip *));
+  readyClips = xQueueCreate(bufferCount - 1, sizeof(Clip *));
+  if (storage && freeClips && readyClips) {
+    for (size_t i = 0; i < bufferCount; ++i) {
+      Clip *clip = new (storage + i * sizeof(Clip)) Clip;
+      if (i == 0) captureBuffer = clip;
+      else xQueueSend(freeClips, &clip, 0);
+    }
+    if (beginMic()) {
+      if (xTaskCreatePinnedToCore(uploadClips, "stt_upload", 8192, nullptr, 1,
+                                  nullptr, 0) == pdPASS) {
+        return true;
+      }
+      i2s_driver_uninstall(I2S_NUM_0);
+    }
   }
-  if (captured == sampleCount) { normalize(wav + 44, captured); sendWav(wav); }
-  else {
-    Serial.println("Microphone capture incomplete; skipping STT.");
-    delay(1000);
-  }
-  heap_caps_free(wav);
+  if (readyClips) vQueueDelete(readyClips);
+  if (freeClips) vQueueDelete(freeClips);
+  if (storage) heap_caps_free(storage);
+  captureBuffer = nullptr;
+  return false;
 }
 } // namespace
 
 void setup() {
   Serial.begin(115200);
-  micReady = beginMic();
-  if (!micReady) Serial.println("Microphone initialization failed.");
+  if (!startCapture()) Serial.println("Microphone pipeline initialization failed.");
+  else Serial.println("Calibrating background noise. Wait for Listening.");
 }
 
 void loop() {
-  if (micReady) recordAndSend();
-  else delay(1000);
+  if (!captureBuffer) {
+    delay(1000);
+    return;
+  }
+  int32_t raw[256];
+  size_t bytes = 0;
+  if (i2s_read(I2S_NUM_0, raw, sizeof(raw), &bytes, pdMS_TO_TICKS(100)) != ESP_OK ||
+      bytes == 0 || bytes % sizeof(raw[0]) != 0) {
+    speechCapture.resetUtterance();
+    frameSize = 0;
+    dcPrevIn = dcPrevOut = 0;
+    Serial.println("Microphone read interrupted; discarded partial audio.");
+    delay(20);
+    return;
+  }
+
+  for (size_t i = 0; i < bytes / sizeof(raw[0]); ++i) {
+    frame[frameSize++] = toPcm(raw[i]);
+    if (frameSize != SpeechCapture::frameSamples) continue;
+    frameSize = 0;
+    const bool wasListening = speechCapture.listening();
+    const size_t completed = speechCapture.push(frame, captureBuffer->pcm);
+    if (!wasListening && speechCapture.listening())
+      Serial.printf("Listening. Background RMS %.1f\n", speechCapture.backgroundRms());
+    if (completed > 0) queueClip(completed);
+  }
 }
