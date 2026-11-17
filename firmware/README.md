@@ -70,3 +70,22 @@ The publisher uses separate lower-priority persistence and network tasks. Sixtee
 `audio_io.h` provides nonblocking candidate INMP441 receive and MAX98357A transmit drivers at 16 kHz; startup is disabled unless `KAEW_AUDIO_ENABLED=1` is compiled. `gateway_cloud_compile` compiles the enabled path. It does not yet capture a complete utterance, detect a wake word, send audio, receive TTS audio, or invoke `readMicrophone`/`play` in the application. INMP441 microphone SD=GPIO6, SCK=GPIO7, WS=GPIO8; MAX98357A amplifier DIN=GPIO9, BCLK=GPIO10, LRC=GPIO11; HX711 SCK=GPIO4, DT=GPIO5. These remain provisional and must be checked against the actual board and breakouts. I²S audio and publisher resource contention require physical measurement.
 
 At 16 kHz, mono 16-bit PCM uses 32,000 bytes/second before protocol overhead; a 15-second recording needs about 480 kB. The N16R8 board profile selects 8 MB octal PSRAM, but available PSRAM, DMA placement, audio channel alignment, clipping and timing cannot be validated until a real board is present. See [Espressif I²S documentation](https://docs.espressif.com/projects/esp-idf/en/v5.2.2/esp32s3/api-reference/peripherals/i2s.html). The VAD threshold in `audio_processing.h` is illustrative, not calibrated for the microphone or noise environment.
+
+## Mic + STT test
+
+Standalone INMP441 test for the ESP32-S3 N16R8: VDD → 3V3, GND → GND,
+SD → GPIO6, SCK/BCLK → GPIO7, WS → GPIO8, L/R → GND (left channel).
+No amplifier is needed. Configure `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`,
+`KAEW_CLOUD_URL` and `KAEW_CLOUD_CA` in the ignored `include/cloud_config.local.h`.
+For this test only, add optional `KAEW_ADMIN_TOKEN` with the STT admin credential;
+empty or missing skips sending. Keep this header private. The test strips the
+cloud URL path and posts to `/api/stt` with verified TLS (WiFi and NTP required).
+
+```bash
+pio run -d firmware -e mic_test -t upload && pio device monitor -d firmware -b 115200
+```
+
+Idle output is one RMS bar line every 200 ms at 115200 baud. Press and release
+BOOT (GPIO0) to capture three seconds of 16 kHz mono audio into PSRAM and print
+the cloud transcript. Level output pauses during capture and upload; network
+operations use 20 s timeouts. This build does not initialize gateway controls.
