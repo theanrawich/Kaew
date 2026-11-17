@@ -1,7 +1,0 @@
-**
-!cloud/
-!cloud/**
-cloud/.env
-cloud/.env.*
-cloud/*.sqlite3*
-cloud/__pycache__/

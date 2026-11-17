@@ -5,7 +5,7 @@ ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gat
 | Path | Purpose |
 | --- | --- |
 | [firmware/](firmware/README.md) | PlatformIO firmware, protocol, safety and C++ host tests |
-| [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, optional AI and voice tools |
+| [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, AI advice, Groq STT and voice tools |
 | [simulation/](simulation/index.html) | JavaScript simulation, browser viewer and protocol tests; also used by `cloud/simulate.mjs` |
 | [scripts/](scripts/) | Host test runner and measurement capture/analysis tools |
 | [docs/](docs/) | Wiring, hardware procedures, contracts and historical validation records |
@@ -22,7 +22,7 @@ export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
 python3 cloud/server.py
 ```
 
-Leave `DATABASE_URL` unset for SQLite. Open <http://127.0.0.1:8080/> and enter the admin token. The server reads process environment; it does not load `.env` automatically. See [environment examples](cloud/.env.example) and [cloud setup](cloud/README.md) for Postgres, Render, reminders and optional voice dependencies. SQLite migrations run automatically; Postgres migrations must be applied explicitly before startup.
+Leave `DATABASE_URL` unset for SQLite. Open <http://127.0.0.1:8080/> and enter the admin token. The server reads process environment; it does not load `.env` automatically. See [environment examples](cloud/.env.example) and [cloud setup](cloud/README.md) for Postgres, Render, reminders and Groq STT and the WAV voice CLI. SQLite migrations run automatically; Postgres migrations must be applied explicitly before startup.
 
 ## Firmware
 

@@ -120,33 +120,3 @@ class OllamaProvider:
         outer=json.loads(raw)
         if outer.get('done') is not True: raise ValueError('incomplete model response')
         return parse_output(outer['response'])
-
-
-class TransformersProvider:
-    """Optional local CPU inference. Outputs remain advisory and independently validated."""
-    def __init__(self, model_path, engine=None, constrained=False):
-        if engine is None:
-            import torch
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
-            model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True)
-            model.eval()
-            prefix_allowed_tokens_fn=None
-            if constrained:
-                from lmformatenforcer import JsonSchemaParser
-                from lmformatenforcer.integrations.transformers import build_transformers_prefix_allowed_tokens_fn
-                prefix_allowed_tokens_fn=build_transformers_prefix_allowed_tokens_fn(tokenizer,JsonSchemaParser(ADVICE_SCHEMA))
-            def engine(prompt):
-                messages=[{'role':'user','content':prompt}]
-                text=tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-                inputs=tokenizer(text, return_tensors='pt')
-                with torch.inference_mode():
-                    output=model.generate(**inputs, max_new_tokens=256, do_sample=False,
-                                          prefix_allowed_tokens_fn=prefix_allowed_tokens_fn)
-                return tokenizer.decode(output[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)
-        self.engine=engine
-        self.model=str(model_path)
-
-    def __call__(self, context):
-        validate_context(context)
-        return parse_output(self.engine(prompt(context)))
