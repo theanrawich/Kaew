@@ -6,7 +6,7 @@
 
 ตารางด้านล่างเป็น **ข้อเสนอ hardware** จากการทบทวนเดิม ไม่ใช่ค่าที่เปิดใช้ทั้งหมดใน firmware ปัจจุบัน:
 
-- Node: DS18B20 GPIO4; UART TX GPIO25 → S3 RX GPIO1, UART RX GPIO26 ← S3 TX GPIO2 พร้อม common logic ground ที่ตรวจสอบแล้ว
+- Node: DS18B20 GPIO4; UART TX GPIO17 → S3 RX GPIO1, UART RX GPIO18 ← S3 TX GPIO2 (node เป็น ESP32-S3 N16R8) พร้อม common logic ground ที่ตรวจสอบแล้ว
 - Gateway: HX711 DATA GPIO17 / CLOCK GPIO18; UART RX GPIO1 / TX GPIO2
 - Node TDS และ level: `-1` (ยังปิด); gateway pump และ E-stop: `-1` (ยังปิด) ไม่ถือว่า GPIO ที่จองในตารางถูก commission แล้ว
 - I²S ที่เสนอ: microphone GPIO4/5/6 และ amplifier GPIO10/11/12; ปิดโดย default และยังไม่เชื่อม voice pipeline

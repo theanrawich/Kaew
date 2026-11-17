@@ -29,8 +29,8 @@ Turn both boards off before wiring. Power each from its own suitable regulated 5
 | Node 3V3 | DS18B20 VDD and one end of 4.7 kΩ | Externally powered three-wire mode; confirm actual probe wires, do not infer colors. |
 | Node GND | DS18B20 GND and gateway GND | Verify board pins and common ground. |
 | Node GPIO4 | DS18B20 DQ and other end of 4.7 kΩ | GPIO4 on classic ESP32; verify breakout exposes it. |
-| Node GPIO25 TX | S3 GPIO1 RX | 115200 8N1, cross connection. |
-| Node GPIO26 RX | S3 GPIO2 TX | 115200 8N1, cross connection. |
+| Node GPIO17 TX | S3 GPIO1 RX | 115200 8N1, cross connection. |
+| Node GPIO18 RX | S3 GPIO2 TX | 115200 8N1, cross connection. |
 
 Before connecting each signal, measure supply and idle signal against its local ground; verify within the receiving board's recommended operating limits and check for shorts. GPIO mapping is confirmed against firmware and chip documentation, **not** the physical boards. GPIO34 ADC is disabled; level remains unknown. HX711, audio, TDS, level, motor and stop wiring are unnecessary for this subset. The gateway still initializes its HX711 input; no sensor is required to publish temperature, and periodic UART/cloud diagnostics run even without HX711 (`hx711_ready=0`). No pump or driver power may be connected.
 
