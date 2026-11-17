@@ -167,9 +167,15 @@ Missing credentials return 503; recognition failures return 422.
 
 At `/stt`, enter the admin token (whitespace and surrounding quotes are trimmed;
 it is stored in sessionStorage). This display-only page polls `/api/stt/recent`
-every two seconds and shows ESP32 transcripts newest first with Bangkok times.
-It never requests microphone access. The admin-only endpoint returns
-`{items:[{text,model,at}]}`, where `at` is Unix time. The server keeps only the
-last 50 successful transcriptions in memory; history clears on restart.
+every two seconds and shows ESP32 clips newest first with Bangkok times.
+Set `TYPHOON_API_KEY` privately on the same server (on Render, use the
+`kaew-cloud` service environment) to compare Groq with the hosted
+[`typhoon-asr-realtime` file transcription API](https://docs.opentyphoon.ai/en/asr/).
+Both providers receive the same WAV in parallel. Each elapsed time measures
+the server-side transcription call, including the provider network round trip.
+`/api/stt` still uses the Groq transcript for its response and command parsing.
+The admin-only history includes each provider's transcript or error, model,
+and elapsed milliseconds when attempted. The last 50 entries are kept in
+memory and clear on restart.
 The WAV CLI also accepts `--backend groq`; `--model` is optional for this backend
 and selects the Groq model id. Existing admin and TTS configuration still applies.

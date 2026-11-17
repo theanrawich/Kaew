@@ -5,12 +5,18 @@
 body{font-family:system-ui,sans-serif;margin:0;padding:20px;background:#fffbe6;color:#111;max-width:900px;margin-inline:auto}
 h1{font-size:24px}input{font:inherit;padding:10px;border:2px solid #111;max-width:100%;box-sizing:border-box}
 #status{margin:16px 0}#items{padding:0;list-style:none}li{background:white;border:2px solid #111;padding:16px;margin:12px 0;overflow-wrap:anywhere}
-time,.model{font-size:14px;color:#555}p{white-space:pre-wrap;margin-bottom:0}
+time,.model,.elapsed{font-size:14px;color:#555}p{white-space:pre-wrap;margin:8px 0 0}
+.comparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.result{border:1px solid #d8d5c6;padding:12px}
+.result h2{font-size:16px;margin:0 0 4px}
+.model,.elapsed{display:block}
+@media(max-width:600px){.comparison{grid-template-columns:1fr}}
 </style></head><body>
 <h1>Kaew – ESP32 mic transcripts</h1>
 <label for="token">Admin token</label>
 <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="Admin token">
 <div id="status" role="status" aria-live="polite">Enter the admin token to view transcripts.</div>
+<p>Times include the server’s round trip to each ASR API.</p>
 <ul id="items" aria-label="ESP32 transcripts, newest first"></ul>
 <script>
 const tokenInput=document.getElementById('token');
@@ -29,6 +35,18 @@ tokenInput.addEventListener('input',()=>{
   poll();
 });
 tokenInput.addEventListener('change',()=>{tokenInput.value=normalize(tokenInput.value);});
+function renderResult(label,result){
+  const panel=document.createElement('section');panel.className='result';
+  const heading=document.createElement('h2');heading.textContent=label;
+  const model=document.createElement('span');model.className='model';model.textContent=result.model;
+  const elapsed=document.createElement('span');elapsed.className='elapsed';
+  elapsed.textContent=Number.isFinite(result.elapsed_ms)?result.elapsed_ms.toLocaleString()+' ms':'—';
+  const transcript=document.createElement('p');
+  transcript.textContent=result.text??(result.error==='not_configured'?'API key not configured.':
+    result.error==='stt_failed'?'Transcription failed.':'No transcript.');
+  panel.append(heading,model,elapsed,transcript);
+  return panel;
+}
 async function poll(){
   const token=normalize(tokenInput.value);
   if(!token||busy)return;
@@ -50,9 +68,10 @@ async function poll(){
       const time=document.createElement('time');
       time.dateTime=new Date(item.at*1000).toISOString();
       time.textContent=clock.format(new Date(item.at*1000))+' (Bangkok)';
-      const model=document.createElement('span');model.className='model';model.textContent=' · '+item.model;
-      const text=document.createElement('p');text.textContent=item.text;
-      row.append(time,model,text);return row;
+      const comparison=document.createElement('div');comparison.className='comparison';
+      comparison.append(renderResult('Groq Whisper',item),
+        renderResult('Typhoon ASR Realtime',item.typhoon??{model:'typhoon-asr-realtime'}));
+      row.append(time,comparison);return row;
     });
     items.replaceChildren(...rows);
     statusLine.textContent=(rows.length?'Connected · '+rows.length+' recent transcripts':'Connected · Waiting for ESP32 transcripts')+' · Updated '+clock.format(new Date())+' (Bangkok)';
