@@ -17,28 +17,32 @@ TRACE = re.compile(r"^TRACE (tx|rx|ack|drop) (\d+) (\d+) (\d+) (\d+)$")
 DROPPED = re.compile(r"\btrace_dropped=(\d+)\b")
 
 
-def convert(records, window_us, test_id, commit, evidence):
+def convert(records, window_us, test_id, commit, evidence, *, recovery_us):
     events = []
-    diagnostics = set()
+    closing_diagnostics = set()
+    measured_until_us = window_us + recovery_us
     for record in records:
         source, line = record["source"], record["line"].strip()
         if source not in ("node", "gateway") or record["time_us"] < 0:
             raise ValueError("invalid recorder source/time")
         counter = DROPPED.search(line)
         if counter:
-            diagnostics.add(source)
             if int(counter[1]):
                 raise ValueError("trace loss reported; repeat capture with complete logs")
+            if record["time_us"] >= measured_until_us:
+                closing_diagnostics.add(source)
         match = TRACE.fullmatch(line)
         if match:
             event, board_ms, node, session, seq = match.groups()
             if (source == "gateway") != (event == "rx"):
                 raise ValueError("TRACE event came from the wrong serial port")
+            if record["time_us"] >= measured_until_us:
+                continue # Closing-tail traffic must not inflate recovery PDR.
             events.append(dict(test_id=test_id, trial="1", time_us=str(record["time_us"]), event=event,
                                phase="window" if record["time_us"] < window_us else "recovery",
                                node=node, session=session, seq=seq, firmware_commit=commit, evidence=evidence))
-    if diagnostics != {"node", "gateway"}:
-        raise ValueError("capture lacks trace_dropped diagnostics from both boards")
+    if closing_diagnostics != {"node", "gateway"}:
+        raise ValueError("capture lacks closing trace_dropped diagnostics from both boards after window + recovery")
     key = lambda event: (event["node"], event["session"], event["seq"])
     cohort = {key(event) for event in events if event["event"] == "tx" and event["phase"] == "window"}
     if not cohort:
@@ -48,7 +52,7 @@ def convert(records, window_us, test_id, commit, evidence):
     return [event for event in events if key(event) in cohort]
 
 
-def capture(node_port, gateway_port, duration_s):
+def capture(node_port, gateway_port, duration_s, closing_grace_s=3):
     try:
         import serial
     except ImportError as exc:
@@ -65,13 +69,17 @@ def capture(node_port, gateway_port, duration_s):
         start = time.perf_counter_ns()
         def reader(source, port):
             try:
-                while time.perf_counter_ns() - start < duration_s * 1e9:
+                while time.perf_counter_ns() - start < (duration_s + closing_grace_s) * 1e9:
                     line = port.read_until(b"\n", 2048)
                     if line:
                         if not line.endswith(b"\n"):
                             raise ValueError(f"{source}: incomplete serial line")
-                        records.append({"source": source, "time_us": (time.perf_counter_ns()-start)//1000,
-                                        "line": line.decode("utf-8", errors="strict").rstrip()})
+                        record = {"source": source, "time_us": (time.perf_counter_ns()-start)//1000,
+                                  "line": line.decode("utf-8", errors="strict").rstrip()}
+                        records.append(record)
+                        if record["time_us"] >= duration_s * 1e6 and DROPPED.search(record["line"]):
+                            return # Each port closes only after its own final counter.
+                errors.append(f"{source}: missing closing trace_dropped counter after measurement")
             except Exception as exc:
                 errors.append(str(exc))
         threads = [threading.Thread(target=reader, args=(source, port)) for source, port in zip(("node", "gateway"), ports)]
@@ -92,12 +100,15 @@ def main():
     parser.add_argument("--from-log", type=Path)
     parser.add_argument("--window-s", type=float, default=60)
     parser.add_argument("--recovery-s", type=float, default=10)
+    parser.add_argument("--closing-grace-s", type=float, default=3, help="extra seconds to obtain final counters; excluded from PDR")
     parser.add_argument("--test-id", required=True)
     parser.add_argument("--firmware-commit", required=True)
     parser.add_argument("--output", type=Path, required=True, help="new CSV path; matching .jsonl stores raw logs")
     args = parser.parse_args()
     if not 1 <= args.window_s <= 3600 or not 1 <= args.recovery_s <= 3600:
         parser.error("window/recovery durations must be 1..3600 seconds")
+    if not 1 <= args.closing_grace_s <= 60:
+        parser.error("closing grace must be 1..60 seconds")
     if not args.from_log and (not args.node or not args.gateway or args.node == args.gateway):
         parser.error("specify two distinct ports or --from-log")
     try:
@@ -110,11 +121,11 @@ def main():
             raw_path = args.output.with_suffix(".jsonl")
             if raw_path.exists():
                 raise ValueError("raw log exists; choose a new output name")
-            records, errors = capture(args.node, args.gateway, args.window_s + args.recovery_s)
+            records, errors = capture(args.node, args.gateway, args.window_s + args.recovery_s, args.closing_grace_s)
             raw_path.write_text("".join(json.dumps(item, ensure_ascii=False) + "\n" for item in records), encoding="utf-8")
             if errors:
                 raise ValueError("; ".join(errors))
-        events = convert(records, args.window_s*1e6, args.test_id, args.firmware_commit, str(raw_path))
+        events = convert(records, args.window_s*1e6, args.test_id, args.firmware_commit, str(raw_path), recovery_us=args.recovery_s*1e6)
         with args.output.open("x", newline="", encoding="utf-8") as output:
             writer = csv.DictWriter(output, fieldnames=sorted(FIELDS["packets"]))
             writer.writeheader(); writer.writerows(events)

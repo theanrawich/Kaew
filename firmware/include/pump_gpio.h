@@ -32,9 +32,11 @@ static_assert(GPIO_IS_VALID_OUTPUT_GPIO(KAEW_PUMP_PIN) && GPIO_IS_VALID_GPIO(KAE
 constexpr bool reservedGatewayPin(int pin) {
   return pin == 1 || pin == 2 || pin == 17 || pin == 18 || pin == 4 || pin == 5 || pin == 6 ||
     pin == 10 || pin == 11 || pin == 12 || pin == 0 || pin == 3 || pin == 45 || pin == 46 ||
-    pin == 19 || pin == 20 || (pin >= 26 && pin <= 37);
+    pin == 19 || pin == 20 || pin == 43 || pin == 44 || (pin >= 26 && pin <= 37);
 }
-static_assert(!reservedGatewayPin(KAEW_PUMP_PIN) && !reservedGatewayPin(KAEW_ESTOP_PIN), "GPIO conflicts with peripherals, boot, USB or memory");
+// Serial uses UART0 TX43/RX44 when USB CDC on boot is disabled. Reserve both
+// even in CDC builds so a console configuration change cannot drive the pump.
+static_assert(!reservedGatewayPin(KAEW_PUMP_PIN) && !reservedGatewayPin(KAEW_ESTOP_PIN), "GPIO conflicts with peripherals, UART0 console, boot, USB or memory");
 static_assert(KAEW_INDEPENDENT_CUTOFF_VERIFIED == 1, "Verify independent pump power interruption first");
 static_assert(KAEW_PUMP_PIN >= 0 && KAEW_ESTOP_PIN >= 0 && KAEW_PUMP_PIN != KAEW_ESTOP_PIN,
               "Explicit distinct verified pump/stop pins required");

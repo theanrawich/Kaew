@@ -386,3 +386,106 @@ gateway_cloud_compile  SUCCESS   00:00:06.247
 sensor_node_trace      SUCCESS   00:00:02.569
 gateway_trace          SUCCESS   00:00:05.417
 ========================= 5 succeeded in 00:00:22.194 =========================
+PR #8 review-fix revalidation (baseline implementation e2b60d3; synthetic/fake hardware only)
+Host programs, configuration matrix and pump GPIO compile cases
+g++.EXE (Rev2, Built by MSYS2 project) 14.2.0
+Copyright (C) 2024 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+PASS pump-gpio/default-disabled
+PASS pump-gpio/non-console-positive-control
+PASS pump-gpio/reject-pump-43 (expected compile failure)
+PASS pump-gpio/reject-estop-43 (expected compile failure)
+PASS pump-gpio/reject-pump-44 (expected compile failure)
+PASS pump-gpio/reject-estop-44 (expected compile failure)
+PASS host/safety
+PASS host/scale
+PASS host/protocol
+PASS host/integration
+PASS host/dispense
+PASS host/durable_queue
+PASS host/audio
+PASS valid_refill
+PASS no_cup
+PASS cup_removed_first_sample
+PASS partial_lift
+PASS estop
+PASS tank_low_unknown
+PASS invalid_hx711
+PASS stale_scale
+PASS no_progress
+PASS excessive_rise
+PASS timeout
+PASS duplicates_overlap
+PASS invalid_target
+PASS reboot_off
+PASS explicit_recovery
+PASS remote_network_failure
+PASS target_reached
+PASS tank_stops_updating
+PASS repeated_operations
+PASS envelope_age_and_rejected_replay
+PASS disabled_actuator_and_limits
+PASS parser_framing
+PASS stale_idle_and_clock_wrap
+PASS storage_backpressure_cannot_hide_dry
+PASS calibration_stability
+PASS host/gateway_dispensing
+PASS cloud-config/empty
+PASS cloud-config/url_only
+PASS cloud-config/token_only
+PASS cloud-config/configured
+PASS cloud-config/forced_off
+PASS cloud-config/forced_on
+PASS: 8 host programs (25 gateway scenarios), 6 pump GPIO compile cases, 6 cloud configuration cases
+Measurement/capture regressions
+test_accuracy_signed_error_mae_rmse_and_repeatability (test_analyze_measurements.MeasurementsTest.test_accuracy_signed_error_mae_rmse_and_repeatability) ... ok
+test_clock_mismatch_and_backwards_time_rejected (test_analyze_measurements.MeasurementsTest.test_clock_mismatch_and_backwards_time_rejected) ... ok
+test_duplicate_trials_rejected_including_leading_zero (test_analyze_measurements.MeasurementsTest.test_duplicate_trials_rejected_including_leading_zero) ... ok
+test_header_only_template_and_missing_evidence_rejected (test_analyze_measurements.MeasurementsTest.test_header_only_template_and_missing_evidence_rejected) ... ok
+test_impossible_volume_and_zero_density_rejected (test_analyze_measurements.MeasurementsTest.test_impossible_volume_and_zero_density_rejected) ... ok
+test_incomplete_capture_bad_phase_and_bad_ids_rejected (test_analyze_measurements.MeasurementsTest.test_incomplete_capture_bad_phase_and_bad_ids_rejected) ... ok
+test_latency_mean_range_sample_variation_and_units (test_analyze_measurements.MeasurementsTest.test_latency_mean_range_sample_variation_and_units) ... ok
+test_malformed_schema_rejected (test_analyze_measurements.MeasurementsTest.test_malformed_schema_rejected) ... ok
+test_packet_reboot_sequence_wrap_and_missing_packets (test_analyze_measurements.MeasurementsTest.test_packet_reboot_sequence_wrap_and_missing_packets) ... ok
+test_packet_repeated_trials_have_variation_and_pooled_rate (test_analyze_measurements.MeasurementsTest.test_packet_repeated_trials_have_variation_and_pooled_rate) ... ok
+test_packet_retries_duplicates_window_and_recovery (test_analyze_measurements.MeasurementsTest.test_packet_retries_duplicates_window_and_recovery) ... ok
+test_saturated_raw_and_nonfinite_values_rejected (test_analyze_measurements.MeasurementsTest.test_saturated_raw_and_nonfinite_values_rejected) ... ok
+test_versions_are_never_averaged_together (test_analyze_measurements.MeasurementsTest.test_versions_are_never_averaged_together) ... ok
+test_volume_overshoot_density_and_post_stop (test_analyze_measurements.MeasurementsTest.test_volume_overshoot_density_and_post_stop) ... ok
+test_closing_tail_does_not_extend_measured_recovery (test_capture_packet_delivery.CaptureTest.test_closing_tail_does_not_extend_measured_recovery) ... ok
+test_cohort_preserves_retries_and_late_arrivals_excludes_new_samples (test_capture_packet_delivery.CaptureTest.test_cohort_preserves_retries_and_late_arrivals_excludes_new_samples) ... ok
+test_counter_at_measurement_end_is_a_valid_closing_counter (test_capture_packet_delivery.CaptureTest.test_counter_at_measurement_end_is_a_valid_closing_counter) ... ok
+test_counters_after_window_must_also_cover_recovery (test_capture_packet_delivery.CaptureTest.test_counters_after_window_must_also_cover_recovery) ... ok
+test_late_trace_loss_on_either_board_invalidates_the_run (test_capture_packet_delivery.CaptureTest.test_late_trace_loss_on_either_board_invalidates_the_run) ... ok
+test_no_transmissions_rejected (test_capture_packet_delivery.CaptureTest.test_no_transmissions_rejected) ... ok
+test_opening_zero_counters_do_not_prove_completeness (test_capture_packet_delivery.CaptureTest.test_opening_zero_counters_do_not_prove_completeness) ... ok
+test_saved_log_with_final_counters_creates_bounded_results (test_capture_packet_delivery.CaptureTest.test_saved_log_with_final_counters_creates_bounded_results) ... ok
+test_saved_log_without_final_counter_cannot_create_result_csv (test_capture_packet_delivery.CaptureTest.test_saved_log_without_final_counter_cannot_create_result_csv) ... ok
+test_trace_loss_missing_diagnostics_and_wrong_port_rejected (test_capture_packet_delivery.CaptureTest.test_trace_loss_missing_diagnostics_and_wrong_port_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 24 tests in 0.035s
+
+OK
+Gateway build result excerpt (full local log: .kaew-validation/review-builds.log)
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [=         ]   6.0% (used 19732 bytes from 327680 bytes)
+Flash: [          ]   4.6% (used 303741 bytes from 6553600 bytes)
+Building .pio\build\gateway_trace\firmware.bin with action:
+  "$PYTHONEXE" "$OBJCOPY" --chip esp32s3 elf2image --flash_mode ${__get_board_flash_mode(__env__)} --flash_freq ${__get_board_f_image(__env__)} --flash_size 16MB --elf-sha256-offset 0xb0 -o $TARGET $SOURCES
+Building .pio\build\gateway_trace\firmware.bin
+esptool.py v4.5.1
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+========================= [SUCCESS] Took 4.92 seconds =========================
+
+Environment            Status    Duration
+---------------------  --------  ------------
+gateway                SUCCESS   00:00:05.476
+gateway_cloud_compile  SUCCESS   00:00:05.940
+gateway_trace          SUCCESS   00:00:04.923
+========================= 3 succeeded in 00:00:16.339 =========================
+Regression reproduction: baseline GPIO43 compiled and opening-only counters were accepted; both are rejected by the new checks.

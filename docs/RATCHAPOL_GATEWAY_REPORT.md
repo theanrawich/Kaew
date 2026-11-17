@@ -111,7 +111,9 @@ Safety receiver แยกจาก delivery receiver: dry/unknown packet ที�
 | 17 หยุดอัปเดต | `stale_scale`, `tank_stops_updating` | PASS |
 | 18 start/stop ซ้ำ | `repeated_operations` 20 รอบ | PASS |
 
-รวม C++ **8 programs**, ใน suite ใหม่ **25 scenarios**; configuration matrix **6 cases**; simulator **25 tests**; cloud Python **79 tests: 74 ผ่าน, 5 ข้ามเพราะไม่ได้ตั้ง optional Postgres test DB**; measurement/capture Python **17 tests** ผ่าน Build `sensor_node`, `gateway`, `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` ผ่านในเครื่อง หลักฐานและ command อยู่ใน [validation](validation/software-2026-11-17.md) GitHub Actions ยังไม่ได้รันจาก branch นี้ ไม่ได้ push
+รวม C++ **8 programs**, ใน suite ใหม่ **25 scenarios**; configuration matrix **6 cases**; เพิ่ม GPIO compile checks **6 cases** (positive controls 2 และ expected compile failures 4); measurement/capture Python **24 tests** ผ่านหลังแก้ review ส่วน simulator **25 tests** และ cloud Python **79 tests: 74 ผ่าน, 5 ข้ามเพราะไม่ได้ตั้ง optional Postgres test DB** เป็นผลจาก implementation เดิมที่ source ไม่เปลี่ยน Build ทั้ง 5 environments ผ่านในรอบแรก และ build gateway 3 environments ผ่านอีกครั้งหลังแก้ pin guard หลักฐานและ command อยู่ใน [validation](validation/software-2026-11-17.md) งานเดิม push เป็น commit `e2b60d3` แล้วใน [PR #8](https://github.com/theanrawich/Kaew/pull/8) และ [CI ของ commit นั้นผ่าน](https://github.com/theanrawich/Kaew/actions/runs/44014634559) ผล CI ของ review-fix ให้ดูที่ PR
+
+หลัง review กัน GPIO43/44 ไว้เสมอ เพราะ console `Serial` อาจใช้ UART0 TX43/RX44 ทดสอบ compile-fail โดย include header จริงและเปิด commissioning เฉพาะใน host fixture ที่มี inert GPIO stubs ไม่ได้สร้าง/flash firmware เปิดปั๊มจริง ส่วน PDR ต้องมี `trace_dropped=0` ปิดท้ายจากทั้งสองบอร์ดหลังจบ window + recovery จึงยอมสร้างผล ช่วงรอ counter ไม่ถูกนับเป็นเวลาวัดเพิ่ม
 
 ## 7. การวัดและงานที่ต้องใช้เครื่องจริง
 
@@ -147,9 +149,9 @@ Suphachok/ทีม hardware ส่งวงจรและค่าตรวจ
 | `firmware/include/packet_trace.h`, `firmware/src/node.cpp` | optional packet instrumentation/diagnostic สำหรับงานวัดผล |
 | `firmware/platformio.ini` | เพิ่ม trace environments โดย default targets ยังเป็น node/gateway |
 | `firmware/test/gateway_dispensing_test.cpp` | 25 deterministic scenarios ด้วย fake hardware |
-| `scripts/run_host_tests.py` | รัน suites เดิม+ใหม่และ cloud config matrix ข้ามระบบปฏิบัติการ |
+| `scripts/run_host_tests.py`, `firmware/test/pump_gpio_compile_test.cpp` | รัน suites, cloud config matrix และ pin compile-fail checks โดยไม่เรียก hardware |
 | `scripts/analyze_measurements.py`, `capture_packet_delivery.py` | วิเคราะห์ CSV และเตรียมจับ serial packet logs |
-| `scripts/test_analyze_measurements.py`, `test_capture_packet_delivery.py` | 17 tests ของสูตร/validation/recorder ด้วย synthetic fixtures |
+| `scripts/test_analyze_measurements.py`, `test_capture_packet_delivery.py` | 24 tests ของสูตร/validation/recorder ด้วย synthetic fixtures |
 | `.github/workflows/firmware.yml` | เพิ่ม suites และ compile trace environments ใน CI |
 | `docs/GATEWAY_REFILL_CONTRACT.md` | สัญญาคำสั่งและสิ่งที่ต้องส่งมอบจากทีม |
 | `docs/PERFORMANCE_TEST_PLAN.md` | ขั้นตอนวัด 3 metrics และ optional volume/stop |
