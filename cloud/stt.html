@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kaew – Live STT test</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;padding:20px;background:#fffbe6;color:#111}
+h1{font-size:22px;margin:0 0 12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+button,select{font:inherit;padding:10px 16px;border:3px solid #111;background:#fff;box-shadow:4px 4px 0 #111;cursor:pointer}
+button.on{background:#ff5c5c;color:#fff}
+#box{border:3px solid #111;background:#fff;min-height:200px;padding:14px;font-size:22px;line-height:1.5;box-shadow:6px 6px 0 #111}
+#interim{color:#888}
+#status{margin:10px 0;font-size:14px}
+</style></head><body>
+<h1>🎤 Kaew – Live speech-to-text test</h1>
+<div class="row">
+<select id="lang"><option value="th-TH">ไทย (th-TH)</option><option value="en-US">English (en-US)</option></select>
+<button id="mic">Start</button><button id="clear">Clear</button>
+</div>
+<div id="status">Uses the browser's built-in speech recognition (Chrome, Edge or Safari). Nothing is stored.</div>
+<div id="box"><span id="final"></span><span id="interim"></span></div>
+<script>
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+const $=id=>document.getElementById(id), status=$('status');
+let rec=null, on=false;
+if(!SR){status.textContent='This browser has no speech recognition. Try Chrome on desktop/Android or Safari on iPhone.';$('mic').disabled=true;}
+function start(){
+  rec=new SR(); rec.lang=$('lang').value; rec.continuous=true; rec.interimResults=true;
+  rec.onresult=e=>{let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;
+    if(e.results[i].isFinal){$('final').textContent+=t+' ';}else interim+=t;} $('interim').textContent=interim;};
+  rec.onerror=e=>{status.textContent='Error: '+e.error;};
+  rec.onend=()=>{if(on)rec.start();};
+  rec.start(); on=true; $('mic').textContent='Stop'; $('mic').classList.add('on'); status.textContent='Listening ('+rec.lang+')…';
+}
+function stop(){on=false; if(rec)rec.stop(); $('mic').textContent='Start'; $('mic').classList.remove('on'); status.textContent='Stopped.';}
+$('mic').onclick=()=>on?stop():start();
+$('clear').onclick=()=>{$('final').textContent='';$('interim').textContent='';};
+$('lang').onchange=()=>{if(on){stop();start();}};
+</script></body></html>
