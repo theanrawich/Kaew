@@ -85,8 +85,9 @@ cloud URL path and posts to `/api/stt` with verified TLS (WiFi and NTP required)
 pio run -d firmware -e mic_test -t upload && pio device monitor -d firmware -b 115200
 ```
 
-After startup, the test automatically records five seconds of 16 kHz mono audio
-into PSRAM, uploads the WAV and prints the transcript at 115200 baud. The next
-recording starts after the upload attempt finishes. Audio during the upload is
-skipped, so each cycle takes five seconds plus upload and transcription time.
-Network operations use 20 s timeouts. This build does not initialize gateway controls.
+After startup, the test captures consecutive five-second clips of 16 kHz mono
+audio into PSRAM. A separate task uploads WAVs in order and prints transcripts
+at 115200 baud while recording continues. If the buffers fill because uploads
+are slower than capture, the firmware logs and drops the newly completed clip
+and keeps recording. Network operations use 20 s timeouts. This build does not
+initialize gateway controls.

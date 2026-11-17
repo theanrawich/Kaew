@@ -20,13 +20,15 @@ constexpr size_t sampleCount = clipSeconds * sampleRate;
 constexpr size_t wavSize = 44 + sampleCount * sizeof(int16_t);
 constexpr uint32_t captureTimeoutMs = clipSeconds * 1000 + 2000;
 constexpr uint32_t timeoutMs = 20000;
-bool micReady = false;
+constexpr size_t bufferCount = 4;
+QueueHandle_t freeClips = nullptr;
+QueueHandle_t readyClips = nullptr;
+uint8_t *captureBuffer = nullptr;
 
 // INMP441 sends 24-bit left-aligned samples: >>16 gives true 16-bit scale
 // (the old >>14 was 4x too hot and clipped). A one-pole DC blocker removes the
 // mic's DC offset, which otherwise reads as constant "noise".
 float dcPrevIn = 0, dcPrevOut = 0;
-void resetDc() { dcPrevIn = dcPrevOut = 0; }
 int16_t toPcm(int32_t raw) {
   float x = static_cast<float>(raw >> 16);
   float y = x - dcPrevIn + 0.995f * dcPrevOut;
@@ -168,48 +170,81 @@ void sendWav(uint8_t *wav) {
   cJSON_Delete(json);
 }
 
-void recordAndSend() {
-  uint8_t *wav = static_cast<uint8_t *>(heap_caps_malloc(wavSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
-  if (!wav) {
-    Serial.println("PSRAM allocation failed.");
-    delay(1000);
-    return;
+void uploadClips(void *) {
+  for (;;) {
+    uint8_t *wav = nullptr;
+    if (xQueueReceive(readyClips, &wav, portMAX_DELAY) == pdTRUE) {
+      normalize(wav + 44, sampleCount);
+      sendWav(wav);
+      xQueueSend(freeClips, &wav, 0);
+    }
   }
-  wavHeader(wav);
+}
+
+bool captureClip(uint8_t *wav) {
   Serial.printf("recording %lus...\n", static_cast<unsigned long>(clipSeconds));
-  // Discard samples queued while the previous clip was being uploaded.
   int32_t raw[256];
-  size_t bytes = 0;
-  do {
-    bytes = 0;
-    i2s_read(I2S_NUM_0, raw, sizeof(raw), &bytes, 0);
-  } while (bytes);
   size_t captured = 0;
-  resetDc();
   const uint32_t start = millis();
   while (captured < sampleCount && millis() - start < captureTimeoutMs) {
     size_t wanted = min(size_t(256), sampleCount - captured);
-    bytes = 0;
+    size_t bytes = 0;
     if (i2s_read(I2S_NUM_0, raw, wanted * sizeof(int32_t), &bytes, pdMS_TO_TICKS(100)) != ESP_OK) break;
     for (size_t i = 0; i < bytes / sizeof(int32_t); ++i)
       put16(wav + 44 + 2 * captured++, static_cast<uint16_t>(toPcm(raw[i])));
   }
-  if (captured == sampleCount) { normalize(wav + 44, captured); sendWav(wav); }
-  else {
-    Serial.println("Microphone capture incomplete; skipping STT.");
-    delay(1000);
+  return captured == sampleCount;
+}
+
+bool startCapture() {
+  auto *storage = static_cast<uint8_t *>(
+      heap_caps_malloc(bufferCount * wavSize, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+  freeClips = xQueueCreate(bufferCount, sizeof(uint8_t *));
+  readyClips = xQueueCreate(bufferCount - 1, sizeof(uint8_t *));
+  if (storage && freeClips && readyClips) {
+    for (size_t i = 0; i < bufferCount; ++i) {
+      uint8_t *wav = storage + i * wavSize;
+      wavHeader(wav);
+      if (i != 0) xQueueSend(freeClips, &wav, 0);
+    }
+    if (beginMic()) {
+      if (xTaskCreatePinnedToCore(uploadClips, "stt_upload", 8192, nullptr, 1,
+                                  nullptr, 0) == pdPASS) {
+        captureBuffer = storage;
+        return true;
+      }
+      i2s_driver_uninstall(I2S_NUM_0);
+    }
   }
-  heap_caps_free(wav);
+  if (readyClips) vQueueDelete(readyClips);
+  if (freeClips) vQueueDelete(freeClips);
+  if (storage) heap_caps_free(storage);
+  return false;
 }
 } // namespace
 
 void setup() {
   Serial.begin(115200);
-  micReady = beginMic();
-  if (!micReady) Serial.println("Microphone initialization failed.");
+  if (!startCapture()) Serial.println("Microphone pipeline initialization failed.");
 }
 
 void loop() {
-  if (micReady) recordAndSend();
-  else delay(1000);
+  if (!captureBuffer) {
+    delay(1000);
+    return;
+  }
+  if (!captureClip(captureBuffer)) {
+    Serial.println("Microphone capture incomplete; skipping STT.");
+    delay(1);
+    return;
+  }
+
+  // Keep a buffer for the next clip even when the uploader falls behind.
+  uint8_t *next = nullptr;
+  if (xQueueReceive(freeClips, &next, 0) != pdTRUE) {
+    Serial.println("STT upload backlog full; dropping completed clip.");
+    return;
+  }
+  xQueueSend(readyClips, &captureBuffer, 0);
+  captureBuffer = next;
 }
