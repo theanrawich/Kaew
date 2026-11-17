@@ -37,23 +37,26 @@ int16_t toPcm(int32_t raw) {
   return static_cast<int16_t>(sample > 32767 ? 32767 : sample < -32768 ? -32768 : sample);
 }
 
-// Scale the finished clip so its peak sits near 70% full scale (max 8x gain),
-// so quiet speech is audible to STT without clipping loud speech.
-void normalize(uint8_t *pcm, size_t count) {
+// Normalize clips for STT only when they need at most 7x gain.
+bool normalize(uint8_t *pcm, size_t count) {
   int32_t peak = 0;
   for (size_t i = 0; i < count; ++i) {
     int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
     peak = max(peak, abs(static_cast<int32_t>(v)));
   }
-  if (peak < 64) return;
-  float gain = min(8.0f, 23000.0f / peak);
+  const float gain = min(8.0f, 23000.0f / max(peak, int32_t{1}));
+  Serial.printf("peak %ld gain %.3fx\n", static_cast<long>(peak), gain);
+  if (gain > 7.0f) {
+    Serial.println("STT skipped: gain > 7x");
+    return false;
+  }
   for (size_t i = 0; i < count; ++i) {
     int16_t v = static_cast<int16_t>(pcm[2 * i] | (pcm[2 * i + 1] << 8));
     int32_t o = static_cast<int32_t>(v * gain);
     o = o > 32767 ? 32767 : o < -32768 ? -32768 : o;
     pcm[2 * i] = o & 0xff; pcm[2 * i + 1] = (o >> 8) & 0xff;
   }
-  Serial.printf("peak %ld gain %.1fx\n", static_cast<long>(peak), gain);
+  return true;
 }
 
 // A server error must never echo local credentials onto the console.
@@ -174,8 +177,7 @@ void uploadClips(void *) {
   for (;;) {
     uint8_t *wav = nullptr;
     if (xQueueReceive(readyClips, &wav, portMAX_DELAY) == pdTRUE) {
-      normalize(wav + 44, sampleCount);
-      sendWav(wav);
+      if (normalize(wav + 44, sampleCount)) sendWav(wav);
       xQueueSend(freeClips, &wav, 0);
     }
   }
