@@ -27,6 +27,8 @@ jobs:
         run: python -m pip install platformio==6.2.0
       - name: Build both firmware targets
         run: pio run -d firmware
+      - name: Build standalone microphone test
+        run: pio run -d firmware -e mic_test
       - name: Compile gateway publisher enabled
         run: pio run -d firmware -e gateway_cloud_compile
       - name: Compile measurement trace builds (pump disabled)
