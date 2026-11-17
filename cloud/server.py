@@ -1,6 +1,7 @@
 """Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
 from audio_service import AudioError, GroqWhisperASR
 import hmac
+from collections import deque
 from contextlib import closing
 import json
 import math
@@ -267,6 +268,8 @@ class Handler(BaseHTTPRequestHandler):
         result={'text':text,'model':model}
         if parse_qs(urlsplit(self.path).query).get('command')==['1']:
             result['command']=self.voice_result({'text':text})
+        with self.server.stt_lock:
+            self.server.stt_recent.append({'text':text,'model':model,'at':time.time()})
         return self.reply(200,result)
 
     def voice(self,data):
@@ -316,10 +319,10 @@ class Handler(BaseHTTPRequestHandler):
             body = (ROOT / ('stt.html' if path == '/stt' else 'dashboard.html')).read_bytes()
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Cache-Control', 'no-store'); self.send_header('Content-Length', str(len(body)))
-            self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
+            self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
-        if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
+        if path not in ('/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
         if path == '/api/advice' and self.authorized(self.server.device_token):
             raw_query = urlsplit(self.path).query
             if not raw_query: return self.reply(401, {'error': 'unauthorized'})
@@ -335,6 +338,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(409, {'error': 'advice_unavailable'})
             return self.reply(200, result)
         if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
+        if path == '/api/stt/recent':
+            with self.server.stt_lock:
+                items = list(reversed(self.server.stt_recent))
+            return self.reply(200, {'items':items})
         with closing(connect(self.server.db_path)) as db, db:
             if path == '/api/advice':
                 row=db.execute('SELECT output_json,model,fallback,created_at FROM advice_log ORDER BY id DESC LIMIT 1').fetchone()
@@ -451,6 +458,8 @@ def create_server(host, port, db_path, device_token, admin_token, provider=None,
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
     server.provider = provider or MockProvider()
     server.hydration_provider = select_provider() if hydration_provider is _ENV_PROVIDER else hydration_provider
+    server.stt_lock = threading.Lock()
+    server.stt_recent = deque(maxlen=50)
     server.advice_lock = threading.Lock()
     server.provider_name = 'telegram' if isinstance(server.provider, TelegramProvider) else 'mock'
     server.stop_reminders = threading.Event()

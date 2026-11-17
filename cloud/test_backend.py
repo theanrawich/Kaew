@@ -61,6 +61,39 @@ class BackendTest(unittest.TestCase):
             self.assertEqual(result['command'],self.request('POST','/api/voice','admin-secret',{'text':result['text']})[1])
             self.assertEqual(self.stt_request(body=wav_fixture(True)),(422,{'error':'stt_failed'}))
 
+    def test_stt_recent_admin_only(self):
+        self.assertEqual(self.request('GET','/api/stt/recent','admin-secret'),(200,{'items':[]}))
+        for token in (None,'device-secret'):
+            self.assertEqual(self.request('GET','/api/stt/recent',token)[0],401)
+
+    def test_stt_recent_success_only_newest_first_and_cap(self):
+        asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'ESP32 transcript'}).encode())
+        before=time.time()
+        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo'}), patch('server.GroqWhisperASR',return_value=asr):
+            for index in range(52):
+                with patch.object(asr,'transcribe',return_value='transcript %d'%index):
+                    self.assertEqual(self.stt_request()[0],200)
+            self.assertEqual(self.stt_request(body=wav_fixture(True))[0],422)
+        status,result=self.request('GET','/api/stt/recent','admin-secret')
+        self.assertEqual(status,200)
+        self.assertEqual(len(result['items']),50)
+        self.assertEqual([item['text'] for item in result['items']],['transcript %d'%i for i in range(51,1,-1)])
+        for item in result['items']:
+            self.assertEqual(set(item),{'text','model','at'})
+            self.assertEqual(item['model'],'whisper-large-v3-turbo')
+            self.assertLessEqual(before,item['at'])
+            self.assertLessEqual(item['at'],time.time())
+
+    def test_stt_page_is_display_only(self):
+        with urllib.request.urlopen(self.url+'/stt',timeout=3) as response:
+            page=response.read().decode()
+            self.assertIn("connect-src 'self'",response.headers['Content-Security-Policy'])
+        for forbidden in ('getUserMedia','SpeechRecognition','MediaRecorder','AudioContext'):
+            self.assertNotIn(forbidden,page)
+        self.assertIn('Kaew – ESP32 mic transcripts',page)
+        self.assertIn('/api/stt/recent',page)
+        self.assertIn('Asia/Bangkok',page)
+
     def test_unknown_adc_is_persisted_without_becoming_a_measurement(self):
         sample=dict(self.sample,tds_adc=65535)
         self.assertEqual(self.request('POST','/api/telemetry','device-secret',sample)[0],201)
