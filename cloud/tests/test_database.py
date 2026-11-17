@@ -7,7 +7,7 @@ import types
 import unittest
 from contextlib import closing
 from unittest.mock import Mock, MagicMock, patch
-from database import Target, connect, postgres_sql, PostgresConnection, verify_postgres
+from kaew.database import Target, connect, postgres_sql, PostgresConnection, verify_postgres
 
 
 class DatabaseTest(unittest.TestCase):
@@ -73,6 +73,6 @@ class DatabaseTest(unittest.TestCase):
 
     def test_missing_schema_points_to_deliverable(self):
         raw = Mock(); raw.execute.side_effect = RuntimeError('missing table')
-        with patch('database.connect', return_value=PostgresConnection(raw, RuntimeError)):
+        with patch('kaew.database.connect', return_value=PostgresConnection(raw, RuntimeError)):
             with self.assertRaisesRegex(RuntimeError, 'cloud/migrations/postgres/001_initial.sql'):
                 verify_postgres(Target('unused', 'postgresql://example.invalid/test'))

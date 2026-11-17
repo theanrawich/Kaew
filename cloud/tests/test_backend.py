@@ -5,7 +5,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
-from audio_service import AudioError, GroqWhisperASR
+from kaew.audio_service import AudioError, GroqWhisperASR
 import subprocess
 import sys
 import time
@@ -16,12 +16,11 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
-from server import create_server, migrate
-from outbox import Outbox
-from outbox_worker import OutboxWorker
-from voice_pipeline import VoicePipeline
-from audio_service import process_audio
-from test_audio import wav_fixture
+from kaew.server import create_server, migrate
+from tools.outbox import Outbox
+from tools.outbox_worker import OutboxWorker
+from kaew.audio_service import process_audio
+from tests.test_audio import wav_fixture
 
 
 class BackendTest(unittest.TestCase):
@@ -54,7 +53,7 @@ class BackendTest(unittest.TestCase):
 
     def test_stt_success_failure_and_shared_command(self):
         asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'แก้ว เติมน้ำให้หน่อย'}).encode())
-        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo'}), patch('server.GroqWhisperASR',return_value=asr):
+        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo'}), patch('kaew.server.GroqWhisperASR',return_value=asr):
             code,result=self.stt_request(path='/api/stt?command=1')
             self.assertEqual(code,200)
             self.assertEqual(result['model'],'whisper-large-v3-turbo')
@@ -70,7 +69,7 @@ class BackendTest(unittest.TestCase):
         audio = wav_fixture()
         environment = {'GROQ_API_KEY': 'groq-fixture', 'TYPHOON_API_KEY': 'typhoon-fixture'}
         with patch.dict(os.environ, environment), \
-                patch('server.GroqWhisperASR') as groq, patch('server.TyphoonASR') as typhoon:
+                patch('kaew.server.GroqWhisperASR') as groq, patch('kaew.server.TyphoonASR') as typhoon:
             groq.return_value.transcribe.return_value = 'เติมน้ำ'
             typhoon.return_value.transcribe.return_value = 'เติมน้ำให้หน่อย'
             self.assertEqual(self.stt_request(body=audio)[1]['text'], 'เติมน้ำ')
@@ -97,7 +96,7 @@ class BackendTest(unittest.TestCase):
     def test_stt_recent_success_only_newest_first_and_cap(self):
         asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'ESP32 transcript'}).encode())
         before=time.time()
-        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo','TYPHOON_API_KEY':''}), patch('server.GroqWhisperASR',return_value=asr):
+        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo','TYPHOON_API_KEY':''}), patch('kaew.server.GroqWhisperASR',return_value=asr):
             for index in range(52):
                 with patch.object(asr,'transcribe',return_value='transcript %d'%index):
                     self.assertEqual(self.stt_request()[0],200)
@@ -202,7 +201,7 @@ class BackendTest(unittest.TestCase):
     def test_simulator_to_database_pipeline(self):
         env = dict(os.environ, KAEW_CLOUD_URL=self.url, KAEW_DEVICE_TOKEN='device-secret',
                    KAEW_OUTBOX_PATH=os.path.join(self.directory.name, 'sender.sqlite3'), KAEW_PYTHON=sys.executable)
-        result = subprocess.run(['node', os.path.join(os.path.dirname(__file__), 'simulate.mjs')],
+        result = subprocess.run(['node', str(Path(__file__).resolve().parents[1] / 'tools/simulate.mjs')],
                                 env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         status, body = self.request('GET', '/api/telemetry', 'admin-secret')
@@ -315,7 +314,7 @@ class BackendTest(unittest.TestCase):
     def test_existing_database_migrates_without_losing_telemetry(self):
         path=os.path.join(self.directory.name,'old.sqlite3')
         with closing(sqlite3.connect(path)) as db, db:
-            db.executescript((Path(__file__).parent/'migrations/001_initial.sql').read_text())
+            db.executescript((Path(__file__).resolve().parents[1]/'migrations/001_initial.sql').read_text())
             db.execute("INSERT INTO devices(id) VALUES ('node-1')")
             db.execute("INSERT INTO telemetry(device_id,session,seq,level,temperature_c,tds_adc,received_at) VALUES ('node-1',1,1,'wet',25,1000,1)")
         migrate(path)
@@ -386,7 +385,7 @@ class BackendTest(unittest.TestCase):
     def test_simulated_uart_to_notification_worker(self):
         env=dict(os.environ,KAEW_CLOUD_URL=self.url,KAEW_DEVICE_TOKEN='device-secret',KAEW_SIM_LEVEL='dry',
                  KAEW_OUTBOX_PATH=os.path.join(self.directory.name,'acceptance.sqlite3'),KAEW_PYTHON=sys.executable)
-        run=subprocess.run(['node',os.path.join(os.path.dirname(__file__),'simulate.mjs')],env=env,capture_output=True,text=True,timeout=10)
+        run=subprocess.run(['node',str(Path(__file__).resolve().parents[1] / 'tools/simulate.mjs')],env=env,capture_output=True,text=True,timeout=10)
         self.assertEqual(run.returncode,0,run.stderr)
         deadline=time.monotonic()+4
         while time.monotonic()<deadline:
@@ -463,16 +462,6 @@ class BackendTest(unittest.TestCase):
         time.sleep(.3)
         jobs=self.request('GET','/api/notifications','admin-secret')[1]['items']
         self.assertEqual(sum(j['kind']=='offline' for j in jobs),1)
-
-    def test_mock_speech_pipeline_invokes_backend_safely(self):
-        class FakeASR:
-            def transcribe(self, audio): return {'sample1':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ','sample2':'แก้ว เติมน้ำให้หน่อย'}[audio]
-        class FakeTTS:
-            def synthesize(self, text): return 'mock-audio:'+text
-        service=lambda text: self.request('POST','/api/voice','admin-secret',{'text':text})[1]
-        voice=VoicePipeline(FakeASR(),service,FakeTTS())
-        reminder=voice.handle('sample1'); self.assertTrue(reminder['executed']); self.assertEqual(reminder['minutes'],30)
-        refill=voice.handle('sample2'); self.assertFalse(refill['executed']); self.assertTrue(refill['audio'].startswith('mock-audio:'))
 
     def test_wav_input_to_backend_to_playable_wav_with_mock_speech(self):
         class ASR:

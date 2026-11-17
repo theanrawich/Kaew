@@ -5,9 +5,14 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
+
+# Support direct execution from any working directory.
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from urllib.parse import urlsplit
-from audio_service import AudioError, GroqWhisperASR, GoogleThaiTTS, process_audio
-from notifications import NoRedirect
+from kaew.audio_service import AudioError, GroqWhisperASR, GoogleThaiTTS, process_audio
+from kaew.notifications import NoRedirect
 
 
 def main():

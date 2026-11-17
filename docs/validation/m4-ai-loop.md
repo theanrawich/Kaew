@@ -21,3 +21,5 @@ Safety evidence is software-only: exact-schema/size parsing, authentication/read
 **Not performed:** real provider inference, ESP32 runtime/TLS/NTP/Wi-Fi tests, deployment, board flash, physical pump/E-stop commissioning, calibration, shutdown/overshoot measurements, or real water dispensing. The provider and pump in integration tests are explicitly deterministic fakes. `KAEW_PUMP_COMMISSIONED=0`, unspecified GPIO/polarity and `KAEW_AI_REFILL_ENABLED=0` remain defaults; the compile-only AI environment changes the feature flag, not physical commissioning.
 
 Remaining integration: Theanrawich reviews/deploys the restricted device view and creates a fresh genuine model decision through the existing workflow; Suphachok verifies power/driver/E-stop and sensors; Arm performs supervised hardware/network tests and sets measured limits before a separately reviewed commissioning configuration.
+
+Cloud tests now live in `cloud/tests/`. The tables above retain commands and results from their stated revisions; the current command from the repository root is `python3 -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v`.

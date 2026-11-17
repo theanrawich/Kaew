@@ -3,8 +3,8 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
-from notifications import NoRedirect
-from hydration_ai import (recommend, InvalidInput, ADVICE_SCHEMA,
+from kaew.notifications import NoRedirect
+from kaew.hydration_ai import (recommend, InvalidInput, ADVICE_SCHEMA,
                           ChatProvider, select_provider)
 
 
@@ -56,7 +56,7 @@ class HydrationAITest(unittest.TestCase):
         response=MagicMock()
         response.read.return_value=json.dumps({'choices':[{'message':{'content':'```json\n'+json.dumps(self.output)+'\n```'}}]}).encode()
         opener=MagicMock(); opener.open.return_value.__enter__.return_value=response
-        with patch('hydration_ai.urllib.request.build_opener',return_value=opener) as build:
+        with patch('kaew.hydration_ai.urllib.request.build_opener',return_value=opener) as build:
             result=recommend(self.context,ChatProvider('groq','test-placeholder'))
         self.assertFalse(result['fallback']); self.assertEqual(result['model'],'openai/gpt-oss-20b')
         self.assertIsInstance(build.call_args.args[0],NoRedirect)

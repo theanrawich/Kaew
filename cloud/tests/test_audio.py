@@ -1,7 +1,7 @@
 import base64
 import io
 import json
-import audio_service
+from kaew import audio_service
 import urllib.error
 from unittest.mock import patch, MagicMock
 import math
@@ -10,7 +10,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from audio_service import validate_wav, GoogleThaiTTS, AudioError, process_audio
+from kaew.audio_service import validate_wav, GoogleThaiTTS, AudioError, process_audio
 
 
 def wav_fixture(silent=False):
@@ -56,14 +56,14 @@ class AudioTest(unittest.TestCase):
         response.read.return_value=b'{"text":"hello"}'
         opener=MagicMock()
         opener.open.return_value=response
-        with patch('audio_service.urllib.request.build_opener',return_value=opener) as build:
+        with patch('kaew.audio_service.urllib.request.build_opener',return_value=opener) as build:
             self.assertEqual(audio_service.GroqWhisperASR('test-placeholder').transcribe(wav_fixture()),'hello')
             self.assertIsInstance(build.call_args.args[0],audio_service.NoRedirect)
             self.assertEqual(opener.open.call_args.kwargs['timeout'],15)
             response.read.assert_called_once_with(65_537)
         for error in (urllib.error.HTTPError('https://api.groq.com',401,'denied',{},None),
                       urllib.error.URLError('offline'),TimeoutError()):
-            with patch('audio_service.urllib.request.build_opener',return_value=opener):
+            with patch('kaew.audio_service.urllib.request.build_opener',return_value=opener):
                 opener.open.side_effect=error
                 with self.assertRaisesRegex(AudioError,'^speech recognition failed$'):
                     audio_service.GroqWhisperASR('test-placeholder').transcribe(wav_fixture())

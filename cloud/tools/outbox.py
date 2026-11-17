@@ -5,7 +5,7 @@ import urllib.error
 import urllib.request
 from contextlib import closing
 from urllib.parse import urlsplit
-from server import validate
+from kaew.server import validate
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):

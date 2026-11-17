@@ -2,7 +2,7 @@
 import {randomInt} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {encodeFrame, createWireReceiver} from '../simulation/wire-codec.mjs';
+import {encodeFrame, createWireReceiver} from '../../simulation/wire-codec.mjs';
 
 const token = process.env.KAEW_DEVICE_TOKEN;
 if (!token) throw new Error('KAEW_DEVICE_TOKEN is required');

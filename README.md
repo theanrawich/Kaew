@@ -6,7 +6,7 @@ ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gat
 | --- | --- |
 | [firmware/](firmware/README.md) | PlatformIO firmware, protocol, safety and C++ host tests |
 | [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, AI advice, Groq STT and voice tools |
-| [simulation/](simulation/index.html) | JavaScript simulation, browser viewer and protocol tests; also used by `cloud/simulate.mjs` |
+| [simulation/](simulation/index.html) | JavaScript simulation, browser viewer and protocol tests; also used by `cloud/tools/simulate.mjs` |
 | [scripts/](scripts/) | Host test runner and measurement capture/analysis tools |
 | [docs/](docs/) | Wiring, hardware procedures, contracts and historical validation records |
 | [render.yaml](render.yaml) | Render service configuration; hosted storage uses Supabase Postgres |
@@ -40,7 +40,7 @@ Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `ga
 Python 3.11+, Node.js 20+ and g++ are required. These match [CI](.github/workflows/firmware.yml):
 
 ```bash
-python3 -m unittest discover -s cloud -p 'test_*.py' -v
+python3 -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
 npm test --prefix simulation
 python3 scripts/run_host_tests.py
 python3 -m unittest discover -s scripts -p 'test_*.py' -v

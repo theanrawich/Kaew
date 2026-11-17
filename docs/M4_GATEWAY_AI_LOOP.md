@@ -85,8 +85,8 @@ The server may recommend 100–400 mL under the existing AI contract. The gatewa
 
 ```text
 python scripts/run_host_tests.py
-python -m unittest discover -s cloud -p 'test_gateway_advice.py' -v
-python -m unittest discover -s cloud -p 'test_*.py' -v
+python -m unittest discover -s cloud/tests -t cloud -p 'test_gateway_advice.py' -v
+python -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
 python -m unittest discover -s scripts -p 'test_*.py' -v
 node --test simulation/*.test.mjs
 pio run -d firmware -e sensor_node -e gateway -e gateway_cloud_compile -e sensor_node_trace -e gateway_trace -e gateway_ai_compile
@@ -94,7 +94,7 @@ pio run -d firmware -e sensor_node -e gateway -e gateway_cloud_compile -e sensor
 
 The new C++ program has 12 named deterministic scenarios: model-dependent targets/reached stop, disabled feature/no consent, binding/duplicates, once-only decisions/recovery, invalid caps, fallback/staleness/flags, timeout/old network replies, unsafe conditions during fetch, disabled actuator, manual override/STOP, reboot/ID wrap, and strict JSON. Original safety suites and compile-fail pin checks remain intact.
 
-`cloud/test_gateway_advice.py` exercises the actual local HTTP API and compiles `ai_refill_probe.cpp`: a **deterministic test provider** generates 120 and 240 mL recommendations through the existing `recommend/apply_advice` path; the returned device JSON is parsed by the same C++ decoder/bridge/controller and produces fake targets 220 and 340 g for a synthetic 100 g cup, then stops at the target. A 400 mL recommendation is rejected locally. This is inspectable software integration with a mock inference engine and fake actuator; it is **not live model inference, ESP32 execution, measured water or physical safety evidence**.
+`cloud/tests/test_gateway_advice.py` exercises the actual local HTTP API and compiles `ai_refill_probe.cpp`: a **deterministic test provider** generates 120 and 240 mL recommendations through the existing `recommend/apply_advice` path; the returned device JSON is parsed by the same C++ decoder/bridge/controller and produces fake targets 220 and 340 g for a synthetic 100 g cup, then stops at the target. A 400 mL recommendation is rejected locally. This is inspectable software integration with a mock inference engine and fake actuator; it is **not live model inference, ESP32 execution, measured water or physical safety evidence**.
 
 Recorded M4 results: 9 C++ host programs (25 gateway scenarios and 12 AI scenario groups), 6 GPIO compile checks (2 positive / 4 expected failures), 6 cloud configuration cases; cloud 87 tests (82 passed / 5 optional Postgres skipped); measurement/capture Python 24/24; simulator 25/25; all 6 PlatformIO environments built successfully. Earlier PR #8 recorded 8 C++ programs, cloud 79 tests (74 passed / 5 skipped), simulator 25/25, measurement/capture 24/24 after review, and all 5 then-existing firmware environments built. These historical counts are separate snapshots, not additional current runs. See the [M4 validation summary](validation/m4-ai-loop.md) and [PR #8 summary](validation/software-2026-11-17.md). No cloud deployment, live token/API call, real serial session, board flash or pump operation occurred.
 

@@ -1,6 +1,6 @@
 import json
 import unittest
-from notifications import TelegramProvider, MockProvider, DeliveryError
+from kaew.notifications import TelegramProvider, MockProvider, DeliveryError
 
 
 class NotificationsTest(unittest.TestCase):

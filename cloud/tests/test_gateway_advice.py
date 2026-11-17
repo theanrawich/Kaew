@@ -12,8 +12,8 @@ import unittest
 import urllib.error
 import urllib.request
 
-from gateway_advice import parse_gateway_query, project_advice
-from server import create_server
+from kaew.gateway_advice import parse_gateway_query, project_advice
+from kaew.server import create_server
 
 QUERY = 'gateway=1&boot_session=77&request_id=1&cup_session=1&nonce=123'
 
@@ -126,7 +126,7 @@ class GatewayAdviceApiTest(unittest.TestCase):
         compiler=shutil.which('g++')
         if not compiler:
             self.skipTest('g++ required for C++ fake-pump integration probe')
-        root=Path(__file__).resolve().parents[1]
+        root=Path(__file__).resolve().parents[2]
         executable=Path(self.directory.name)/'ai-refill-probe.exe'
         subprocess.run([compiler,'-std=c++17','-Wall','-Wextra','-Werror',f'-I{root / "firmware/include"}',
                         str(root/'firmware/test/ai_refill_probe.cpp'),'-o',str(executable)],check=True,capture_output=True)
