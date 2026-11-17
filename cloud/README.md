@@ -154,3 +154,20 @@ Context is short and non-medical: rolling 24-hour drink count/volume, minutes si
 The default **`openai/gpt-oss-20b`** was confirmed in Groq's live models list on 2026-11-15 (11 models, no Llama chat model). It is a current Groq production model, the official replacement for deprecated free-tier `llama-3.1-8b-instant` after Llama chat was removed from free/developer tiers on 2026-08-16. Its approximately 1000 tokens/s speed suits a live demo, and the stated free-tier 30 RPM / 1K RPD limits are ample for one dispenser. Set **`KAEW_AI_MODEL=openai/gpt-oss-120b`** for the stronger Groq production option (also on that list). No other model id is hardcoded; limits/availability can change. OpenRouter uses the same `KAEW_AI_MODEL` value; check its availability separately.
 
 After review/merge the operator must apply Postgres **002** in Supabase, set the **`GROQ_API_KEY` secret on `kaew-cloud` in Render**, then deploy from **`prod` (or the reviewed branch)**. Existing database/admin/device secrets remain private. No AI key is required to start, and no AI secrets have been added as mandatory Blueprint inputs. The server reads process environment and does not load `.env` itself. No live SQL or deployment is performed by this change. Software tests establish scheduling and mock delivery; hardware and live Telegram delivery still require checkpoint evidence.
+
+### Cloud speech recognition
+
+Set `GROQ_API_KEY` privately to enable Groq Whisper; optionally set
+`KAEW_STT_MODEL` (default `whisper-large-v3-turbo`). No extra dependencies are needed.
+POST raw `audio/wav` to `/api/stt` with the admin Bearer token; device tokens are
+rejected. Input must be non-silent mono 16-bit 16 kHz PCM WAV, at most 15 seconds
+and 2,000,000 bytes. The response contains `text` and `model`; add `?command=1`
+to process the transcript through the same command logic as `/api/voice`.
+Missing credentials return 503; recognition failures return 422.
+
+At `/stt`, choose **Groq Whisper (cloud)** and enter the admin token (stored only
+in sessionStorage). Use HTTPS or localhost and allow microphone access. Speech
+is sent to Groq in roughly four-second chunks, including the final chunk on Stop;
+quiet chunks are skipped. Cloud mode uses Thai. Browser Web Speech remains available.
+The WAV CLI also accepts `--backend groq`; `--model` is optional for this backend
+and selects the Groq model id. Existing admin and TTS configuration still applies.

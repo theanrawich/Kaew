@@ -6,15 +6,15 @@ import sys
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
-from audio_service import AudioError, FasterWhisperASR, TransformersThaiASR, GoogleThaiTTS, MmsThaiTTS, process_audio
+from audio_service import AudioError, GroqWhisperASR, FasterWhisperASR, TransformersThaiASR, GoogleThaiTTS, MmsThaiTTS, process_audio
 from notifications import NoRedirect
 
 
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('input_wav'); parser.add_argument('output_wav')
-    parser.add_argument('--model',required=True,help='local CTranslate2 Faster-Whisper model directory')
-    parser.add_argument('--backend',choices=('faster-whisper','transformers'),default='faster-whisper')
+    parser.add_argument('--model',help='local model directory or Groq model id (optional for groq)')
+    parser.add_argument('--backend',choices=('faster-whisper','transformers','groq'),default='faster-whisper')
     parser.add_argument('--tts-model',help='local MMS Thai TTS model directory')
     parser.add_argument('--url',default='http://127.0.0.1:8080')
     args=parser.parse_args()
@@ -33,7 +33,8 @@ def main():
         except Exception: raise AudioError('backend command failed') from None
     if Path(args.input_wav).stat().st_size>2_000_000: raise AudioError('input WAV too large')
     tts=MmsThaiTTS(args.tts_model) if args.tts_model else GoogleThaiTTS(tts_token)
-    asr=(FasterWhisperASR if args.backend=='faster-whisper' else TransformersThaiASR)(args.model)
+    if args.backend!='groq' and not args.model: raise AudioError('local ASR model path required')
+    asr=GroqWhisperASR(os.environ.get('GROQ_API_KEY',''),model=args.model or 'whisper-large-v3-turbo') if args.backend=='groq' else (FasterWhisperASR if args.backend=='faster-whisper' else TransformersThaiASR)(args.model)
     result=process_audio(Path(args.input_wav).read_bytes(),asr,command,tts,args.output_wav)
     print(json.dumps(result,ensure_ascii=False))
     return 0 if result.get('audio_written') else 2

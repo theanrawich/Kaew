@@ -1,4 +1,5 @@
 """Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
+from audio_service import AudioError, GroqWhisperASR
 import hmac
 from contextlib import closing
 import json
@@ -174,6 +175,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = urlsplit(self.path).path
+        if path == '/api/stt': return self.stt()
         if path in ('/api/events', '/api/reminder', '/api/goal', '/api/voice', '/api/advice'):
             data = self.read_json()
             if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
@@ -247,16 +249,40 @@ class Handler(BaseHTTPRequestHandler):
             db.execute("INSERT INTO settings VALUES ('goal_ml',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",(data['goal_ml'],))
         return self.reply(200, {'status':'saved'})
 
-    def voice(self, data):
-        if not isinstance(data,dict) or set(data)!={'text'}: return self.reply(400, {'error':'invalid_voice'})
+    def stt(self):
+        if not self.authorized(self.server.admin_token): return self.reply(401,{'error':'unauthorized'})
+        if self.headers.get('Content-Type','').strip().lower()!='audio/wav' or self.headers.get('Transfer-Encoding'):
+            return self.reply(400,{'error':'invalid_audio'})
+        try: length=int(self.headers.get('Content-Length','-1'))
+        except ValueError: return self.reply(400,{'error':'invalid_audio'})
+        if length>2_000_000: return self.reply(413,{'error':'audio_too_large'})
+        if length<1: return self.reply(400,{'error':'invalid_audio'})
+        key=os.environ.get('GROQ_API_KEY','')
+        if not key: return self.reply(503,{'error':'stt_unavailable'})
+        audio=self.rfile.read(length)
+        if len(audio)!=length: return self.reply(400,{'error':'invalid_audio'})
+        model=os.environ.get('KAEW_STT_MODEL','whisper-large-v3-turbo')
+        try: text=GroqWhisperASR(key,model=model).transcribe(audio)
+        except AudioError: return self.reply(422,{'error':'stt_failed'})
+        result={'text':text,'model':model}
+        if parse_qs(urlsplit(self.path).query).get('command')==['1']:
+            result['command']=self.voice_result({'text':text})
+        return self.reply(200,result)
+
+    def voice(self,data):
+        result=self.voice_result(data)
+        return self.reply(400 if 'error' in result else 200,result)
+
+    def voice_result(self, data):
+        if not isinstance(data,dict) or set(data)!={'text'}: return {'error':'invalid_voice'}
         intent=parse_text(data['text']); kind=intent['intent']
-        if kind=='invalid': return self.reply(400, {'error':'invalid_voice'})
+        if kind=='invalid': return {'error':'invalid_voice'}
         if kind=='reminder':
             minutes=intent['minutes']
             with closing(connect(self.server.db_path)) as db, db:
                 db.execute('BEGIN IMMEDIATE')
                 db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,0) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(minutes,time.time()+minutes*60))
-            return self.reply(200, {'intent':kind,'minutes':minutes,'executed':True,'reply':'ได้เลย จะเตือนอีก %d นาที'%minutes})
+            return {'intent':kind,'minutes':minutes,'executed':True,'reply':'ได้เลย จะเตือนอีก %d นาที'%minutes}
         if kind=='level':
             with closing(connect(self.server.db_path)) as db:
                 row=db.execute('SELECT level,received_at,source FROM telemetry ORDER BY id DESC LIMIT 1').fetchone()
@@ -265,17 +291,17 @@ class Handler(BaseHTTPRequestHandler):
             level=row['level'] if row and 0<=time.time()-row['received_at']<5 else 'unknown'
             text={'wet':'ข้อมูลระดับล่าสุดระบุว่าพบระดับน้ำ แต่อาจล่าช้า', 'dry':'ข้อมูลระดับล่าสุดระบุว่าน้ำต่ำ แต่อาจล่าช้า','unknown':'ยังไม่ทราบระดับน้ำ'}[level]
             if row and row['source']=='simulated': text += ' (ข้อมูลจำลอง)'
-            return self.reply(200, {'intent':kind,'level':level,'executed':True,'reply':text})
+            return {'intent':kind,'level':level,'executed':True,'reply':text}
         if kind=='status':
             with closing(connect(self.server.db_path)) as db:
                 row=db.execute("SELECT last_seen,(SELECT source FROM telemetry WHERE device_id='node-1' ORDER BY id DESC LIMIT 1) AS source FROM devices WHERE id='node-1'").fetchone()
             online=bool(row and row['last_seen'] and time.time()-row['last_seen']<30)
             text='ข้อมูลล่าสุดระบุว่าอุปกรณ์'+('ออนไลน์' if online else 'ออฟไลน์')
             if row and row['source']=='simulated': text+=' (ข้อมูลจำลอง)'
-            return self.reply(200, {'intent':kind,'online':online,'executed':True,'reply':text})
-        if kind=='refill': return self.reply(200, {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'})
-        if kind=='stop': return self.reply(200, {'intent':kind,'executed':False,'reply':'ยังไม่มีช่องสั่งหยุดผ่านเสียง กรุณาใช้ปุ่มหยุดจริง'})
-        return self.reply(200, {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'})
+            return {'intent':kind,'online':online,'executed':True,'reply':text}
+        if kind=='refill': return {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'}
+        if kind=='stop': return {'intent':kind,'executed':False,'reply':'ยังไม่มีช่องสั่งหยุดผ่านเสียง กรุณาใช้ปุ่มหยุดจริง'}
+        return {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'}
 
     def advice(self,data):
         if not isinstance(data,dict) or set(data)!={'include_simulated'} or type(data['include_simulated']) is not bool:

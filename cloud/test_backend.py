@@ -1,8 +1,11 @@
+import http.client
 import json
 import os
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
+from audio_service import GroqWhisperASR
 import subprocess
 import sys
 import time
@@ -22,6 +25,42 @@ from test_audio import wav_fixture
 
 
 class BackendTest(unittest.TestCase):
+    def stt_request(self,token='admin-secret',body=None,content_type='audio/wav',path='/api/stt'):
+        headers={'Content-Type':content_type}
+        if token: headers['Authorization']='Bearer '+token
+        req=urllib.request.Request(self.url+path,data=wav_fixture() if body is None else body,headers=headers)
+        try:
+            with urllib.request.urlopen(req,timeout=3) as res: return res.status,json.load(res)
+        except urllib.error.HTTPError as e: return e.code,json.load(e)
+
+    def test_stt_auth_limits_and_unavailable(self):
+        with patch.dict(os.environ,{'GROQ_API_KEY':''}):
+            for token in (None,'device-secret'):
+                self.assertEqual(self.stt_request(token)[0],401)
+            self.assertEqual(self.stt_request(),(503,{'error':'stt_unavailable'}))
+            self.assertEqual(self.stt_request(content_type='application/json')[0],400)
+            # Send only headers: the server rejects oversized uploads before reading.
+            connection=http.client.HTTPConnection('127.0.0.1',self.server.server_port,timeout=3)
+            try:
+                connection.putrequest('POST','/api/stt')
+                connection.putheader('Authorization','Bearer admin-secret')
+                connection.putheader('Content-Type','audio/wav')
+                connection.putheader('Content-Length','2000001')
+                connection.endheaders()
+                response=connection.getresponse()
+                self.assertEqual(response.status,413)
+                self.assertEqual(json.load(response),{'error':'audio_too_large'})
+            finally: connection.close()
+
+    def test_stt_success_failure_and_shared_command(self):
+        asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'แก้ว เติมน้ำให้หน่อย'}).encode())
+        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo'}), patch('server.GroqWhisperASR',return_value=asr):
+            code,result=self.stt_request(path='/api/stt?command=1')
+            self.assertEqual(code,200)
+            self.assertEqual(result['model'],'whisper-large-v3-turbo')
+            self.assertEqual(result['command'],self.request('POST','/api/voice','admin-secret',{'text':result['text']})[1])
+            self.assertEqual(self.stt_request(body=wav_fixture(True)),(422,{'error':'stt_failed'}))
+
     def test_unknown_adc_is_persisted_without_becoming_a_measurement(self):
         sample=dict(self.sample,tds_adc=65535)
         self.assertEqual(self.request('POST','/api/telemetry','device-secret',sample)[0],201)
