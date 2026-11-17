@@ -22,7 +22,7 @@ Use `python3` if your system has no `python` alias. The server reads process env
 | `KAEW_PORT` | Overrides platform `PORT`; otherwise `PORT` or `8080`. Leave unset on Render. |
 | `KAEW_TRUST_EDGE_HTTPS=1` | Allows public bind behind a TLS-terminating platform. It does not add TLS to Python or trust arbitrary forwarding headers. Only use when external traffic reaches a verified HTTPS edge and the backend HTTP port stays private. |
 | `KAEW_DEV_ALLOW_INSECURE_LAN=1` | Separate development-only opt-in for LAN HTTP, exposing bearer tokens in plaintext. Not the hosted deployment path. |
-| `DATABASE_URL` | **Required secret for hosted Render/Fly**, copied privately from Supabase with `sslmode=require`. If empty/unset, select local SQLite. Never commit the URL, password or Supabase keys. |
+| `DATABASE_URL` | **Required secret for hosted Render**, copied privately from Supabase with `sslmode=require`. If empty/unset, select local SQLite. Never commit the URL, password or Supabase keys. |
 | `KAEW_DB_PATH` | Local SQLite filename only; ignored when `DATABASE_URL` selects Postgres. Parent directory must exist and be writable. |
 | `PORT` | Provided automatically by Render; do not add a fixed port in Dashboard. |
 | `PYTHON_VERSION` | Blueprint sets `3.11.11`. |
@@ -46,28 +46,11 @@ The target Supabase project already exists: **`kaew`**, ref **`hhzukhrznuvtwsgip
 
 No Render disk is required for hosted telemetry now. Free web-service sleep/cold starts still pause scheduled reminders and may trigger gateway retries; wake and check the service before recording. Supabase free-plan availability/limits should also be checked before the checkpoint. No hosted deployment or physical end-to-end test has been performed here.
 
-For a subsequent deliberate CLI deploy, install/login yourself if needed:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/render-oss/cli/refs/heads/main/bin/install.sh | sh
-render login
-# Export RENDER_SERVICE_ID, DATABASE_URL and the two matching tokens privately.
-bash cloud/deploy.sh render
-```
-
-The helper refuses missing/equal tokens or missing `DATABASE_URL` and never prints their values. It **does not upload or rotate Render secrets**, apply schema, or push local commits: set matching secrets in Dashboard first. It deploys the remote branch configured on the service. Missing CLI prints install/login guidance and exits non-zero. Official references: [Blueprint secret inputs](https://render.com/docs/blueprint-spec), [free instance limits](https://render.com/docs/free), [CLI](https://render.com/docs/cli).
-
 ## Local Postgres verification and implementation
 
 `cloud/database.py` loads pinned psycopg v3 only when a Postgres target is selected. The adapter converts `?` to `%s` outside literals/comments and uses dictionary rows. Portable `ON CONFLICT` upserts work on both databases. An explicit transaction plus a transaction-level advisory writer lock preserves SQLite's read-before-write dedup/notification behavior for `BEGIN IMMEDIATE` paths. Connection/query failures use the existing retryable database-error family without logging credentials. Short-lived connections and one service instance suit this checkpoint, not a large-scale service.
 
 Local SQLite tests need no dependency install. For a **disposable local** Postgres database, install `python -m pip install -r cloud/requirements.txt`, export `KAEW_TEST_POSTGRES_URL` to its loopback connection URL, and run `python -m unittest discover -s cloud -p 'test_postgres.py' -v`. These opt-in tests apply the schema twice and truncate Kaew tables; never point them at a real project. They reject non-loopback hosts and do not use `DATABASE_URL` to opt in. Without that test variable they skip before importing psycopg.
-
-## Fly / Docker (secondary)
-
-Render + Supabase is the selected path; existing Fly config remains an alternative, not a guaranteed free tier. Apply the same schema first. Export `KAEW_FLY_APP`, **`DATABASE_URL`** and the two distinct tokens privately, then run `bash cloud/deploy.sh fly` after installing/logging in to flyctl and provisioning an authorized app. The helper imports these three secrets over stdin and deploys with `cloud/fly.toml`, one Machine and a remote Docker builder. No Supabase URI belongs in TOML. See [Fly configuration](https://fly.io/docs/reference/configuration/) and [secret import](https://fly.io/docs/flyctl/secrets-import/).
-
-The non-root Docker image includes psycopg from `cloud/requirements.txt`, Python 3.11 and `PYTHONDONTWRITEBYTECODE=1`. Build from repo root with `docker build -f cloud/Dockerfile -t kaew-cloud .` (BuildKit reads `cloud/Dockerfile.dockerignore`). Supply `DATABASE_URL` and both tokens at runtime behind a TLS edge. Without `DATABASE_URL`, the image falls back to `/data/kaew.sqlite3` for local experiments; retain it with a volume writable by UID 10001. Optional voice/model packages are not installed.
 
 ## Verify telemetry and gateway
 
@@ -99,43 +82,19 @@ For Telegram, explicitly configure both `KAEW_TELEGRAM_TOKEN` and `KAEW_TELEGRAM
 
 The admin-authenticated `/api/voice` endpoint accepts Thai text transcripts, not microphone audio. It handles wake-word-prefixed reminder and level queries, and explicitly declines refill and remote stop: no voice path can operate the pump. Reminders created by voice are one-shot and replace the existing reminder. The most recent level reports an observed switch state and may be delayed; it does not estimate remaining volume. `voice_pipeline.py` allows mock ASR/TTS injection for tests. There is no hardware audio or wake-word integration yet. Calendar-day statistics, production TLS/deployment and physical integration remain outstanding. Firmware actuation remains disabled.
 
-## Experimental WAV and advisory paths
+## Groq speech-to-text and WAV CLI
 
-`audio_cli.py` accepts an explicitly selected mono 16-bit PCM 16 kHz WAV (maximum 15 s), runs local Faster-Whisper, calls the authenticated text-command API and writes the Google Cloud Thai TTS response as a WAV. This is an explicit file-based invocation; it is not a continuous wake-word detector. Audio input remains local, while the response text is sent to Google Cloud TTS. Use a private OAuth access token in `KAEW_GOOGLE_TTS_TOKEN`; the service can incur charges. Do not commit the token or private recordings. The existing `KAEW_ADMIN_TOKEN` is also required.
+The server uses `GroqWhisperASR` for `/api/stt` when `GROQ_API_KEY` is configured. Input must be mono 16-bit PCM 16 kHz WAV, at most 15 seconds, with audible speech. Audio is sent to Groq; the endpoint returns a transcript by default; `?command=1` also processes voice intent through the same logic as `/api/voice`.
 
-Install optional dependencies from `cloud/requirements-voice.txt` and provide a local CTranslate2 Faster-Whisper model directory. For example, after independently downloading a suitable multilingual model:
+`audio_cli.py` sends an explicitly selected WAV to Groq, calls the admin-authenticated `/api/voice` endpoint, and writes Google Cloud Thai TTS speech to a distinct output WAV. It uses only Python's standard library. Export `GROQ_API_KEY`, `KAEW_ADMIN_TOKEN`, and `KAEW_GOOGLE_TTS_TOKEN` privately, then run:
 
-```powershell
-$env:KAEW_ADMIN_TOKEN = '<local-admin-token>'
-$env:KAEW_GOOGLE_TTS_TOKEN = '<short-lived-google-oauth-token>'
-python cloud/audio_cli.py input.wav output.wav --model C:\path\to\local-model
+```bash
+python cloud/audio_cli.py input.wav output.wav --url https://<service>.onrender.com
 ```
 
-If command execution succeeds but speech output fails, the result explicitly reports `audio_written: false`; the command is not repeated. The current tested Faster-Whisper tiny produced an inaccurate transcript on one public Thai sample, so model suitability and accuracy need representative evaluation. Real Google TTS was not tested without credentials. `AudioIO` contains opt-in I²S read/write drivers for the candidate pins, but microphone capture, invocation, buffering and streaming to this service, as well as actual speaker playback, are **not integrated or hardware-tested**.
+The optional `--model` selects a Groq model id (default `whisper-large-v3-turbo`). Google TTS receives the reply text. Provider credentials and private recordings must remain outside Git. If speech output fails after command processing, the CLI reports `audio_written: false` and does not repeat the command. Tests mock providers; they do not establish live provider availability or recognition accuracy.
 
-For an isolated smoke test with a local model and WAV, run `python cloud/asr_smoke.py --model <local-model-dir> --wav <16k-mono-wav>`. This starts a temporary loopback backend and exercises real ASR and command handling; its TTS output is a generated test tone, not speech. A public Thai sample used for development is available from [Thai Speech 20K](https://huggingface.co/datasets/hotdogs/thai-speech-20k). Neither that single sample nor the mock tests establish Thai command accuracy.
-
-### Local experimental Thai speech and model evaluation
-
-For an optional no-credential TTS path install `cloud/requirements-local-models.txt` into a separate Python environment and download the [Meta MMS Thai model](https://huggingface.co/facebook/mms-tts-tha) to a local directory. Its model license is **CC-BY-NC-4.0**; assess usage rights before deployment. Model binaries and generated voice files must remain outside Git. `audio_cli.py` accepts `--tts-model <local-mms-dir>` instead of the Google token. Output is mono 16 kHz signed 16-bit PCM WAV. The local provider accepts Thai text and decimal integers only, and rejects unsupported characters. It is not a streaming or interruptible playback implementation.
-
-For a reproducible isolated smoke run with real ASR and real TTS, use:
-
-```powershell
-python cloud/asr_smoke.py --model <whisper-dir> --wav <input.wav> --tts-model <mms-dir> --output <response.wav>
-```
-
-This does not force an intent or demonstrate a simulated refill. A `no_wake` response means the recognizer failed to detect the invocation and no action was executed. No personal audio is stored by the server; explicitly supplied input and output files are retained by the caller.
-
-`cloud/generate_asr_corpus.py --model <mms-dir> --out <private-dir>` generates nine synthetic phrases from the tracked `asr_commands.json`. Run `cloud/asr_eval.py --model <whisper-dir> --manifest <private-dir>/manifest.json --output <private-dir>/results.json`. CER uses normalized Thai characters without whitespace; WER uses PyThaiNLP newmm tokens. This tiny, single synthetic voice corpus cannot establish real-world recognition accuracy or represent different speakers and noise conditions. Do not use its intent results to authorize physical dispensing.
-
-`cloud/evaluate_hydration.py --model <qwen-dir>` runs three local advisory cases using the optional Transformers provider. Outputs are strictly validated, rejected on invalid JSON or invalid values, and always have `actuation_allowed: false`. The model is not integrated into the backend advice endpoint. Model output may contain unsupported medical claims and is not medical advice. A prior small-model experiment failed to produce acceptable decisions.
-
-The experimental `--backend transformers` option in `audio_cli.py`, `asr_smoke.py`, and `asr_eval.py` supports a local [Thai-finetuned Whisper](https://huggingface.co/biodatlab/whisper-th-small-combined) model. For example, add `--backend transformers` to the smoke or evaluator command above. This is an offline CPU implementation, not a verified wake-word recognizer. The nine-phrase synthetic trial detected only one intended command correctly; do not enable unattended dispensing from it. Evaluate unrelated speech and representative human recordings before considering false activation rates or deployment. See the execution ledger for model-specific measurements.
-
-For a schema-constrained local experiment, add `--constrained` to `evaluate_hydration.py`. JSON structure does not prove that a decision or its explanation is factually correct: the evaluated small model fabricated data in its explanation. Unknown goal or cup content remains null context; the advisory volume never authorizes actuation. Ollama requests also include the JSON schema, but no live Ollama server was tested.
-
-`simulation/voice-bridge.mjs` is a standalone typed-command adapter to the existing UART simulation and plant, with tests for cup, tank, stale data and stop interlocks. It is **not connected to the backend voice endpoint**, does not persist actions, and cannot control hardware. Backend tank responses expire observations after five seconds of server receipt; receipt time does not prove the source measurement is fresh if an outbox delayed delivery.
+`simulation/voice-bridge.mjs` is a tested typed-command adapter to the UART simulation and plant. It is separate from the backend voice endpoint and cannot control hardware.
 
 ## Closed-loop AI reminders (M4)
 
@@ -177,5 +136,5 @@ the server-side transcription call, including the provider network round trip.
 The admin-only history includes each provider's transcript or error, model,
 and elapsed milliseconds when attempted. The last 50 entries are kept in
 memory and clear on restart.
-The WAV CLI also accepts `--backend groq`; `--model` is optional for this backend
-and selects the Groq model id. Existing admin and TTS configuration still applies.
+The WAV CLI uses Groq; optional `--model` selects the Groq model id.
+Existing admin and Google TTS configuration still applies.

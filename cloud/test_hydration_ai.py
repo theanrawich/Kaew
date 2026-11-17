@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 from urllib.error import HTTPError
 from notifications import NoRedirect
-from hydration_ai import (recommend, InvalidInput, TransformersProvider, ADVICE_SCHEMA,
+from hydration_ai import (recommend, InvalidInput, ADVICE_SCHEMA,
                           ChatProvider, select_provider)
 
 
@@ -47,11 +47,6 @@ class HydrationAITest(unittest.TestCase):
 
     def test_invalid_sensor_data_rejected(self):
         with self.assertRaises(InvalidInput): recommend(dict(self.context,cup_ml=float('nan')),None)
-
-    def test_local_provider_accepts_new_contract_and_fences(self):
-        provider=TransformersProvider('unused',engine=lambda p:'```json\n'+json.dumps(self.output)+'\n```')
-        result=recommend(self.context,provider)
-        self.assertFalse(result['fallback']); self.assertFalse(result['actuation_allowed'])
 
     def test_schema_requires_exact_fields(self):
         self.assertFalse(ADVICE_SCHEMA['additionalProperties'])

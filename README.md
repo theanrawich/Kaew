@@ -1,73 +1,52 @@
-# Kaew (แก้ว) — AI-assisted Smart Water Dispenser
+# Kaew (แก้ว)
 
-งาน M4 ต่อจาก PR #8: [gateway ดึงคำแนะนำ AI และตรวจจ่ายผ่าน local safety](docs/M4_GATEWAY_AI_LOOP.md) มี opt-in software path และ fake-hardware integration tests แล้ว ต้องยืนยันในเครื่องหนึ่งครั้งต่อการเติม ปั๊มยัง commissioned = 0 และยังไม่ deploy backend/flash บอร์ดหรือวัดฮาร์ดแวร์ในงานนี้
+ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gateway → Python cloud API and dashboard. AI provides hydration advice; dispensing remains subject to local safety checks. Physical pump commissioning is disabled by default, and software tests do not establish hardware readiness.
 
-Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง และ cloud
-
-สถานะ 17 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway เชื่อมคำสั่ง refill กับ SafetyController และทดสอบ fake actuator แล้ว แต่ **physical pump และ remote actuation ยังปิดโดย default** ดู [งาน Gateway/การทดสอบของ Arm](docs/M4_GATEWAY_AI_LOOP.md) และ [ผล software validation](docs/validation/software-2026-11-17.md) AI reminder closed loop มีในซอฟต์แวร์แล้ว (สถานะ deploy เดิมไม่ได้ตรวจใหม่ในรอบนี้) ตามบันทึกเดิม Cloud เปิดใช้งานที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
-
-ระบบสื่อสารตามเส้นทางนี้:
-
-```text
-Sensor node (ESP32: temperature; TDS/level ยังปิด)
-  -- UART: 20-byte KW frames, CRC16, ACK/retry -->
-Gateway (ESP32-S3: HX711, safety controller, durable outbox)
-  -- HTTPS bearer telemetry -->
-Cloud (cloud/server.py + Supabase Postgres; local: SQLite) --> dashboard + optional Telegram
-```
-
-CRC16 ตรวจความเสียหายของข้อมูล ไม่ใช่การยืนยันตัวตน UART ส่วน safety ต้องทำงานในเครื่องและมีวงจรหยุดตัดกำลังปั๊มโดยอิสระจาก AI/cloud ข้อมูล ADC ยังไม่ใช่ TDS ที่สอบเทียบ และระดับน้ำแบบจุดเดียวไม่บอกปริมาตรถัง
-
-| โฟลเดอร์ / ไฟล์ | เนื้อหา |
+| Path | Purpose |
 | --- | --- |
-| `firmware/` | PlatformIO: `sensor_node`, `gateway`, protocol, safety, outbox และ host tests |
-| `cloud/` | Python server, SQLite/Postgres migrations, dashboard, Telegram และ AI/voice experiments |
-| `simulation/` | แบบจำลองและการทดสอบ JavaScript |
-| `docs/` | handoff, รายการซื้อ, wiring และบันทึกทดสอบ |
+| [firmware/](firmware/README.md) | PlatformIO firmware, protocol, safety and C++ host tests |
+| [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, AI advice, Groq STT and voice tools |
+| [simulation/](simulation/index.html) | JavaScript simulation, browser viewer and protocol tests; also used by `cloud/simulate.mjs` |
+| [scripts/](scripts/) | Host test runner and measurement capture/analysis tools |
+| [docs/](docs/) | Wiring, hardware procedures, contracts and historical validation records |
+| [render.yaml](render.yaml) | Render service configuration; hosted storage uses Supabase Postgres |
 
-ติดตั้ง PlatformIO แล้ว build/flash ตาม [firmware/README.md](firmware/README.md) โดยตรวจรุ่นบอร์ด ขา และ serial port ก่อนเสมอ:
+## Cloud quick start
 
-```bash
-pio run -d firmware -e sensor_node
-pio run -d firmware -e gateway
-pio run -d firmware -e gateway -t upload --upload-port <GATEWAY_PORT>
-pio run -d firmware -e sensor_node -t upload --upload-port <NODE_PORT>
-```
-
-ทดสอบซอฟต์แวร์จาก root (Node.js 20+, Python 3.11+, g++):
-
-```bash
-node --test simulation/*.test.mjs
-python -m unittest discover -s cloud -p 'test_*.py' -v
-python scripts/run_host_tests.py
-python -m unittest discover -s scripts -p 'test_*.py' -v
-```
-
-เครื่องที่ไม่มีคำสั่ง `python` ให้ใช้ `python3` แทน Host runner รัน C++ 9 programs (รวม 12 AI scenarios ใหม่), GPIO compile checks 6 และ cloud config matrix 6 cases ตาม [.github/workflows/firmware.yml](.github/workflows/firmware.yml); CI ยัง compile ทั้งสองบอร์ด, `gateway_cloud_compile` และ optional trace builds ดู [แผนวัด latency/PDR/accuracy และ CSV](docs/PERFORMANCE_TEST_PLAN.md) สำหรับงานที่ยังต้องใช้เครื่องจริง
-
-เริ่ม cloud ในเครื่องด้วย environment variables ที่เป็นส่วนตัว ใช้ device/admin token คนละค่าและสุ่มให้ยาว:
+Use Python 3.11+ from the repository root. Local SQLite needs no third-party packages. In Bash, enter two distinct private tokens:
 
 ```bash
 read -rsp 'Device token: ' KAEW_DEVICE_TOKEN; echo
 read -rsp 'Admin token: ' KAEW_ADMIN_TOKEN; echo
 export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
-python cloud/server.py
+python3 cloud/server.py
 ```
 
-เปิด `http://127.0.0.1:8080/` แล้วกรอก admin token เพื่อดู dashboard ค่าเริ่มต้น bind เฉพาะ loopback และฐานข้อมูลอยู่ที่ `cloud/kaew.sqlite3` (gitignored) ดูตัวแปรใน [cloud/.env.example](cloud/.env.example); server อ่าน environment โดยตรง ไม่โหลด `.env` เอง
+Leave `DATABASE_URL` unset for SQLite. Open <http://127.0.0.1:8080/> and enter the admin token. The server reads process environment; it does not load `.env` automatically. See [environment examples](cloud/.env.example) and [cloud setup](cloud/README.md) for Postgres, Render, reminders and Groq STT and the WAV voice CLI. SQLite migrations run automatically; Postgres migrations must be applied explicitly before startup.
 
-Hosted stack ที่เลือกคือ **Render web service เดียว** ให้บริการทั้ง API และ dashboard ผ่าน HTTPS และเก็บข้อมูลที่ **Supabase Postgres** โดยใช้ secret `DATABASE_URL` เมื่อไม่ตั้งตัวแปรนี้จะใช้ SQLite local ตาม `KAEW_DB_PATH` ต่อไป ไม่ต้องติดตั้ง psycopg สำหรับการพัฒนา SQLite
+## Firmware
 
-Cloud API และ dashboard เปิดใช้งานแล้วที่ <https://kaew-cloud.onrender.com> โดย POST telemetry ไปที่ `https://kaew-cloud.onrender.com/api/telemetry` ใช้ device token; dashboard ใช้ admin token แยกกัน การอัปเดต AI นี้ต้องให้ operator apply Postgres migration 002, ตั้ง GROQ_API_KEY secret บน kaew-cloud และ deploy จาก prod หลัง merge (หรือ reviewed branch) ภายหลัง ดู [cloud/README.md](cloud/README.md) สำหรับ local setup และข้อมูลดูแลระบบ ข้อมูล hosted อยู่ใน Supabase แต่ยังต้องวางแผน backup และคำนึงถึง free service ที่พักเมื่อไม่มีการใช้งาน
+Install PlatformIO Core (CI uses 6.2.0), then:
 
-Gateway ใช้ไฟล์ส่วนตัว `firmware/include/cloud_config.local.h` โดยคัดลอกจาก [example](firmware/include/cloud_config.local.h.example) แล้วตั้ง SSID/password, URL เต็ม `https://kaew-cloud.onrender.com/api/telemetry`, device token และ CA ที่ตรวจสอบแล้ว เมื่อ URL/token ไม่ว่างจะเปิด publisher อัตโนมัติ; `KAEW_CLOUD_ENABLED=0` บังคับปิดได้ HTTPS ยังต้องมี CA และนาฬิกาที่ sync **ห้าม commit token, Wi-Fi password, Telegram credentials, `.env` หรือ local header** สำหรับ checkpoint ได้เตรียม local header แล้วโดย Wi-Fi SSID/password ยังว่าง ให้กรอกในเครื่องก่อน build แล้ว flash gateway ก่อน node ตาม [ขั้นตอน firmware](firmware/README.md#build-and-flash) ตั้ง Telegram ผ่าน environment ของ server เท่านั้น
+```bash
+pio run -d firmware                     # sensor_node and gateway
+pio run -d firmware -e mic_test          # standalone microphone/STT test
+```
 
-เปิดห้องทดลองจำลอง 3D ในเบราว์เซอร์: `npm ci --prefix simulation` แล้ว serve repo root และเปิด `simulation/index.html` (การทดสอบ `node --test simulation/*.test.mjs` ไม่ต้องติดตั้ง)
+Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` and `gateway_ai_compile`. See [build/flash instructions](firmware/README.md#build-and-flash), [pin map](docs/wiring.md) and [refill safety contract](docs/GATEWAY_REFILL_CONTRACT.md) before using hardware. Private gateway settings belong in the ignored `firmware/include/cloud_config.local.h`, using the [example](firmware/include/cloud_config.local.h.example). Never commit this header, `.env`, tokens or Wi-Fi credentials.
 
-เอกสารทำงาน: [รายการซื้อ](docs/SHOPPING_LIST.md) · [wiring และขาที่เสนอ](docs/wiring.md) · [แบบบันทึกทดสอบ](docs/TEST_RECORD_TEMPLATE.md) · [Gateway AI loop](docs/M4_GATEWAY_AI_LOOP.md) · [แผนหลักฐานรายวิชา](docs/course-evidence.md)
+## Tests and simulator
 
-สมาชิก SengKeng มี 5 คน: **Theanrawich Thungpromsri, Pongsest Ruangwitthayanusorn, Ratchapol Srisongkram, Tanakrit Onjinda และ Suphachok** เกณฑ์ M8 ต้องมี commit จริงจากสมาชิกทุกคน แต่ละคนต้องทำงานและ commit ด้วยบัญชีของตนเอง ไม่สร้างประวัติแทนกัน
+Python 3.11+, Node.js 20+ and g++ are required. These match [CI](.github/workflows/firmware.yml):
 
-AI reminder loop ตอบเกณฑ์ **M4**: ประวัติการดื่ม/telemetry → โมเดลเลือกช่วงเตือนครั้งถัดไป → server ตรวจและจำกัด 15–180 นาที → บันทึก `reminders.next_due` → scheduler สร้าง notification job เมื่อถึงเวลา → delivery worker ส่งผ่าน Telegram (ถ้าตั้งค่า) หรือ mock แล้วเลือกช่วงถัดไปอีกครั้ง การบันทึก drink event และ admin `POST /api/advice` ตั้งเวลาใหม่โดยไม่ส่งเตือนทันที; dashboard แสดง decision ล่าสุดผ่าน admin `GET /api/advice` ถ้าโมเดลไม่พร้อม ใช้ 60 นาที/200 มล. พร้อมบันทึก `fallback=true` และยังตั้งเตือนจริง ปริมาณ `suggested_ml` เป็นคำแนะนำเท่านั้น **AI ไม่ควบคุมปั๊ม และ `actuation_allowed` เป็น false เสมอ**
+```bash
+python3 -m unittest discover -s cloud -p 'test_*.py' -v
+npm test --prefix simulation
+python3 scripts/run_host_tests.py
+python3 -m unittest discover -s scripts -p 'test_*.py' -v
+pio run -d firmware -e sensor_node -e gateway -e mic_test -e gateway_cloud_compile -e sensor_node_trace -e gateway_trace -e gateway_ai_compile
+```
 
-ตั้ง `GROQ_API_KEY` เป็น secret ใน process environment; `KAEW_AI_MODEL` มีค่าเริ่มต้น `openai/gpt-oss-20b` ซึ่งเป็น Groq production model ที่เร็วประมาณ 1000 tok/s เหมาะกับ demo และแทน Llama free-tier รุ่นที่เลิกใช้แล้ว ถ้าต้องการโมเดลที่หนักกว่า ให้ตั้ง `KAEW_AI_MODEL=openai/gpt-oss-120b` ไม่ได้ hardcode model id อื่น Optional `OPENROUTER_API_KEY` เป็น secret สำหรับ provider สำรอง ใช้ model id เดียวกัน ไม่มี key ก็เริ่ม server ได้และ fallback โดยไม่เรียก network Server ไม่โหลด `.env` เอง ใช้ decision-on-request และ scheduler ใน web service เดิม ไม่เพิ่ม cron/paid addon; Render free-plan sleep จะพัก scheduler ด้วย ยังต้องพิสูจน์ hardware/Telegram live delivery ดู [รายละเอียดและขั้นตอน operator](cloud/README.md#closed-loop-ai-reminders-m4)
+Postgres integration tests skip unless `KAEW_TEST_POSTGRES_URL` selects a disposable loopback database; see [Postgres verification](cloud/README.md#local-postgres-verification-and-implementation). JavaScript tests need no dependency installation. For the browser viewer, run `npm ci --prefix simulation`, serve the repository with `python3 -m http.server 8000`, and open <http://localhost:8000/simulation/>.
+
+For hardware work, start with the [checkpoint procedure](docs/CHECKPOINT_CRITICAL_PATH.md), [measurement plan](docs/PERFORMANCE_TEST_PLAN.md) and [gateway AI loop](docs/M4_GATEWAY_AI_LOOP.md). Codex contributors should read [AGENTS.md](AGENTS.md).

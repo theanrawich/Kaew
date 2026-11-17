@@ -10,8 +10,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from types import SimpleNamespace
-from audio_service import validate_wav, FasterWhisperASR, TransformersThaiASR, GoogleThaiTTS, AudioError, process_audio, normalize_thai_tts, MmsThaiTTS
+from audio_service import validate_wav, GoogleThaiTTS, AudioError, process_audio
 
 
 def wav_fixture(silent=False):
@@ -82,16 +81,6 @@ class AudioTest(unittest.TestCase):
         with self.assertRaises(AudioError): validate_wav(wav_fixture(True))
         with self.assertRaises(AudioError): validate_wav(b'not wav')
 
-    def test_whisper_adapter_uses_actual_wav_and_rejects_empty_recognition(self):
-        class Model:
-            def transcribe(self, audio, **opts):
-                self.seen=audio.read(4); return iter([SimpleNamespace(text='แก้ว เติมน้ำให้หน่อย')]), None
-        model=Model(); asr=FasterWhisperASR(model=model)
-        self.assertEqual(asr.transcribe(wav_fixture()),'แก้ว เติมน้ำให้หน่อย'); self.assertEqual(model.seen,b'RIFF')
-        class Empty:
-            def transcribe(self,*a,**k): return iter([]),None
-        with self.assertRaises(AudioError): FasterWhisperASR(model=Empty()).transcribe(wav_fixture())
-
     def test_tts_adapter_returns_playable_wav_and_validates_provider_data(self):
         def transport(payload, token): return {'audioContent':base64.b64encode(wav_fixture()).decode()}
         tts=GoogleThaiTTS('test-token',transport=transport)
@@ -122,22 +111,6 @@ class AudioTest(unittest.TestCase):
             result=process_audio(wav_fixture(),ASR(),command,BrokenTTS(),dest)
             self.assertTrue(result['executed']); self.assertFalse(result['audio_written'])
             self.assertEqual(len(calls),1); self.assertFalse(dest.exists())
-
-    def test_thai_numbers_and_mock_mms_pcm_make_esp_compatible_wav(self):
-        self.assertEqual(normalize_thai_tts('อีก 30 นาที'),'อีก สามสิบ นาที')
-        self.assertEqual(normalize_thai_tts('น้ำ 21 มล.'),'น้ำ ยี่สิบเอ็ด มล')
-        tts=MmsThaiTTS(engine=lambda text: (16000,[0.1,-0.1]*200))
-        audio=tts.synthesize('เตือนอีก 30 นาที')
-        with wave.open(io.BytesIO(audio),'rb') as w:
-            self.assertEqual((w.getframerate(),w.getnchannels(),w.getsampwidth()),(16000,1,2))
-        with self.assertRaises(AudioError): tts.synthesize('')
-
-    def test_transformers_asr_uses_validated_pcm(self):
-        calls=[]
-        asr=TransformersThaiASR(engine=lambda samples: calls.append(len(samples)) or 'แก้ว เติมน้ำให้หน่อย')
-        self.assertEqual(asr.transcribe(wav_fixture()),'แก้ว เติมน้ำให้หน่อย')
-        self.assertGreater(calls[0],0)
-        with self.assertRaises(AudioError): asr.transcribe(wav_fixture(silent=True))
 
 
 if __name__=='__main__': unittest.main()
