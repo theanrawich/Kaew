@@ -22,6 +22,7 @@ public:
     return false;
   }
   const char *text() const { return bytes_; }
+  bool idle() const { return size_ == 0 && !discard_; }
 };
 inline bool decimalU32(const char *s, uint32_t &out) {
   if (!s || !*s) return false;

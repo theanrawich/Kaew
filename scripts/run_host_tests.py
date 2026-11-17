@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing")
+TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing", "ai_refill")
 
 
 def run(command):
@@ -34,7 +34,7 @@ def check_pump_pin_guards(compiler, work):
         cases.append((f"reject-estop-{pin}", [*commissioned, "-DKAEW_PUMP_PIN=15", f"-DKAEW_ESTOP_PIN={pin}"], True))
     for name, flags, must_fail in cases:
         command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", f"-I{work}", "-Ifirmware/include", *flags,
-                   "-c", str(ROOT / "firmware/test/pump_gpio_compile_test.cpp"), "-o", str(work / "pump_gpio.o")]
+                   "-c", str(ROOT / "firmware/test/pump_gpio_compile_test.cpp"), "-o", str(work / f"pump_gpio_{name}.o")]
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True)
         if must_fail:
             if result.returncode == 0 or "GPIO conflicts with peripherals, UART0 console" not in result.stderr:
@@ -59,7 +59,7 @@ def main():
             executable = work / f"{name}.exe"
             # Keep original programs' compiler policy; enforce warnings on the
             # new integration suite without changing unrelated legacy modules.
-            warnings = ["-Wall", "-Wextra", "-Werror"] if name == "gateway_dispensing" else []
+            warnings = ["-Wall", "-Wextra", "-Werror"] if name in ("gateway_dispensing", "ai_refill") else []
             run([compiler, "-std=c++17", *warnings, "-Ifirmware/include",
                  ROOT / "firmware/test" / f"{name}_test.cpp", "-o", executable])
             run([executable])
@@ -78,12 +78,13 @@ def main():
                 local.unlink()
                 extra = ["-DKAEW_CLOUD_ENABLED=1"]
             expected = int(mode in ("configured", "forced_on"))
-            executable = work / "cloud_config.exe"
+            # Avoid overwriting a just-run executable still held by Windows/AV.
+            executable = work / f"cloud_config_{mode}.exe"
             run([compiler, "-std=c++17", f"-I{work}", f"-DEXPECT_ENABLED={expected}", *extra,
                  ROOT / "firmware/test/cloud_config_test.cpp", "-o", executable])
             run([executable])
             print(f"PASS cloud-config/{mode}", flush=True)
-    print("PASS: 8 host programs (25 gateway scenarios), 6 pump GPIO compile cases, 6 cloud configuration cases", flush=True)
+    print("PASS: 9 host programs (25 gateway + 12 AI scenarios), 6 pump GPIO compile cases, 6 cloud configuration cases", flush=True)
 
 
 if __name__ == "__main__":

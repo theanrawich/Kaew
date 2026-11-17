@@ -2,6 +2,13 @@
 
 Status: **IN PROGRESS — not hardware-ready or software-complete**. This tracked ledger supersedes the local copy. Do not infer physical safety, course compliance, or purchase readiness from simulation results.
 
+## M4 gateway AI loop — continuation after merged PR #8
+
+- Started `feature/ratchapol-ai-refill-loop` from current `origin/main` (`d8d164e`), preserving the merged safety and GPIO43/44 guards.
+- Added a bounded read-only device projection of existing advice, separate HTTPS worker, locally confirmed boot/request/cup/nonce-bound intent and private shared refill validation. Model/reminder logic is unchanged. All physical commissioning and AI refill feature defaults remain off.
+- New evidence includes deterministic model-provider → local HTTP → actual C++ decoder/bridge/SafetyController → fake-pump integration. No real inference/provider call, deploy, flash, physical pump or experimental measurement is claimed.
+- See [M4 architecture/contract/handoff](M4_GATEWAY_AI_LOOP.md) and [executed validation](validation/m4-ai-loop.md). Earlier sections describe historical milestones.
+
 ## Ratchapol gateway/testing continuation — 17 November 2026
 
 - Initial checkout clean at `65a2f0f` on `main`; implementation published as `e2b60d3` on `feature/ratchapol-gateway-testing` in PR #8. Publication does not enable physical actuation.

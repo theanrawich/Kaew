@@ -8,6 +8,7 @@
 #include "packet_trace.h"
 #include "wire_protocol.h"
 #include "cloud_publisher.h"
+#include "ai_advice_client.h"
 #include "audio_io.h"
 #ifndef KAEW_AUDIO_ENABLED
 #define KAEW_AUDIO_ENABLED 0
@@ -36,6 +37,7 @@ FrameParser parser;
 Receiver receiver;
 Receiver safetyReceiver; // Safety data is independent of outbox backpressure.
 CloudPublisher cloud;
+AiAdviceClient adviceClient;
 AudioIO audio;
 GpioPump pump;
 CommandLine commands;
@@ -50,6 +52,8 @@ SafetyLimits safetyLimits() {
   return limits; // Provisional development limits, not hardware acceptance values.
 }
 GatewayDispenser *dispenser = nullptr;
+AiRefillBridge *aiRefill = nullptr;
+uint32_t cupSession = 0;
 Inputs inputs{false, false, false, false, false, 0, 0, 0};
 uint32_t lastPrint = 0, bootSession = 0;
 
@@ -84,28 +88,42 @@ void refreshInputs() {
 void controlTick() {
   refreshInputs();
   dispenser->update(inputs); // Apply output BEFORE optional I/O/diagnostics.
+  aiRefill->update(inputs,scaleInputs.tare(),cupSession);
   if (dispenser->safety().state() == DispenseState::Faulted) scaleInputs.clearTare();
 }
 void command(const char *line) {
   controlTick();
-  if (!strcmp(line, "STOP")) { dispenser->stop(); scaleInputs.clearTare(); return; }
+  if (!strcmp(line, "STOP")) { aiRefill->cancel(); dispenser->stop(); scaleInputs.clearTare(); return; }
   if (!strcmp(line, "RESET")) {
+    aiRefill->cancel();
     Serial.println(dispenser->recover(inputs) ? "reset accepted; new TARE and REFILL required" : "reset rejected");
     scaleInputs.clearTare(); return;
   }
   RefillRequest request{};
   if (parseRefill(line, request)) {
+    aiRefill->cancel(); // A manual decision supersedes any in-flight AI intent.
     const auto result = dispenser->request(request, CommandSource::LocalOperator, inputs, scaleInputs.tare());
     Serial.printf("refill_result=%u request=%lu target_ml=%.1f\n", unsigned(result),
                   static_cast<unsigned long>(request.requestId), request.targetWaterMl);
     return;
   }
   if (dispenser->safety().state() != DispenseState::Idle) { Serial.println("command rejected: not idle"); return; }
+  if (!strcmp(line, "AI_REFILL")) {
+    AdviceQuery query{}; uint32_t nonce=esp_random(); if (!nonce) nonce=1;
+    const auto result=aiRefill->arm(inputs,scaleInputs.tare(),cupSession,nonce,query);
+    if (result == AiResult::Armed && !adviceClient.submit(query)) { aiRefill->cancel(); Serial.println("AI request unavailable; intent discarded"); }
+    else Serial.printf("ai_intent=%u request=%lu\n",unsigned(result),static_cast<unsigned long>(query.requestId));
+    return;
+  }
   if (!strcmp(line, "TARE")) {
-    Serial.println(scaleInputs.setTare() ? "cup tare set (operator confirms EMPTY cup)" : "cup tare rejected"); return;
+    aiRefill->cancel();
+    const bool set=cupSession < UINT32_MAX && scaleInputs.setTare();
+    if (set) ++cupSession;
+    Serial.println(set ? "cup tare set (operator confirms EMPTY cup)" : "cup tare rejected"); return;
   }
   Calibration next{};
   if (parseCalibration(line, next)) {
+    aiRefill->cancel();
     if (preferences.putBytes("cal-v1", &next, sizeof next) == sizeof next) {
       calibration = next; scaleInputs.calibrate(next); Serial.println("calibration saved; verify with independent masses");
     } else Serial.println("calibration rejected or storage failed");
@@ -118,8 +136,9 @@ void command(const char *line) {
 void setup() {
   pump.begin(); pump.set(false);
   bootSession = esp_random(); if (!bootSession) bootSession = 1;
-  static GatewayDispenser control(pump, bootSession, KAEW_LOCAL_REFILL_ENABLED, safetyLimits());
+  static GatewayDispenser control(pump, bootSession, KAEW_LOCAL_REFILL_ENABLED, safetyLimits(), {}, KAEW_AI_REFILL_ENABLED);
   dispenser = &control;
+  static AiRefillBridge bridge(control); aiRefill=&bridge;
   Serial.begin(115200);
   Serial1.begin(115200, SERIAL_8N1, LINK_RX, LINK_TX);
   if (preferences.begin("kaew-scale", false) && preferences.getBytesLength("cal-v1") == sizeof calibration)
@@ -131,6 +150,7 @@ void setup() {
   if (!scaleSamples || xTaskCreatePinnedToCore(acquireScale, "kaew-scale", 3072, nullptr, 1, nullptr, 0) != pdPASS)
     Serial.println("scale acquisition unavailable; dispensing remains blocked");
   cloud.begin();
+  adviceClient.begin();
   if (KAEW_AUDIO_ENABLED && !audio.begin()) Serial.println("audio driver init failed");
 }
 
@@ -172,6 +192,17 @@ void loop() {
   controlTick(); // Includes newly received low/unknown level.
   for (unsigned n = 0; n < 64 && Serial.available(); ++n) {
     if (commands.push(static_cast<char>(Serial.read()))) command(commands.text());
+  }
+  controlTick(); // Local STOP/RESET/manual decisions precede an AI reply.
+  AdviceResponse response{};
+  if (commands.idle() && !Serial.available() && adviceClient.take(response)) {
+    controlTick();
+    if (!response.valid) { aiRefill->fail(response.query); Serial.println("AI response rejected: transport/schema/expiry"); }
+    else {
+      const auto result=aiRefill->deliver(response.proposal,inputs,scaleInputs.tare(),cupSession);
+      Serial.printf("ai_result=%u refill_result=%u advice=%lu suggested_ml=%lu\n",unsigned(result),unsigned(aiRefill->refillResult()),
+        static_cast<unsigned long>(response.proposal.adviceId),static_cast<unsigned long>(response.proposal.suggestedMl));
+    }
   }
   controlTick();
   if (uint32_t(inputs.nowMs - lastPrint) >= 1000 && Serial.availableForWrite() >= 64) {

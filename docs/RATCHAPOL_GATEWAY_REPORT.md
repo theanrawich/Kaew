@@ -1,5 +1,7 @@
 # งาน Gateway และการทดสอบของ Ratchapol (Arm)
 
+งานต่อ M4 จาก PR #8 ดู [AI gateway loop](M4_GATEWAY_AI_LOOP.md) และ [ผลตรวจรอบ M4](validation/m4-ai-loop.md) รายละเอียด/ผลตัวเลขในหัวข้อเดิมด้านล่างเป็นหลักฐานของ PR #8; โค้ดปัจจุบันเพิ่ม locally confirmed AI path โดยไม่เปิด commissioning
+
 ปรับปรุง 17 พฤศจิกายน 2026 · ใช้เตรียมรายงาน/สไลด์และตอบ Q&A · อ้างอิงซอฟต์แวร์ใน branch `feature/ratchapol-gateway-testing` จาก baseline `65a2f0f` สถานะผลตรวจและลายนิ้วมือไฟล์ดู [validation record](validation/software-2026-11-17.md)
 
 **สิ่งที่ยืนยันได้:** เชื่อมเส้นทางคำสั่งกับ SafetyController, ประมวลผล HX711, ทดสอบด้วย fake actuator, เพิ่มเครื่องมือวัดและเอกสาร ส่ง build ผ่านในเครื่องแล้ว **ปั๊มจริงยังปิด, ไม่ได้ flash บอร์ด, ไม่ได้สอบเทียบหรือวัดฮาร์ดแวร์** โค้ดและเอกสารรอบนี้ใช้ Codex ช่วยพัฒนา/ตรวจ Arm ต้อง review ทดลองจริงและอธิบายได้ก่อนนำไปอ้างเป็นผลงานตนเอง ไม่ถือว่าการช่วยเขียนนี้เป็นหลักฐานว่า Arm ได้ลงมือทดสอบวงจรจริงแล้ว
@@ -123,7 +125,7 @@ Safety receiver แยกจาก delivery receiver: dry/unknown packet ที�
 
 ## 8. ขอบเขตและงานต่อ
 
-ยังไม่มี authenticated remote pump adapter, cup identity/capacity sensor, driver current/position feedback, hardware-calibrated thresholds หรือพิสูจน์ worst-case stop latency `CAL/TARE/REFILL` ผ่าน local console เป็น engineering interface ไม่ใช่ UX ผู้ใช้สุดท้าย Fault/dispense events ยังไม่ถูกส่งขึ้น cloud ด้วย publisher เดิม
+เพิ่ม opt-in local-confirmed AI pull adapter แล้วตาม [M4 design](M4_GATEWAY_AI_LOOP.md) ส่วน general remote pump commands, cup identity/capacity sensor, driver feedback, hardware-calibrated thresholds และ worst-case stop latency ยังไม่พร้อม `CAL/TARE/REFILL` ผ่าน local console เป็น engineering interface ไม่ใช่ UX ผู้ใช้สุดท้าย Fault/dispense events ยังไม่ถูกส่งขึ้น cloud ด้วย publisher เดิม
 
 Suphachok/ทีม hardware ส่งวงจรและค่าตรวจจริงตาม [handoff](GATEWAY_REFILL_CONTRACT.md); Theanrawich ตกลง total/add semantics, authentication/expiry/cup confirmation และ event reporting ก่อนทำ adapter Arm ทำ physical measurements, ปรับ limits จากผลจริง, review โค้ด, commit ด้วย identity จริงของตน และเก็บหลักฐาน ห้ามใช้ commit ที่ยังไม่เกิดหรืออ้าง AI/helper เป็นผลทดลอง
 

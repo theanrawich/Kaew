@@ -11,6 +11,7 @@ from database import connect, Target, verify_postgres
 from notifications import MockProvider, TelegramProvider
 from voice import parse_text
 from hydration_ai import recommend, select_provider
+from gateway_advice import parse_gateway_query, project_advice
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -262,6 +263,20 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
         if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
+        if path == '/api/advice' and self.authorized(self.server.device_token):
+            raw_query = urlsplit(self.path).query
+            if not raw_query: return self.reply(401, {'error': 'unauthorized'})
+            try:
+                context = parse_gateway_query(raw_query)
+            except ValueError:
+                return self.reply(400, {'error': 'invalid_gateway_query'})
+            with closing(connect(self.server.db_path)) as db:
+                row = db.execute('SELECT id,output_json,fallback,created_at FROM advice_log WHERE simulated=0 ORDER BY id DESC LIMIT 1').fetchone()
+            try:
+                result = project_advice(row, context, time.time())
+            except (ValueError, TypeError, KeyError):
+                return self.reply(409, {'error': 'advice_unavailable'})
+            return self.reply(200, result)
         if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
         with closing(connect(self.server.db_path)) as db, db:
             if path == '/api/advice':

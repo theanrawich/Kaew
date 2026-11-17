@@ -1,5 +1,7 @@
 # Kaew (แก้ว) — AI-assisted Smart Water Dispenser
 
+งาน M4 ต่อจาก PR #8: [gateway ดึงคำแนะนำ AI และตรวจจ่ายผ่าน local safety](docs/M4_GATEWAY_AI_LOOP.md) มี opt-in software path และ fake-hardware integration tests แล้ว ต้องยืนยันในเครื่องหนึ่งครั้งต่อการเติม ปั๊มยัง commissioned = 0 และยังไม่ deploy backend/flash บอร์ดหรือวัดฮาร์ดแวร์ในงานนี้
+
 Kaew เป็นต้นแบบเครื่องจ่ายน้ำอัจฉริยะที่ใช้ AI ช่วยเสนอการเตือนและปริมาณน้ำ สำหรับรายวิชา **2110356 Embedded Systems 2026/1** กลุ่ม **SengKeng** มีทั้ง firmware, ระบบจำลอง, cloud และแบบ CAD
 
 สถานะ 17 พ.ย. 2026: firmware, local cloud, dashboard และ Telegram adapter มีในซอฟต์แวร์แล้ว แต่ขา **TDS, level, pump และ E-stop ยังไม่กำหนด**; gateway เชื่อมคำสั่ง refill กับ SafetyController และทดสอบ fake actuator แล้ว แต่ **physical pump และ remote actuation ยังปิดโดย default** ดู [งาน Gateway/การทดสอบของ Arm](docs/RATCHAPOL_GATEWAY_REPORT.md) และ [ผล software validation](docs/validation/software-2026-11-17.md) AI reminder closed loop มีในซอฟต์แวร์แล้ว (สถานะ deploy เดิมไม่ได้ตรวจใหม่ในรอบนี้) ตามบันทึกเดิม Cloud เปิดใช้งานที่ **https://kaew-cloud.onrender.com** บน Render และ Supabase Postgres แต่ **ยังไม่ได้พิสูจน์เส้นทางด้วยฮาร์ดแวร์จริง** วิดีโอ checkpoint กำหนด **20 พ.ย. 2026** ดู [เส้นทาง checkpoint และหลักฐาน](docs/CHECKPOINT_CRITICAL_PATH.md)
@@ -42,7 +44,7 @@ python scripts/run_host_tests.py
 python -m unittest discover -s scripts -p 'test_*.py' -v
 ```
 
-เครื่องที่ไม่มีคำสั่ง `python` ให้ใช้ `python3` แทน Host runner รัน C++ 8 programs และ cloud config matrix 6 cases ตาม [.github/workflows/firmware.yml](.github/workflows/firmware.yml); CI ยัง compile ทั้งสองบอร์ด, `gateway_cloud_compile` และ optional trace builds ดู [แผนวัด latency/PDR/accuracy และ CSV](docs/PERFORMANCE_TEST_PLAN.md) สำหรับงานที่ยังต้องใช้เครื่องจริง
+เครื่องที่ไม่มีคำสั่ง `python` ให้ใช้ `python3` แทน Host runner รัน C++ 9 programs (รวม 12 AI scenarios ใหม่), GPIO compile checks 6 และ cloud config matrix 6 cases ตาม [.github/workflows/firmware.yml](.github/workflows/firmware.yml); CI ยัง compile ทั้งสองบอร์ด, `gateway_cloud_compile` และ optional trace builds ดู [แผนวัด latency/PDR/accuracy และ CSV](docs/PERFORMANCE_TEST_PLAN.md) สำหรับงานที่ยังต้องใช้เครื่องจริง
 
 เริ่ม cloud ในเครื่องด้วย environment variables ที่เป็นส่วนตัว ใช้ device/admin token คนละค่าและสุ่มให้ยาว:
 

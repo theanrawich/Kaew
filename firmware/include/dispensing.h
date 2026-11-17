@@ -30,15 +30,33 @@ struct RefillLimits {
 };
 
 class GatewayDispenser {
+  friend class AiRefillBridge;
   PumpActuator &actuator_;
   SafetyController safety_;
   RefillLimits limits_;
   uint32_t boot_, lastRequest_ = 0;
-  bool localEnabled_;
+  bool localEnabled_, aiEnabled_;
+  RefillResult boundedRequest(const RefillRequest &r, const Inputs &i, const CupTare &tare, bool enabled) {
+    update(i);
+    if (!enabled || !actuator_.available() || !limits_.valid()) return RefillResult::Disabled;
+    if (r.version != 1 || !boot_ || r.bootSession != boot_ || !r.requestId) return RefillResult::InvalidEnvelope;
+    if (r.requestId <= lastRequest_) return RefillResult::Duplicate;
+    lastRequest_ = r.requestId;
+    if (uint32_t(i.nowMs - r.issuedAtMs) >= limits_.maxAgeMs) return RefillResult::Expired;
+    if (safety_.state() != DispenseState::Idle) return RefillResult::Busy;
+    if (!std::isfinite(r.targetWaterMl) || r.targetWaterMl <= 0 || r.targetWaterMl > limits_.maxWaterMl)
+      return RefillResult::InvalidVolume;
+    float currentMl = 0;
+    if (!tare.volume(i.cupPresent, i.weightG, currentMl)) return RefillResult::TareRequired;
+    if (r.targetWaterMl <= currentMl) return RefillResult::InvalidVolume;
+    if (!safety_.start(i, i.weightG + (r.targetWaterMl - currentMl))) return RefillResult::Unsafe;
+    actuator_.set(true);
+    return RefillResult::Started;
+  }
 public:
   GatewayDispenser(PumpActuator &actuator, uint32_t bootSession,
-                   bool localEnabled = false, SafetyLimits safety = {}, RefillLimits limits = {})
-    : actuator_(actuator), safety_(safety), limits_(limits), boot_(bootSession), localEnabled_(localEnabled) {
+                   bool localEnabled = false, SafetyLimits safety = {}, RefillLimits limits = {}, bool aiEnabled = false)
+    : actuator_(actuator), safety_(safety), limits_(limits), boot_(bootSession), localEnabled_(localEnabled), aiEnabled_(aiEnabled) {
     actuator_.set(false); // No operation/target/ID survives construction/reboot.
   }
   void update(const Inputs &i) {
@@ -49,23 +67,9 @@ public:
   RefillResult request(const RefillRequest &r, CommandSource source, const Inputs &i, const CupTare &tare) {
     update(i); // A malformed/duplicate request must never defer a safety stop.
     if (source != CommandSource::LocalOperator) return RefillResult::RemoteDisabled;
-    if (!localEnabled_ || !actuator_.available() || !limits_.valid()) return RefillResult::Disabled;
-    if (r.version != 1 || !boot_ || r.bootSession != boot_ || !r.requestId) return RefillResult::InvalidEnvelope;
     // Strictly increasing IDs in one gateway boot. Never wrap; start a new boot
     // session if exhausted. Consume rejected requests too: no deferred replay.
-    if (r.requestId <= lastRequest_) return RefillResult::Duplicate;
-    lastRequest_ = r.requestId;
-    if (uint32_t(i.nowMs - r.issuedAtMs) >= limits_.maxAgeMs) return RefillResult::Expired;
-    if (safety_.state() != DispenseState::Idle) return RefillResult::Busy;
-    if (!std::isfinite(r.targetWaterMl) || r.targetWaterMl <= 0 || r.targetWaterMl > limits_.maxWaterMl)
-      return RefillResult::InvalidVolume;
-    float currentMl = 0;
-    if (!tare.volume(i.cupPresent, i.weightG, currentMl)) return RefillResult::TareRequired;
-    if (r.targetWaterMl <= currentMl) return RefillResult::InvalidVolume;
-    const float targetG = i.weightG + (r.targetWaterMl - currentMl);
-    if (!safety_.start(i, targetG)) return RefillResult::Unsafe;
-    actuator_.set(true);
-    return RefillResult::Started;
+    return boundedRequest(r, i, tare, localEnabled_);
   }
   void stop() { safety_.stop(); actuator_.set(false); }
   bool recover(const Inputs &i) { update(i); return safety_.reset(i); }

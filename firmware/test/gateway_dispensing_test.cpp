@@ -206,10 +206,15 @@ void parser_framing() {
     assert(!parseCalibration(s, c));
   for (const char *s : {"REFILL -77 1 600 100", "REFILL 77 4294967296 600 100", "REFILL 77 1 600 nan",
        "REFILL 77 1 600 100 extra", "REFILL 77 1 600", "REFILL 77 1 600 100junk"}) assert(!parseRefill(s, r));
-  CommandLine line; for (int n=0; n<140; ++n) assert(!line.push('x'));
+  CommandLine line; assert(line.idle());
+  for (int n=0; n<140; ++n) assert(!line.push('x'));
+  assert(!line.idle());
   for (char ch : std::string("REFILL 77 1 600 100\n")) assert(!line.push(ch));
+  assert(line.idle());
   for (char ch : std::string("STOP")) assert(!line.push(ch));
+  assert(!line.idle()); // An incomplete STOP must defer a pending AI reply.
   assert(line.push('\n') && std::string(line.text()) == "STOP");
+  assert(line.idle());
   assert(!line.push('\0')); for (char ch : std::string("STOP\n")) assert(!line.push(ch));
 }
 void stale_idle_and_clock_wrap() {
