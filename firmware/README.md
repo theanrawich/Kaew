@@ -187,3 +187,11 @@ LEVEL and the speaker beep are informational. Dip the level sensor to check
 for a change, and listen to confirm that the speaker makes sound. After
 debugging, re-flash `sensor_node` and `gateway_cloud_compile` (or `gateway`)
 for normal operation.
+
+## Standalone Arduino IDE hardware tests
+
+To check the gateway load cell, OLED, microphone, or speaker one module at a
+time from Arduino IDE (not PlatformIO), use the sketches in
+[arduino_tests](arduino_tests/README.md). Open the matching `.ino`, set
+**ESP32S3 Dev Module**, USB CDC On Boot Enabled, Flash 16MB, PSRAM OPI, port
+**COM15**, and Serial Monitor 115200. Leave GPIO13 untouched.
