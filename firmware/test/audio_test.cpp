@@ -1,12 +1,36 @@
 #include <cassert>
+#include <cstring>
 #include "speech_capture.h"
-#include "audio_processing.h"
+#include "speech_upload.h"
 int main() {
   assert(pcm32to16(0)==0); assert(pcm32to16(65536)==1);
   assert(pcm32to16(-65536)==-1);
-  int16_t silent[4]={0,0,0,0}, loud[4]={1000,-1000,500,-500};
-  assert(!voiceActivity(silent,4,300)); assert(voiceActivity(loud,4,300));
-  assert(!voiceActivity(loud,0,300));
+  MicDcBlocker filter;
+  assert(filter.convert(1000 * 65536) == 1000);
+  assert(filter.convert(1000 * 65536) == 995);
+  for (int i = 0; i < 2000; ++i) filter.convert(1000 * 65536);
+  assert(filter.convert(1000 * 65536) == 0);
+  filter.reset();
+  assert(filter.convert(-1000 * 65536) == -1000);
+  assert(filter.convert(INT32_MAX) == INT16_MAX);
+
+  int16_t quiet[] = {1000, -1000};
+  const auto quietStats = normalizeSpeech(quiet, 2);
+  assert(quietStats.peak == 1000 && quietStats.rms == 1000 && quietStats.gain == 7);
+  assert(quiet[0] == 7000 && quiet[1] == -7000);
+  int16_t clipped[] = {INT16_MIN, INT16_MAX};
+  const auto clippedStats = normalizeSpeech(clipped, 2);
+  assert(clippedStats.clipped == 2 && clippedStats.peak == 32768);
+  assert(clipped[0] == -23000 && clipped[1] == 22999);
+
+  uint8_t header[speechWavHeaderSize];
+  writeSpeechWavHeader(header, sizeof quiet);
+  const uint8_t expected[] = {
+    'R','I','F','F',40,0,0,0,'W','A','V','E','f','m','t',' ',16,0,0,0,
+    1,0,1,0,128,62,0,0,0,125,0,0,2,0,16,0,'d','a','t','a',4,0,0,0
+  };
+  static_assert(sizeof expected == sizeof header, "WAV header size");
+  assert(std::memcmp(header, expected, sizeof header) == 0);
   int16_t frame[SpeechCapture::frameSamples];
   static int16_t clip[SpeechCapture::maxSamples];
   SpeechCapture capture;

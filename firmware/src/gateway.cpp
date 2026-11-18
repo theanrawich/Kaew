@@ -9,9 +9,11 @@
 #include "wire_protocol.h"
 #include "cloud_publisher.h"
 #include "ai_advice_client.h"
-#include "audio_io.h"
 #ifndef KAEW_AUDIO_ENABLED
 #define KAEW_AUDIO_ENABLED 0
+#endif
+#if KAEW_AUDIO_ENABLED
+#include "speech_pipeline.h"
 #endif
 #ifndef KAEW_DISPENSE_TIMEOUT_MS
 #define KAEW_DISPENSE_TIMEOUT_MS 30000
@@ -38,7 +40,10 @@ Receiver receiver;
 Receiver safetyReceiver; // Safety data is independent of outbox backpressure.
 CloudPublisher cloud;
 AiAdviceClient adviceClient;
+#if KAEW_AUDIO_ENABLED
 AudioIO audio;
+SpeechPipeline speech(audio);
+#endif
 GpioPump pump;
 CommandLine commands;
 PacketTrace trace;
@@ -149,9 +154,25 @@ void setup() {
   scaleSamples = xQueueCreate(8, sizeof(RawScaleSample));
   if (!scaleSamples || xTaskCreatePinnedToCore(acquireScale, "kaew-scale", 3072, nullptr, 1, nullptr, 0) != pdPASS)
     Serial.println("scale acquisition unavailable; dispensing remains blocked");
+#if KAEW_AUDIO_ENABLED
+  const bool cloudReady = cloud.begin(KAEW_ADMIN_TOKEN[0] && KAEW_WIFI_SSID[0]);
+#else
   cloud.begin();
+#endif
   adviceClient.begin();
-  if (KAEW_AUDIO_ENABLED && !audio.begin()) Serial.println("audio driver init failed");
+#if KAEW_AUDIO_ENABLED
+  if (KAEW_CLOUD_ENABLED && !cloudReady)
+    Serial.println("STT upload unavailable; cloud publisher failed to start.");
+  const auto upload = cloudReady ? SpeechUpload::Command : SpeechUpload::Disabled;
+  if (!audio.begin()) {
+    Serial.println("audio driver init failed");
+  } else if (!speech.begin(upload, true)) {
+    audio.stop();
+    Serial.println("Microphone pipeline initialization failed.");
+  } else {
+    Serial.println("Calibrating background noise. Wait for Listening.");
+  }
+#endif
 }
 
 void loop() {

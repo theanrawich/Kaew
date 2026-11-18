@@ -16,6 +16,9 @@
 #ifndef KAEW_CLOUD_TOKEN
 #define KAEW_CLOUD_TOKEN ""
 #endif
+#ifndef KAEW_ADMIN_TOKEN
+#define KAEW_ADMIN_TOKEN ""
+#endif
 #ifndef KAEW_CLOUD_CA
 #define KAEW_CLOUD_CA ""
 #endif

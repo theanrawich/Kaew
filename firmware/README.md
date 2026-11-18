@@ -1,6 +1,6 @@
 # Firmware commissioning checkpoint
 
-The opt-in [M4 AI recommendation path](../docs/design/m4-gateway-ai-loop.md) adds `AI_REFILL`: one local confirmation, one authenticated read-only device request to `/api/advice`, and validation through the existing SafetyController. `gateway_ai_compile` builds this path with pump commissioning still disabled. No admin token is used in firmware. The new path is covered by deterministic fake-hardware/HTTP-to-C++ tests; physical operation remains blocked pending commissioning.
+The opt-in [M4 AI recommendation path](../docs/design/m4-gateway-ai-loop.md) adds `AI_REFILL`: one local confirmation, one authenticated read-only device request to `/api/advice`, and validation through the existing SafetyController. `gateway_ai_compile` builds this path with pump commissioning still disabled. The AI refill path uses the device token. The new path is covered by deterministic fake-hardware/HTTP-to-C++ tests; physical operation remains blocked pending commissioning.
 
 These programs are **not commissioned for physical pump operation**. Pin assignments are proposals for candidate boards, not verified wiring instructions. Gateway local refill integration now calls the shared SafetyController through a bounded validator, exercised with a fake actuator in host tests. GPIO, local manual refill and locally confirmed AI refill remain disabled by default; raw remote AI requests are always rejected. The physical emergency stop must independently remove pump power. Do not connect the TDS or level interface until voltage and pinout are verified. See [Arm's implementation report](../docs/design/m4-gateway-ai-loop.md), [command contract](../docs/design/gateway-refill-contract.md) and [executed validation](../docs/testing/validation/software-2026-11-17.md).
 
@@ -67,9 +67,19 @@ The publisher uses separate lower-priority persistence and network tasks. Sixtee
 
 ## Experimental I²S
 
-`audio_io.h` provides nonblocking candidate INMP441 receive and MAX98357A transmit drivers at 16 kHz; startup is disabled unless `KAEW_AUDIO_ENABLED=1` is compiled. `gateway_cloud_compile` compiles the enabled path. It does not yet capture a complete utterance, detect a wake word, send audio, receive TTS audio, or invoke `readMicrophone`/`play` in the application. INMP441 microphone SD=GPIO6, SCK=GPIO7, WS=GPIO8; MAX98357A amplifier DIN=GPIO9, BCLK=GPIO10, LRC=GPIO11; HX711 SCK=GPIO4, DT=GPIO5. These remain provisional and must be checked against the actual board and breakouts. I²S audio and publisher resource contention require physical measurement.
+`KAEW_AUDIO_ENABLED=1` enables 16 kHz mono speech capture using the same
+INMP441 filtering and utterance detection as `mic_test`. INMP441 microphone
+SD=GPIO6, SCK=GPIO7, WS=GPIO8. MAX98357A speaker DIN=GPIO9, BCLK=GPIO10,
+LRC=GPIO11. Verify these provisional pins against the actual hardware.
 
-At 16 kHz, mono 16-bit PCM uses 32,000 bytes/second before protocol overhead; a 15-second recording needs about 480 kB. The N16R8 board profile selects 8 MB octal PSRAM, but available PSRAM, DMA placement, audio channel alignment, clipping and timing cannot be validated until a real board is present. See [Espressif I²S documentation](https://docs.espressif.com/projects/esp-idf/en/v5.2.2/esp32s3/api-reference/peripherals/i2s.html). The VAD threshold in `audio_processing.h` is illustrative, not calibrated for the microphone or noise environment.
+Capture runs in its own FreeRTOS task with PSRAM clip storage. When
+`KAEW_CLOUD_ENABLED` is also enabled, a separate task normalizes queued clips and
+posts WAV to `/api/stt?command=1` via the publisher's Wi-Fi connection. A full
+queue drops the newest clip. Set `KAEW_ADMIN_TOKEN` privately for this optional
+STT path. It requires HTTPS, a verified CA, and synchronized time. The gateway
+logs the transcript and command result. Voice has no access to gateway pump
+controls. `gateway_cloud_compile` builds both paths. I²S timing and resource
+contention with telemetry still require board testing.
 
 ## Mic + STT test
 
@@ -77,7 +87,7 @@ Standalone INMP441 test for the ESP32-S3 N16R8: VDD → 3V3, GND → GND,
 SD → GPIO6, SCK/BCLK → GPIO7, WS → GPIO8, L/R → GND (left channel).
 No amplifier is needed. Configure `KAEW_WIFI_SSID`, `KAEW_WIFI_PASSWORD`,
 `KAEW_CLOUD_URL` and `KAEW_CLOUD_CA` in the ignored `include/cloud_config.local.h`.
-For this test only, add optional `KAEW_ADMIN_TOKEN` with the STT admin credential;
+Add optional `KAEW_ADMIN_TOKEN` with the STT admin credential;
 empty or missing skips sending. Keep this header private. The test strips the
 cloud URL path and posts to `/api/stt` with verified TLS (WiFi and NTP required).
 
