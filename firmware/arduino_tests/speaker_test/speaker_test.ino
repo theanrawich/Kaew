@@ -27,8 +27,9 @@
  * Hard rules: do not wire or configure GPIO13 (reserved pump relay).
  * Do not actuate the pump. Do not use GPIO21/47 (node UART).
  *
- * Every ~3 s plays a short 400-2400 Hz tone sweep at moderate volume and
- * prints what it is doing. This test cannot hear the speaker itself.
+ * Plays three short beeps once at boot (150 ms tone, 150 ms gap, moderate
+ * volume), then stays silent. Serial still reports INFO/FAIL every ~3 s.
+ * This test cannot hear the speaker itself.
  */
 
 #include <ESP_I2S.h>
@@ -40,38 +41,43 @@ constexpr int SPK_BCLK = 10;
 constexpr int SPK_LRC = 11;
 constexpr int SAMPLE_RATE = 16000;
 constexpr int AMPLITUDE = 5000;  // ~15% of full scale, moderate volume
-constexpr int SWEEP_MS = 500;
+constexpr int TONE_MS = 150;
+constexpr int GAP_MS = 150;
+constexpr int TONE_HZ = 900;
 constexpr uint32_t PERIOD_MS = 3000;
 
 I2SClass i2s;
 bool speakerReady = false;
+bool speakerPlayed = false;
 
-bool playSweep() {
-  constexpr int frames = SAMPLE_RATE * SWEEP_MS / 1000;
-  constexpr float f0 = 400.0f;
-  constexpr float f1 = 2400.0f;
+bool writeTone(int durationMs, int amplitude) {
+  const int frames = SAMPLE_RATE * durationMs / 1000;
   int16_t stereo[128 * 2];
-  float phase = 0.0f;
-
   for (int offset = 0; offset < frames; offset += 128) {
     const int n = min(128, frames - offset);
     for (int i = 0; i < n; ++i) {
-      const float freq = f0 + (f1 - f0) * static_cast<float>(offset + i) / static_cast<float>(frames);
-      phase += 2.0f * PI * freq / static_cast<float>(SAMPLE_RATE);
-      if (phase > 2.0f * PI) phase -= 2.0f * PI;
-      const int16_t sample = static_cast<int16_t>(AMPLITUDE * sinf(phase));
+      const int16_t sample = static_cast<int16_t>(
+          amplitude * sinf(2.0f * PI * TONE_HZ * (offset + i) / static_cast<float>(SAMPLE_RATE)));
       stereo[2 * i] = stereo[2 * i + 1] = sample;
     }
     const size_t bytes = static_cast<size_t>(n) * 2 * sizeof(int16_t);
     if (i2s.write(reinterpret_cast<const uint8_t *>(stereo), bytes) != bytes) {
-      Serial.println("SPEAKER : FAIL  I2S write failed (check DIN/BCLK/LRC)");
       return false;
     }
   }
+  return true;
+}
 
-  memset(stereo, 0, sizeof(stereo));
+bool playBootBeeps() {
+  if (!speakerReady) return false;
+  for (int i = 0; i < 3; ++i) {
+    if (!writeTone(TONE_MS, AMPLITUDE)) return false;
+    if (!writeTone(GAP_MS, 0)) return false;
+  }
+  int16_t silence[128 * 2];
+  memset(silence, 0, sizeof(silence));
   for (int i = 0; i < 4; ++i) {
-    i2s.write(reinterpret_cast<const uint8_t *>(stereo), sizeof(stereo));
+    i2s.write(reinterpret_cast<const uint8_t *>(silence), sizeof(silence));
   }
   return true;
 }
@@ -83,7 +89,7 @@ void setup() {
   Serial.println();
   Serial.println("Kaew GATEWAY speaker test | Arduino-ESP32 3.x (ESP_I2S.h I2SClass) | Serial 115200");
   Serial.println("MAX98357A | DIN GPIO9, BCLK GPIO10, LRC GPIO11");
-  Serial.println("This test cannot self-verify. Listen for a short rising beep every few seconds.");
+  Serial.println("Listen for three short beeps at boot. No more sound after that.");
 
   // setPins(bclk, ws, dout, din). din unused for a speaker-only test.
   i2s.setPins(SPK_BCLK, SPK_LRC, SPK_DIN, -1);
@@ -91,6 +97,15 @@ void setup() {
   if (!speakerReady) {
     Serial.println("SPEAKER : FAIL  I2S init failed (check DIN=GPIO9, BCLK=GPIO10, LRC=GPIO11)");
     Serial.println("          Also check VIN (5V or 3.3V), GND, speaker wires, and SD pin not held low.");
+    return;
+  }
+
+  speakerPlayed = playBootBeeps();
+  if (speakerPlayed) {
+    Serial.println("SPEAKER : INFO  3 beeps played at boot");
+    Serial.println("          No sound? Check VIN (5V or 3.3V), GND, speaker +/- wires, and SD (shutdown) pin not held low.");
+  } else {
+    Serial.println("SPEAKER : FAIL  I2S write failed (check DIN/BCLK/LRC)");
   }
 }
 
@@ -102,14 +117,9 @@ void loop() {
   }
   last = millis();
 
-  if (!speakerReady) {
-    Serial.println("SPEAKER : FAIL  I2S init failed (check DIN/BCLK/LRC, VIN 5V/3.3V, GND, speaker wires, SD pin)");
+  if (!speakerReady || !speakerPlayed) {
+    Serial.println("SPEAKER : FAIL  I2S init/write failed (check DIN/BCLK/LRC, VIN 5V/3.3V, GND, speaker wires, SD pin)");
     return;
   }
-
-  Serial.println("SPEAKER : INFO  playing 400-2400 Hz sweep (~0.5 s, moderate volume)");
-  Serial.println("          No sound? Check VIN (5V or 3.3V), GND, speaker +/- wires, and SD (shutdown) pin not held low.");
-  if (playSweep()) {
-    Serial.println("SPEAKER : INFO  sweep sent (listen — this test cannot hear the speaker)");
-  }
+  Serial.println("SPEAKER : INFO  3 beeps played at boot");
 }

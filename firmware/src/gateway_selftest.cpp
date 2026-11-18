@@ -191,30 +191,49 @@ void reportMic() {
   }
 }
 
-void beep() {
-  if (!speakerReady) {
-    Serial.println("SPEAKER : FAIL  speaker I2S init failed (check DIN/BCLK/LRC)");
-    return;
-  }
+bool speakerPlayed = false;
 
-  // 900 Hz at under 1% of full scale, 120 ms, duplicated into both slots.
-  constexpr int frames = AUDIO_RATE * 120 / 1000;
+bool writeTone(int durationMs, int amplitude) {
+  constexpr int freq = 900;
+  const int frames = AUDIO_RATE * durationMs / 1000;
   int16_t stereo[128 * 2];
   for (int offset = 0; offset < frames; offset += 128) {
+    const int n = min(128, frames - offset);
     for (int i = 0; i < 128; ++i) {
-      const int16_t sample = static_cast<int16_t>(300 * sinf(6.2831853f * 900 * (offset + i) / AUDIO_RATE));
+      const int16_t sample = i < n
+          ? static_cast<int16_t>(amplitude * sinf(6.2831853f * freq * (offset + i) / AUDIO_RATE))
+          : 0;
       stereo[2 * i] = stereo[2 * i + 1] = sample;
     }
     size_t written = 0;
     if (i2s_write(I2S_NUM_1, stereo, sizeof(stereo), &written, pdMS_TO_TICKS(40)) != ESP_OK ||
         written != sizeof(stereo)) {
       i2s_zero_dma_buffer(I2S_NUM_1);
-      Serial.println("SPEAKER : FAIL  speaker I2S write failed (check DIN/BCLK/LRC)");
-      return;
+      return false;
     }
     serviceUart();
   }
-  Serial.println("SPEAKER : INFO  beep (listen)");
+  return true;
+}
+
+// Three 150 ms beeps with 150 ms gaps, moderate volume, once at boot only.
+bool playBootBeeps() {
+  if (!speakerReady) return false;
+  constexpr int amplitude = 5000;  // ~15% of full scale
+  for (int i = 0; i < 3; ++i) {
+    if (!writeTone(150, amplitude)) return false;
+    if (!writeTone(150, 0)) return false;
+  }
+  i2s_zero_dma_buffer(I2S_NUM_1);
+  return true;
+}
+
+void reportSpeaker() {
+  if (!speakerReady || !speakerPlayed) {
+    Serial.println("SPEAKER : FAIL  speaker I2S init/write failed (check DIN/BCLK/LRC)");
+    return;
+  }
+  Serial.println("SPEAKER : INFO  3 beeps played at boot");
 }
 }  // namespace
 
@@ -238,8 +257,7 @@ void setup() {
                 KAEW_OLED_SDA, KAEW_OLED_SCL, KAEW_OLED_ADDRESS);
   Serial.println("UART     | node GPIO21 TX -> gateway GPIO21 RX");
   Serial.println("         | node GPIO47 RX <- gateway GPIO47 TX; common GND");
-  Serial.println("Send a key for a speaker beep.");
-  beep();
+  speakerPlayed = playBootBeeps();
   lastReport = millis();
 }
 
@@ -251,14 +269,9 @@ void loop() {
     reportScale();
     reportOled();
     reportMic();
-    beep();
+    reportSpeaker();
     reportUart();
     Serial.println("=====================================");
-  }
-  if (Serial.available()) {
-    // Coalesce a key and any monitor-added line ending into one beep.
-    for (int budget = 0; budget < 64 && Serial.available(); ++budget) Serial.read();
-    beep();
   }
   delay(1);
 }

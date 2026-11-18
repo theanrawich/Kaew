@@ -72,9 +72,9 @@ Uses the Arduino-ESP32 3.x `I2SClass` API. Prints a level every few seconds. Mak
 
 ### speaker_test — MAX98357A (DIN GPIO9, BCLK GPIO10, LRC GPIO11)
 
-Plays a short 400–2400 Hz tone sweep at moderate volume every ~3 s. This test cannot hear the speaker, so it only reports that the sweep was sent (or that I2S failed).
+Plays three short beeps once at boot (150 ms tone, 150 ms gap, moderate volume), then stays silent. This test cannot hear the speaker, so later Serial lines only repeat the boot result.
 
-- `INFO` — sweep sent. Listen for a rising beep.
+- `INFO` — 3 beeps played at boot. Listen at startup, not later.
 - `FAIL` — I2S init or write failed. Check DIN/BCLK/LRC, VIN (5V or 3.3V), GND, speaker wires, and that the SD (shutdown) pin is not held low.
 
 After debugging, re-flash the normal PlatformIO `gateway` or `gateway_cloud_compile` image for regular operation.
