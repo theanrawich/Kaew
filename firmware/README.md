@@ -180,11 +180,12 @@ Reports appear about every three seconds.
 | HX711 not ready or stuck | Check for swapped DT/SCK and verify VCC/GND. If the raw reading stays identical, check DT/SCK and the load cell wiring. |
 | OLED missing or wrong I²C address | Check for swapped SDA/SCL and verify VCC. If the scan lists an address other than 0x3C, check the address or solder jumper. A responding 0x3C panel should display `Kaew self-test OK`. |
 | Mic silent, constant, or I²S error | Check SD/SCK/WS and tie L/R to GND. |
-| Speaker I²S error | Check DIN/BCLK/LRC. Listen for a quiet beep at boot, during each report, or after sending a key in the gateway monitor. |
+| Speaker I²S error | Check DIN/BCLK/LRC. Listen for three short beeps once at boot (no later sound). The report line stays informational after that. |
 | UART no ping | Run both self-tests and check node GPIO21 TX → gateway GPIO21 RX, node GPIO47 RX ← gateway GPIO47 TX, and common GND. Use GPIO21/47 for this link and leave the board's RX/TX silkscreen pins (GPIO43/44) unused. |
 
-LEVEL and the speaker beep are informational. Dip the level sensor to check
-for a change, and listen to confirm that the speaker makes sound. After
+LEVEL is informational. Dip the level sensor to check for a change. The
+speaker plays three short beeps once at boot; listen then, not during later
+reports. After
 debugging, re-flash `sensor_node` and `gateway_cloud_compile` (or `gateway`)
 for normal operation.
 
