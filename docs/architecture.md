@@ -63,6 +63,7 @@ flowchart LR
 | Gateway | INMP441 microphone (L/R to GND) | SD 6, SCK 7, WS 8 |
 | Gateway | MAX98357A speaker | DIN 9, BCLK 10, LRC 11 |
 | Gateway | UART to node | RX 1, TX 2 |
+| Gateway | AA412 OLED (I²C) | VCC 3.3 V, GND, SDA GPIO17, SCL GPIO18 |
 | Gateway | Pump / E-stop | not assigned (disabled) |
 
-Cross UART TX/RX between boards and share GND.
+Cross UART TX/RX between boards and share GND. GPIO13 is reserved for a future pump relay.

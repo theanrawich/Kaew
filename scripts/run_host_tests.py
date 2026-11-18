@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing", "ai_refill", "drink_detection")
+TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing", "ai_refill", "drink_detection", "reminder_countdown")
 
 
 def run(command):
@@ -59,7 +59,7 @@ def main():
             executable = work / f"{name}.exe"
             # Keep original programs' compiler policy; enforce warnings on the
             # new integration suite without changing unrelated legacy modules.
-            warnings = ["-Wall", "-Wextra", "-Werror"] if name in ("gateway_dispensing", "ai_refill", "drink_detection") else []
+            warnings = ["-Wall", "-Wextra", "-Werror"] if name in ("gateway_dispensing", "ai_refill", "drink_detection", "reminder_countdown") else []
             run([compiler, "-std=c++17", *warnings, "-Ifirmware/include",
                  ROOT / "firmware/test" / f"{name}_test.cpp", "-o", executable])
             run([executable])

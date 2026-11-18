@@ -299,10 +299,12 @@ class Handler(BaseHTTPRequestHandler):
             db.execute('BEGIN IMMEDIATE')
             existing = db.execute('SELECT level, temperature_c, tds_adc, source FROM telemetry WHERE device_id=? AND session=? AND seq=?',
                                   (data['device_id'], data['session'], data['seq'])).fetchone()
+            reminder = db.execute('SELECT next_due FROM reminders WHERE id=1').fetchone()
+            next_reminder_at = math.ceil(reminder['next_due']) if reminder is not None else None
             if existing:
                 if (existing['level'], existing['temperature_c'], existing['tds_adc'],existing['source']) != (data['level'], data['temperature_c'], data['tds_adc'],data.get('source','unknown')):
                     return self.reply(409, {'error': 'duplicate_conflict'})
-                return self.reply(200, {'status': 'duplicate'})
+                return self.reply(200, {'status': 'duplicate', 'next_reminder_at': next_reminder_at})
             db.execute('INSERT INTO telemetry(device_id, session, seq, level, temperature_c, tds_adc, received_at, source) VALUES (?,?,?,?,?,?,?,?)',
                        (data['device_id'], data['session'], data['seq'], data['level'], data['temperature_c'], data['tds_adc'], now,data.get('source','unknown')))
             db.execute('UPDATE devices SET last_seen=? WHERE id=?', (now, data['device_id']))
@@ -316,7 +318,7 @@ class Handler(BaseHTTPRequestHandler):
                 queue_notification(db, 'recovery:%s:%s' % (data['session'],data['seq']), 'recovery', 'แก้ว: อุปกรณ์กลับมาเชื่อมต่อแล้ว' + (' (ข้อมูลจำลอง)' if data.get('source') == 'simulated' else ''), self.server.provider_name, now)
             db.execute("INSERT INTO alert_state VALUES ('offline','0') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
             check_sensor_alerts(db, data, now, self.server.provider_name)
-        self.reply(201, {'status': 'stored'})
+        self.reply(201, {'status': 'stored', 'next_reminder_at': next_reminder_at})
 
     def add_event(self, data, device):
         if not isinstance(data, dict) or set(data) != {'event_id','kind','source','volume_ml'}:

@@ -6,9 +6,12 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include <esp_system.h>
+#include <esp_timer.h>
+#include <cJSON.h>
 #include "cloud_config.h"
 #include "cloud_outbox_record.h"
 #include "nvs_queue_store.h"
+#include "reminder_countdown.h"
 
 // Persistence and network use separate tasks; the control loop never waits for either.
 class CloudPublisher {
@@ -17,6 +20,50 @@ class CloudPublisher {
   QueueHandle_t pending_=nullptr, acknowledgements_=nullptr;
   SemaphoreHandle_t lock_=nullptr;
   std::atomic<uint32_t> rejected_{0}, errors_{0};
+  portMUX_TYPE reminderLock_ = portMUX_INITIALIZER_UNLOCKED;
+  ReminderSnapshot reminder_{};
+
+  void readReminder(HTTPClient &http) {
+    char body[128]{};
+    const int length = http.getSize();
+    auto *stream = http.getStreamPtr();
+    if (!stream || length <= 0 || length >= int(sizeof body)) return;
+
+    // Telemetry was already accepted. Bound the time spent on display metadata.
+    const uint32_t started = millis();
+    int offset = 0;
+    while (offset < length && millis() - started < 250) {
+      const int available = stream->available();
+      if (available > 0) {
+        const int count = stream->read(reinterpret_cast<uint8_t *>(body + offset),
+                                       min(available, length - offset));
+        if (count <= 0) return;
+        offset += count;
+      } else if (!stream->connected()) {
+        return;
+      } else {
+        vTaskDelay(1);
+      }
+    }
+    if (offset != length) return;
+
+    cJSON *json = cJSON_ParseWithOpts(body, nullptr, true);
+    const auto *due = cJSON_GetObjectItemCaseSensitive(json, "next_reminder_at");
+    // The supported calendar range ends at 9999-12-31.
+    if (cJSON_IsNull(due) || (cJSON_IsNumber(due) && due->valuedouble >= CLOCK_MIN_EPOCH &&
+        due->valuedouble <= 253402300799.0 &&
+        due->valuedouble == static_cast<int64_t>(due->valuedouble))) {
+      const ReminderSnapshot snapshot{
+        cJSON_IsNull(due) ? 0 : static_cast<int64_t>(due->valuedouble),
+        esp_timer_get_time() / 1000
+      };
+      portENTER_CRITICAL(&reminderLock_);
+      reminder_ = snapshot;
+      portEXIT_CRITICAL(&reminderLock_);
+    }
+    cJSON_Delete(json);
+  }
+
   bool ready_=false, keepConnected_=false;
   static void persistTask(void *p) { static_cast<CloudPublisher*>(p)->persist(); }
   static void networkTask(void *p) { static_cast<CloudPublisher*>(p)->network(); }
@@ -60,7 +107,7 @@ class CloudPublisher {
       if(WiFi.status()!=WL_CONNECTED) { WiFi.reconnect(); vTaskDelay(pdMS_TO_TICKS(retryMs+esp_random()%(retryMs/4+1))); retryMs=min(retryMs*2,uint32_t(60000));continue; }
       if(!found) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if((!tls && !dev) || !strlen(KAEW_CLOUD_TOKEN) || (tls && !strlen(KAEW_CLOUD_CA))) {vTaskDelay(pdMS_TO_TICKS(10000));continue;}
-      if(tls && time(nullptr)<1577836800) {vTaskDelay(pdMS_TO_TICKS(5000));continue;}
+      if(tls && time(nullptr)<CLOCK_MIN_EPOCH) {vTaskDelay(pdMS_TO_TICKS(5000));continue;}
       WiFiClient plain; WiFiClientSecure secure; if(tls) secure.setCACert(KAEW_CLOUD_CA);
       String requestUrl(url);
       if(record.isDrink()) {
@@ -85,7 +132,9 @@ class CloudPublisher {
         snprintf(body,sizeof body,"{\"device_id\":\"node-1\",\"session\":%lu,\"seq\":%lu,\"level\":\"%s\",\"temperature_c\":%s,\"tds_adc\":%u,\"source\":\"device\"}",
           (unsigned long)packet.session,(unsigned long)packet.seq,level,temp,packet.adc);
       }
-      int result=http.POST((uint8_t*)body,strlen(body)); http.end();
+      int result=http.POST((uint8_t*)body,strlen(body));
+      if (!record.isDrink() && (result == 200 || result == 201)) readReminder(http);
+      http.end();
       if(result==200 || result==201) {
         xSemaphoreTake(lock_,portMAX_DELAY); CloudOutboxRecord head{};
         if(durable_.peek(head) && CloudOutboxRecord::sameId(head,record)) {if(!durable_.pop())++errors_;}
@@ -94,6 +143,13 @@ class CloudPublisher {
     }
   }
 public:
+  ReminderSnapshot reminderSnapshot() {
+    portENTER_CRITICAL(&reminderLock_);
+    const auto snapshot = reminder_;
+    portEXIT_CRITICAL(&reminderLock_);
+    return snapshot;
+  }
+
   bool begin(bool keepConnected = false) {
     if(!KAEW_CLOUD_ENABLED)return false;
     keepConnected_ = keepConnected;
