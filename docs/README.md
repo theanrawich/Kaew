@@ -1,5 +1,7 @@
 # Kaew documentation
 
+- [Architecture](architecture.md) — System diagram, data flow and wiring.
+
 ## Design
 
 - [Gateway refill contract](design/gateway-refill-contract.md) — Command validation, interlocks and commissioning prerequisites.

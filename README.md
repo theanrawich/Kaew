@@ -7,7 +7,7 @@ ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gat
 | [firmware/](firmware/README.md) | PlatformIO firmware, protocol, safety and C++ host tests |
 | [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, Groq AI advice, Typhoon STT and voice commands |
 | [scripts/](scripts/) | Host test runner and measurement capture/analysis tools |
-| [docs/](docs/README.md) | Wiring, hardware procedures, contracts and historical validation records |
+| [docs/](docs/README.md) | [Architecture](docs/architecture.md), wiring, hardware procedures, contracts and historical validation records |
 | [render.yaml](render.yaml) | Render service configuration; hosted storage uses Supabase Postgres |
 
 ## Cloud quick start
