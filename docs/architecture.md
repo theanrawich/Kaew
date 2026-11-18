@@ -27,7 +27,7 @@ flowchart LR
   TY["Typhoon ASR"]
   USER["User (browser)"]
 
-  Node -- "UART node 17/18 to gateway 1/2, framed packets + ACK" --> LOGIC
+  Node -- "UART node 21/47 to gateway 21/47, framed packets + ACK" --> LOGIC
   LC --> LOGIC
   MIC --> SPEECH
   LOGIC -. "advice only, no auto-actuation" .-> PUMP
@@ -58,11 +58,11 @@ flowchart LR
 | Sensor node | TDS (analog, <= 3.3 V output) | GPIO4 |
 | Sensor node | Water level (digital) | GPIO5 |
 | Sensor node | DS18B20 (4.7 kΩ pull-up on DQ) | GPIO6 |
-| Sensor node | UART to gateway | TX 17, RX 18 |
+| Sensor node | UART to gateway | TX 21, RX 47 |
 | Gateway | HX711 load cell | SCK 4, DT 5 |
 | Gateway | INMP441 microphone (L/R to GND) | SD 6, SCK 7, WS 8 |
 | Gateway | MAX98357A speaker | DIN 9, BCLK 10, LRC 11 |
-| Gateway | UART to node | RX 1, TX 2 |
+| Gateway | UART to node | RX 21, TX 47 |
 | Gateway | AA412 OLED (I²C) | VCC 3.3 V, GND, SDA GPIO17, SCL GPIO18 |
 | Gateway | Pump / E-stop | not assigned (disabled) |
 

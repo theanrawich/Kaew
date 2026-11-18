@@ -28,7 +28,7 @@
 
 namespace {
 constexpr int HX_DATA = 5, HX_CLOCK = 4;  // HX711 DT=GPIO5, SCK=GPIO4
-constexpr int LINK_RX = 1, LINK_TX = 2;
+constexpr int LINK_RX = 21, LINK_TX = 47;
 constexpr bool availableOledPin(int pin) {
   // Reserve I2S GPIO6–11 even in builds without audio, plus GPIO12 and the future relay (13).
   return GPIO_IS_VALID_OUTPUT_GPIO(pin) && pin != HX_DATA && pin != HX_CLOCK &&

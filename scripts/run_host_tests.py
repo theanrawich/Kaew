@@ -29,7 +29,7 @@ def check_pump_pin_guards(compiler, work):
                     "-DKAEW_PUMP_ON_LEVEL=1", "-DKAEW_ESTOP_SAFE_LEVEL=1"]
     cases = [("default-disabled", [], False),
              ("non-console-positive-control", [*commissioned, "-DKAEW_PUMP_PIN=15", "-DKAEW_ESTOP_PIN=16"], False)]
-    for pin in (43, 44):
+    for pin in (43, 44, 21, 47):
         cases.append((f"reject-pump-{pin}", [*commissioned, f"-DKAEW_PUMP_PIN={pin}", "-DKAEW_ESTOP_PIN=16"], True))
         cases.append((f"reject-estop-{pin}", [*commissioned, "-DKAEW_PUMP_PIN=15", f"-DKAEW_ESTOP_PIN={pin}"], True))
     for name, flags, must_fail in cases:

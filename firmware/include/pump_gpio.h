@@ -30,7 +30,7 @@
 #if KAEW_PUMP_COMMISSIONED
 static_assert(GPIO_IS_VALID_OUTPUT_GPIO(KAEW_PUMP_PIN) && GPIO_IS_VALID_GPIO(KAEW_ESTOP_PIN), "Invalid S3 GPIO capability");
 constexpr bool reservedGatewayPin(int pin) {
-  return pin == 1 || pin == 2 || pin == 4 || pin == 5 || pin == 6 || pin == 7 || pin == 8 || pin == 9 ||
+  return pin == 21 || pin == 47 || pin == 17 || pin == 18 || pin == 4 || pin == 5 || pin == 6 || pin == 7 || pin == 8 || pin == 9 ||
     pin == 10 || pin == 11 || pin == 0 || pin == 3 || pin == 45 || pin == 46 ||
     pin == 19 || pin == 20 || pin == 43 || pin == 44 || (pin >= 26 && pin <= 37);
 }
