@@ -16,13 +16,13 @@ class InvalidInput(ValueError): pass
 
 
 def _number(value, lo, hi, nullable=False):
-    return (nullable and value is None) or (type(value) in (int,float) and math.isfinite(value) and lo<=value<=hi)
+    return (nullable and value is None) or (type(value) in (int,float) and lo<=value<=hi and math.isfinite(value))
 
 
 def validate_context(c):
     required={'goal_ml','drank_ml','minutes_since_drink','cup_ml','profile'}
     if not isinstance(c,dict) or not required <= set(c): raise InvalidInput('invalid context')
-    if not (_number(c['goal_ml'],100,10000,True) and _number(c['drank_ml'],0,20000) and
+    if not (_number(c.get('body_weight_kg'),20,250,True) and _number(c['goal_ml'],100,10000,True) and _number(c['drank_ml'],0,20000) and
             _number(c['minutes_since_drink'],0,10080,True) and _number(c['cup_ml'],0,300,True) and
             c['profile'] in ('balanced','gentle','active')): raise InvalidInput('invalid context values')
 
@@ -68,7 +68,7 @@ def recommend(context,provider):
 
 
 def prompt(context):
-    return ('Choose the next non-medical hydration reminder from recent history. '
+    return ('Choose the next non-medical hydration reminder using the daily goal, body weight and recent history. '
             'Return JSON only: {"next_reminder_minutes":15..180,"suggested_ml":100..400,"reason":"short reason"}. '
             'Volume is advisory only; never operate a pump. Null means unknown. Data: '
             +json.dumps(context,ensure_ascii=False,allow_nan=False))

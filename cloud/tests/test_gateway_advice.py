@@ -86,7 +86,12 @@ class GatewayAdviceApiTest(unittest.TestCase):
             return response.status,json.load(response)
 
     def decision(self, simulated=False):
-        status,data=self.request('POST','/api/advice','admin-test',{'include_simulated':simulated})
+        with closing(sqlite3.connect(self.path)) as db:
+            next_id=db.execute('SELECT COUNT(*) FROM events').fetchone()[0]+1
+        event={'event_id':f'test-drink-{next_id}','kind':'drink',
+               'source':'simulated' if simulated else 'measured','volume_ml':100}
+        self.assertEqual(self.request('POST','/api/events','admin-test',event)[0],201)
+        status,data=self.request('GET','/api/advice','admin-test')
         self.assertEqual(status,200)
         self.assertFalse(data['advice']['actuation_allowed'])
         return data
@@ -101,7 +106,7 @@ class GatewayAdviceApiTest(unittest.TestCase):
         self.assertNotIn('reason',result)
         self.assertEqual(self.request('GET','/api/advice','device-test')[0],401)
         self.assertEqual(self.request('GET','/api/events','device-test')[0],401)
-        self.assertEqual(self.request('POST','/api/advice','device-test',{'include_simulated':False})[0],401)
+        self.assertEqual(self.request('POST','/api/advice','device-test',{'include_simulated':False})[0],404)
         self.assertEqual(self.request('GET','/api/advice?'+QUERY,'wrong-token')[0],401)
         self.assertIn('advice',self.request('GET','/api/advice','admin-test')[1])
 

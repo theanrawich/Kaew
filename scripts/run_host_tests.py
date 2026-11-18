@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing", "ai_refill")
+TESTS = ("safety", "scale", "protocol", "integration", "dispense", "durable_queue", "audio", "gateway_dispensing", "ai_refill", "drink_detection")
 
 
 def run(command):
@@ -59,7 +59,7 @@ def main():
             executable = work / f"{name}.exe"
             # Keep original programs' compiler policy; enforce warnings on the
             # new integration suite without changing unrelated legacy modules.
-            warnings = ["-Wall", "-Wextra", "-Werror"] if name in ("gateway_dispensing", "ai_refill") else []
+            warnings = ["-Wall", "-Wextra", "-Werror"] if name in ("gateway_dispensing", "ai_refill", "drink_detection") else []
             run([compiler, "-std=c++17", *warnings, "-Ifirmware/include",
                  ROOT / "firmware/test" / f"{name}_test.cpp", "-o", executable])
             run([executable])
@@ -84,7 +84,7 @@ def main():
                  ROOT / "firmware/test/cloud_config_test.cpp", "-o", executable])
             run([executable])
             print(f"PASS cloud-config/{mode}", flush=True)
-    print("PASS: 9 host programs (25 gateway + 12 AI scenarios), 6 pump GPIO compile cases, 6 cloud configuration cases", flush=True)
+    print(f"PASS: {len(TESTS)} host programs (25 gateway + 12 AI scenarios), 6 pump GPIO compile cases, 6 cloud configuration cases", flush=True)
 
 
 if __name__ == "__main__":

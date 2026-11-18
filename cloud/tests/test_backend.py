@@ -193,22 +193,6 @@ class BackendTest(unittest.TestCase):
             self.assertEqual(res.status, 200)
             self.assertIn(b'Kaew telemetry', res.read())
 
-    def test_drinking_event_and_reminder_are_persisted(self):
-        drink = {'event_id':'drink-1','kind':'drink','source':'simulated','volume_ml':120}
-        self.assertEqual(self.request('POST','/api/events','admin-secret',drink)[0],201)
-        self.assertEqual(self.request('POST','/api/events','admin-secret',drink)[0],200)
-        self.assertEqual(self.request('POST','/api/events','device-secret',drink)[0],401)
-        self.assertEqual(self.request('GET','/api/summary','admin-secret')[1]['drinking_ml'],120)
-        reminder = {'interval_minutes':30,'next_due':time.time()-1}
-        self.assertEqual(self.request('POST','/api/reminder','admin-secret',reminder)[0],200)
-        deadline=time.monotonic()+3
-        while time.monotonic()<deadline:
-            _, records=self.request('GET','/api/notifications','admin-secret')
-            if records['items']: break
-            time.sleep(.05)
-        self.assertEqual(len(records['items']),1)
-        self.assertEqual(records['items'][0]['provider'],'mock')
-
     def test_events_since_includes_drinks_outside_latest_100(self):
         older = time.time() - 6 * 86400 + .25
         with closing(sqlite3.connect(self.path)) as db, db:
@@ -247,17 +231,6 @@ class BackendTest(unittest.TestCase):
             self.assertEqual(body['items'][0]['received_at'], 2005)
         self.assertEqual(len(self.request('GET', '/api/events?limit=3', 'admin-secret')[1]['items']), 3)
 
-    def test_reminder_get_includes_repeat_flag(self):
-        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
-        self.assertEqual(self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()+60})[0],200)
-        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
-        self.assertEqual(rem['repeat_enabled'],1)
-        with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('UPDATE reminders SET repeat_enabled=0')
-        rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
-        self.assertEqual(rem['repeat_enabled'],0)
-
-
     def test_existing_database_migrates_without_losing_telemetry(self):
         path=os.path.join(self.directory.name,'old.sqlite3')
         with closing(sqlite3.connect(path)) as db, db:
@@ -276,11 +249,28 @@ class BackendTest(unittest.TestCase):
         items=self.request('GET','/api/notifications','admin-secret')[1]['items']
         self.assertEqual(items[0]['status'],'legacy_mock')
 
-    def test_hydration_goal_is_user_configured_and_persistent(self):
-        self.assertEqual(self.request('GET','/api/goal','admin-secret')[1]['goal_ml'],None)
-        self.assertEqual(self.request('POST','/api/goal','admin-secret',{'goal_ml':2000})[0],200)
-        self.assertEqual(self.request('POST','/api/goal','admin-secret',{'goal_ml':-10})[0],400)
-        self.assertEqual(self.request('GET','/api/goal','admin-secret')[1]['goal_ml'],2000)
+    def test_profile_validates_persists_and_derives_goal(self):
+        def request(method, body=None, token='admin-secret'):
+            return self.request(method,'/api/profile',token,body)
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("INSERT INTO settings VALUES ('goal_ml',2000)")
+        self.assertEqual(request('GET')[1],{'body_weight_kg':None,'goal_ml':None})
+        self.assertEqual(request('POST',{'body_weight_kg':70},'device-secret')[0],401)
+        self.assertEqual(request('GET',token='device-secret')[0],401)
+        for body in ({}, {'body_weight_kg':70,'goal_ml':2500}, *(
+            {'body_weight_kg':v} for v in (19.99,250.01,True,None,'70',10**400)
+        )):
+            with self.subTest(body=body):
+                self.assertEqual(request('POST',body)[0],400)
+        for weight,goal in ((20,1000),(70.5,2327),(250,4000)):
+            expected={'body_weight_kg':weight,'goal_ml':goal}
+            self.assertEqual(request('POST',{'body_weight_kg':weight}),(200,expected))
+            self.assertEqual(request('GET'),(200,expected))
+            self.assertEqual(self.request('GET','/api/goal','admin-secret'),(200,{'goal_ml':goal}))
+        with closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute("SELECT value FROM settings WHERE key='body_weight_g'").fetchone()[0],250000)
+        for path in ('goal','reminder','advice'):
+            self.assertEqual(self.request('POST','/api/'+path,'admin-secret',{})[0],404)
 
     def test_low_water_and_fault_notifications_are_deduplicated(self):
         dry = dict(self.sample,level='dry')
@@ -330,26 +320,30 @@ class BackendTest(unittest.TestCase):
         status, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว เติมน้ำให้หน่อย'})
         self.assertEqual(status,200); self.assertEqual(answer['intent'],'refill'); self.assertFalse(answer['executed'])
         status, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
-        self.assertEqual(answer['intent'],'reminder'); self.assertEqual(answer['minutes'],30)
-        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder']['interval_minutes'],30)
+        self.assertEqual(answer['intent'],'reminder'); self.assertFalse(answer['executed'])
         _, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่'})
         self.assertEqual(answer['level'],'unknown')
         self.request('POST','/api/telemetry','device-secret',self.sample)
         _, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว น้ำในขวดเป็นอย่างไร'})
         self.assertEqual(answer['level'],'wet'); self.assertNotIn('มิลลิลิตร',answer['reply'])
 
-    def test_voice_reminder_is_one_shot_and_missing_wake_is_ignored(self):
-        _,answer=self.request('POST','/api/voice','admin-secret',{'text':'เตือนอีก 5 นาที'})
-        self.assertFalse(answer['executed'])
-        _,answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว remind อีก ๕ นาที'})
-        self.assertEqual(answer['minutes'],5)
-        with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('UPDATE reminders SET next_due=? WHERE id=1',(time.time()-1,))
-        deadline=time.monotonic()+3
-        while time.monotonic()<deadline:
-            if self.request('GET','/api/reminder','admin-secret')[1]['reminder'] is None: break
-            time.sleep(.05)
-        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
+    def test_voice_cannot_create_or_change_reminder(self):
+        def reminder():
+            return self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        self.assertIsNone(reminder())
+        for text in ('เตือนอีก 5 นาที','แก้ว remind อีก ๕ นาที','แก้ว เตือนให้ดื่มน้ำ'):
+            status,answer=self.request('POST','/api/voice','admin-secret',{'text':text})
+            self.assertEqual(status,200)
+            self.assertFalse(answer['executed'])
+            if text.startswith('แก้ว'):
+                self.assertEqual(answer['intent'],'reminder')
+                self.assertIn('อัตโนมัติ',answer['reply'])
+        self.assertIsNone(reminder())
+        self.request('POST','/api/profile','admin-secret',{'body_weight_kg':70})
+        previous=reminder()
+        self.assertIsNotNone(previous)
+        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
+        self.assertEqual(reminder(),previous)
 
     def kinds(self):
         return sorted(x['kind'] for x in self.request('GET','/api/notifications','admin-secret')[1]['items'])
@@ -398,9 +392,9 @@ class BackendTest(unittest.TestCase):
         command=lambda text: self.request('POST','/api/voice','admin-secret',{'text':text})[1]
         out=Path(self.directory.name)/'response.wav'
         result=process_audio(wav_fixture(),ASR(),command,TTS(),out)
-        self.assertTrue(result['executed']); self.assertEqual(result['minutes'],30)
+        self.assertFalse(result['executed']); self.assertEqual(result['intent'],'reminder')
         self.assertTrue(out.read_bytes().startswith(b'RIFF'))
-        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder']['interval_minutes'],30)
+        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
 
     def test_three_voice_examples_with_mock_asr_tts_and_real_backend(self):
         class ASR:
@@ -415,17 +409,18 @@ class BackendTest(unittest.TestCase):
             if intent=='refill': self.assertFalse(result['executed'])
 
     def test_advice_uses_history_and_never_authorizes_actuation(self):
-        self.request('POST','/api/goal','admin-secret',{'goal_ml':2000})
+        self.request('POST','/api/profile','admin-secret',{'body_weight_kg':70})
         self.request('POST','/api/telemetry','device-secret',dict(self.sample,temperature_c=28,source='device'))
-        self.request('POST','/api/events','admin-secret',{'event_id':'a1','kind':'drink','source':'simulated','volume_ml':120})
         contexts=[]
         def fake(context):
             contexts.append(context)
             return {'suggested_ml':180,'next_reminder_minutes':45,'reason':'Based on recent intake.'}
         self.server.hydration_provider=fake
-        status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':True})
+        self.request('POST','/api/events','admin-secret',{'event_id':'a1','kind':'drink','source':'simulated','volume_ml':120})
+        status,result=self.request('GET','/api/advice','admin-secret')
         self.assertEqual(status,200); self.assertEqual(contexts[0]['drank_ml'],120)
-        self.assertEqual(contexts[0]['goal_ml'],2000)
+        self.assertEqual(contexts[0]['body_weight_kg'],70)
+        self.assertEqual(contexts[0]['goal_ml'],2310)
         self.assertEqual(contexts[0]['temperature_c'],28)
         self.assertEqual(contexts[0]['tank_level'],'wet')
         self.assertEqual(contexts[0]['timezone'],'Asia/Bangkok')
@@ -441,49 +436,51 @@ class BackendTest(unittest.TestCase):
         for provider,minutes,fallback in ((lambda c:{'next_reminder_minutes':35,'suggested_ml':220,'reason':'Recent intake.'},35,False),(None,60,True),(lambda c:'invalid JSON',60,True),(timeout,60,True)):
             self.server.hydration_provider=provider
             before=time.time()
-            status,result=self.request('POST','/api/advice','admin-secret',{'include_simulated':False})
-            self.assertEqual(status,200)
-            decision=result['advice']
+            self.assertEqual(self.request('POST','/api/profile','admin-secret',{'body_weight_kg':70})[0],200)
+            decision=self.request('GET','/api/advice','admin-secret')[1]['advice']
             self.assertEqual(decision['fallback'],fallback); self.assertFalse(decision['actuation_allowed'])
-            latest=self.request('GET','/api/advice','admin-secret')[1]['advice']
-            self.assertEqual(latest,decision)
             rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
             self.assertEqual(rem['interval_minutes'],minutes)
             self.assertGreaterEqual(rem['next_due'],before+minutes*60)
             self.assertLessEqual(rem['next_due'],time.time()+minutes*60)
         self.assertEqual(self.request('GET','/api/notifications','admin-secret')[1]['items'],[])
 
-    def test_drink_reschedules_once_without_nagging_and_preserves_voice_reminder(self):
+    def test_device_drink_reschedules_once_and_is_scoped_to_gateway(self):
         contexts=[]
         def model(c):
             contexts.append(c)
             return {'next_reminder_minutes':25,'suggested_ml':210,'reason':'Recent drink.'}
         self.server.hydration_provider=model
-        drink={'event_id':'auto-1','kind':'drink','source':'measured','volume_ml':150}
-        self.request('POST','/api/events','admin-secret',drink)
-        self.request('POST','/api/events','admin-secret',drink)
-        self.assertEqual(len(contexts),1)
-        self.request('POST','/api/events','admin-secret',{'event_id':'no-inference','kind':'fault','source':'measured','volume_ml':None})
+        drink={'event_id':'gateway-1:12345678:9abcdef0:00000001','kind':'drink','source':'measured','volume_ml':150}
+        def post(event, token='device-secret'):
+            return self.request('POST','/api/events',token,event)[0]
+        self.assertEqual(post(drink,'admin-secret'),403)
+        self.assertEqual(post(drink,'wrong-token'),401)
+        self.assertEqual(post(dict(drink,event_id='node-2:12345678:9abcdef0:00000001')),403)
+        self.assertEqual(post(dict(drink,device_id='node-2')),400)
+        self.assertEqual(post(dict(drink,source='simulated')),403)
+        self.assertEqual(post(dict(drink,kind='fault',volume_ml=None)),403)
+        self.assertEqual(post(drink),201)
+        self.assertEqual(post(drink),200)
+        self.assertEqual(post(dict(drink,volume_ml=200)),409)
         self.assertEqual(len(contexts),1)
         self.assertEqual(contexts[0]['drink_count'],1)
         self.assertEqual(contexts[0]['drank_ml'],150)
         rem=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
         self.assertEqual(rem['interval_minutes'],25)
-        self.assertFalse(any(n['kind']=='reminder' for n in self.request('GET','/api/notifications','admin-secret')[1]['items']))
-        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
-        voice=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
-        self.request('POST','/api/events','admin-secret',dict(drink,event_id='auto-2'))
-        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder'],voice)
-        self.request('POST','/api/advice','admin-secret',{'include_simulated':False})
-        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder']['interval_minutes'],25)
+        self.assertEqual(rem['repeat_enabled'],1)
+        self.assertEqual(self.request('GET','/api/events','device-secret')[0],401)
+        self.assertEqual(self.request('GET','/api/summary','admin-secret')[1]['drinking_ml'],150)
+        self.assertEqual(self.request('GET','/api/notifications','admin-secret')[1]['items'],[])
 
-    def test_reminder_commits_fire_before_model_and_does_not_overwrite_new_voice(self):
+    def test_reminder_commits_fire_before_model_and_checks_schedule_snapshot(self):
         entered=threading.Event(); release=threading.Event()
         def model(c):
             entered.set(); release.wait(3)
             return {'next_reminder_minutes':40,'suggested_ml':200,'reason':'Next reminder.'}
         self.server.hydration_provider=model
-        self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()-1})
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO reminders VALUES (1,30,?,1)',(time.time()-1,))
         try:
             self.assertTrue(entered.wait(2))
             # A separate writer succeeds while inference is blocked; fire is durable.
@@ -500,16 +497,6 @@ class BackendTest(unittest.TestCase):
             self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()[0],0)
             self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],1)
 
-    def test_overdue_voice_reminder_is_not_discarded_by_a_drink(self):
-        # Pause scheduler so the pending overdue reminder cannot race the request.
-        self.server.stop_reminders.set(); self.server.reminder_thread.join(); self.server.delivery_thread.join()
-        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
-        with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('UPDATE reminders SET next_due=?',(time.time()-1,))
-        pending=self.request('GET','/api/reminder','admin-secret')[1]['reminder']
-        self.request('POST','/api/events','admin-secret',{'event_id':'pending','kind':'drink','source':'measured','volume_ml':100})
-        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]['reminder'],pending)
-
     def test_repeating_fire_uses_model_to_schedule_next_and_delivers_once(self):
         contexts=[]
         def model(c):
@@ -517,7 +504,8 @@ class BackendTest(unittest.TestCase):
             return {'next_reminder_minutes':42,'suggested_ml':230,'reason':'Next interval.'}
         model.model='mock-reminder-model'
         self.server.hydration_provider=model
-        self.request('POST','/api/reminder','admin-secret',{'interval_minutes':30,'next_due':time.time()-1})
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO reminders VALUES (1,30,?,1)',(time.time()-1,))
         deadline=time.monotonic()+3
         while time.monotonic()<deadline:
             notes=self.request('GET','/api/notifications','admin-secret')[1]['items']

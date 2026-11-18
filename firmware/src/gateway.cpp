@@ -8,6 +8,7 @@
 #include "packet_trace.h"
 #include "wire_protocol.h"
 #include "cloud_publisher.h"
+#include "drink_detection.h"
 #include "ai_advice_client.h"
 #ifndef KAEW_AUDIO_ENABLED
 #define KAEW_AUDIO_ENABLED 0
@@ -35,6 +36,7 @@ std::atomic<bool> scaleOverflow{false};
 Preferences preferences;
 Calibration calibration{};
 ScaleProcessor scaleInputs;
+DrinkDetector drinkDetector;
 FrameParser parser;
 Receiver receiver;
 Receiver safetyReceiver; // Safety data is independent of outbox backpressure.
@@ -61,6 +63,7 @@ AiRefillBridge *aiRefill = nullptr;
 uint32_t cupSession = 0;
 Inputs inputs{false, false, false, false, false, 0, 0, 0};
 uint32_t lastPrint = 0, bootSession = 0;
+uint32_t drinkBootHigh = 0, drinkSequence = 0;
 
 void acquireScale(void *) {
   for (;;) {
@@ -130,7 +133,7 @@ void command(const char *line) {
   if (parseCalibration(line, next)) {
     aiRefill->cancel();
     if (preferences.putBytes("cal-v1", &next, sizeof next) == sizeof next) {
-      calibration = next; scaleInputs.calibrate(next); Serial.println("calibration saved; verify with independent masses");
+      calibration = next; scaleInputs.calibrate(next); drinkDetector.reset(); Serial.println("calibration saved; verify with independent masses");
     } else Serial.println("calibration rejected or storage failed");
     return;
   }
@@ -141,6 +144,7 @@ void command(const char *line) {
 void setup() {
   pump.begin(); pump.set(false);
   bootSession = esp_random(); if (!bootSession) bootSession = 1;
+  drinkBootHigh = esp_random();
   static GatewayDispenser control(pump, bootSession, KAEW_LOCAL_REFILL_ENABLED, safetyLimits(), {}, KAEW_AI_REFILL_ENABLED);
   dispenser = &control;
   static AiRefillBridge bridge(control); aiRefill=&bridge;
@@ -182,8 +186,18 @@ void loop() {
   RawScaleSample sample{};
   for (unsigned n = 0; n < 8 && scaleSamples && xQueueReceive(scaleSamples, &sample, 0) == pdTRUE; ++n) {
     scaleReady = true; raw = sample.raw;
-    scaleInputs.accept(sample.raw, sample.atMs, activeScale());
+    const bool wasActive = activeScale();
+    scaleInputs.accept(sample.raw, sample.atMs, wasActive);
     controlTick(); // Each queued removal is checked, not overwritten by a later sample.
+    if (wasActive || activeScale() || scaleOverflow.load() || !scaleInputs.calibrated() ||
+        !validScaleRaw(sample.raw) || uint32_t(inputs.nowMs - sample.atMs) >= KAEW_SCALE_STALE_MS) {
+      drinkDetector.reset();
+    } else if (cloud.enabled()) {
+      const unsigned volume = drinkDetector.update(toGrams(calibration, sample.raw), sample.atMs,
+                                                   KAEW_SCALE_STALE_MS);
+      if (volume && drinkSequence != UINT32_MAX)
+        cloud.enqueueDrink({drinkBootHigh, bootSession, ++drinkSequence, static_cast<uint16_t>(volume)});
+    }
   }
   controlTick(); // Raw cup removal/target crossing is applied in this iteration.
 
