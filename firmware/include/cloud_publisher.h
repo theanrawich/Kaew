@@ -15,7 +15,7 @@ class CloudPublisher {
   QueueHandle_t pending_=nullptr, acknowledgements_=nullptr;
   SemaphoreHandle_t lock_=nullptr;
   volatile uint32_t rejected_=0, errors_=0;
-  bool ready_=false;
+  bool ready_=false, keepConnected_=false;
   static void persistTask(void *p) { static_cast<CloudPublisher*>(p)->persist(); }
   static void networkTask(void *p) { static_cast<CloudPublisher*>(p)->network(); }
   void persist() {
@@ -40,16 +40,21 @@ class CloudPublisher {
   void network() {
     WiFi.mode(WIFI_STA); WiFi.begin(KAEW_WIFI_SSID,KAEW_WIFI_PASSWORD);
     bool clockRequested=false, storageErrorReported=false; uint32_t retryMs=1000;
+    const char *url=KAEW_CLOUD_URL; bool tls=strncmp(url,"https://",8)==0;
+    bool dev=KAEW_ALLOW_DEV_HTTP && strncmp(url,"http://",7)==0;
     for (;;) {
+      // STT shares this station and clock even when the telemetry outbox is empty.
+      if (tls && !clockRequested && WiFi.status() == WL_CONNECTED) {
+        configTime(0,0,"pool.ntp.org","time.google.com");
+        clockRequested=true;
+      }
       Packet packet{};
       xSemaphoreTake(lock_,portMAX_DELAY); bool found=durable_.peek(packet); bool healthy=durable_.healthy(); xSemaphoreGive(lock_);
       if(!healthy && !storageErrorReported) { ++errors_; storageErrorReported=true; }
-      if(!found) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
+      if(!found && !keepConnected_) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if(WiFi.status()!=WL_CONNECTED) { WiFi.reconnect(); vTaskDelay(pdMS_TO_TICKS(retryMs+esp_random()%(retryMs/4+1))); retryMs=min(retryMs*2,uint32_t(60000));continue; }
-      const char *url=KAEW_CLOUD_URL; bool tls=strncmp(url,"https://",8)==0;
-      bool dev=KAEW_ALLOW_DEV_HTTP && strncmp(url,"http://",7)==0;
+      if(!found) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if((!tls && !dev) || !strlen(KAEW_CLOUD_TOKEN) || (tls && !strlen(KAEW_CLOUD_CA))) {vTaskDelay(pdMS_TO_TICKS(10000));continue;}
-      if(tls && !clockRequested) {configTime(0,0,"pool.ntp.org");clockRequested=true;}
       if(tls && time(nullptr)<1577836800) {vTaskDelay(pdMS_TO_TICKS(5000));continue;}
       WiFiClient plain; WiFiClientSecure secure; if(tls) secure.setCACert(KAEW_CLOUD_CA);
       HTTPClient http; bool began=tls ? http.begin(secure,url) : http.begin(plain,url);
@@ -69,8 +74,9 @@ class CloudPublisher {
     }
   }
 public:
-  bool begin() {
+  bool begin(bool keepConnected = false) {
     if(!KAEW_CLOUD_ENABLED)return false;
+    keepConnected_ = keepConnected;
     if(!store_.begin() || !durable_.recover()) {++errors_;return false;}
     lock_=xSemaphoreCreateMutex(); pending_=xQueueCreate(8,sizeof(Packet)); acknowledgements_=xQueueCreate(8,sizeof(Packet));
     if(!lock_ || !pending_ || !acknowledgements_) {++errors_;return false;}

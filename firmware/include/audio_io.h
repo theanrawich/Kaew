@@ -1,13 +1,13 @@
 #pragma once
 #include <Arduino.h>
 #include <driver/i2s.h>
-#include "audio_processing.h"
+#include "speech_capture.h"
 
 // Candidate pins only; verify board, I2S channel and audio module wiring physically.
 class AudioIO {
   bool rx_=false,tx_=false;
   static bool configure(i2s_port_t port, i2s_mode_t mode, int bits, int bclk, int ws, int in, int out) {
-    i2s_config_t c{}; c.mode=mode; c.sample_rate=16000; c.bits_per_sample=static_cast<i2s_bits_per_sample_t>(bits);
+    i2s_config_t c{}; c.mode=mode; c.sample_rate=SpeechCapture::sampleRate; c.bits_per_sample=static_cast<i2s_bits_per_sample_t>(bits);
     c.channel_format=I2S_CHANNEL_FMT_ONLY_LEFT; c.communication_format=I2S_COMM_FORMAT_STAND_I2S;
     c.intr_alloc_flags=ESP_INTR_FLAG_LEVEL1; c.dma_buf_count=4; c.dma_buf_len=256; c.use_apll=false;
     if(i2s_driver_install(port,&c,0,nullptr)!=ESP_OK) return false;
@@ -16,18 +16,27 @@ class AudioIO {
     return true;
   }
 public:
+  bool beginMicrophone() {
+    rx_ = configure(I2S_NUM_0, static_cast<i2s_mode_t>(I2S_MODE_MASTER | I2S_MODE_RX),
+                    32, 7, 8, 6, I2S_PIN_NO_CHANGE);
+    return rx_;
+  }
+
   bool begin() {
-    rx_=configure(I2S_NUM_0,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_RX),32,7,8,6,I2S_PIN_NO_CHANGE);
+    beginMicrophone();
     tx_=configure(I2S_NUM_1,static_cast<i2s_mode_t>(I2S_MODE_MASTER|I2S_MODE_TX),16,10,11,I2S_PIN_NO_CHANGE,9);
     if(!rx_ || !tx_) { stop(); return false; }
     return rx_ && tx_;
   }
-  size_t readMicrophone(int16_t *out,size_t capacity) {
-    if(!rx_ || !out || !capacity)return 0; int32_t raw[128]; size_t bytes=0;
-    size_t n=capacity<128?capacity:128;
-    if(i2s_read(I2S_NUM_0,raw,n*sizeof(int32_t),&bytes,0)!=ESP_OK)return 0;
-    for(size_t i=0;i<bytes/sizeof(int32_t);i++)out[i]=pcm32to16(raw[i]); return bytes/sizeof(int32_t);
+
+  size_t readMicrophoneRaw(int32_t *out, size_t capacity, TickType_t timeout) {
+    if (!rx_ || !out || !capacity) return 0;
+    size_t bytes = 0;
+    if (i2s_read(I2S_NUM_0, out, capacity * sizeof(*out), &bytes, timeout) != ESP_OK ||
+        bytes % sizeof(*out) != 0) return 0;
+    return bytes / sizeof(*out);
   }
+
   size_t play(const int16_t *samples,size_t count) {
     if(!tx_ || !samples || !count)return 0; size_t bytes=0;
     if(i2s_write(I2S_NUM_1,samples,count*sizeof(int16_t),&bytes,0)!=ESP_OK)return 0;
