@@ -34,7 +34,7 @@ HX711 acquisition runs in a separate core-0 task with an eight-sample queue so a
 
 The state path is Idle → Dispensing → Settling → Idle; faults and explicit STOP latch Faulted. RESET requires safe inputs, never starts dispensing, and requires a fresh empty-cup TARE and new request afterward. Gateway example limits are scale stale 500 ms, no progress 5 s, dispensing 30 s, settling 1 s, progress 3 g, drop 20 g, rise 1000 g/s, cup 30–900 g and total water cap 300 mL. These are unmeasured prototype settings, distinct from controller-class defaults. E-stop, stale/invalid scale, cup, tank and then plausibility/time/progress checks can stop dispensing; the first reported fault does not establish that other inputs are safe.
 
-Manual commands carry version, boot session, increasing ID, gateway timestamp and total-water target; rejected IDs are consumed and cannot start later. See the [command contract](GATEWAY_REFILL_CONTRACT.md). Physical commissioning additionally requires verified independent cutoff, actual pins/polarities and electrical review. GPIO43/44 remain reserved for UART0; compile guards cannot prove wiring or physical power removal. Trace builds forbid pump commissioning. Packet measurements require final zero-drop counters from both boards after the window plus recovery; see the [performance plan](PERFORMANCE_TEST_PLAN.md).
+Manual commands carry version, boot session, increasing ID, gateway timestamp and total-water target; rejected IDs are consumed and cannot start later. See the [command contract](gateway-refill-contract.md). Physical commissioning additionally requires verified independent cutoff, actual pins/polarities and electrical review. GPIO43/44 remain reserved for UART0; compile guards cannot prove wiring or physical power removal. Trace builds forbid pump commissioning. Packet measurements require final zero-drop counters from both boards after the window plus recovery; see the [performance plan](../testing/performance-test-plan.md).
 
 ## Authenticated device view of `/api/advice`
 
@@ -88,7 +88,6 @@ python scripts/run_host_tests.py
 python -m unittest discover -s cloud/tests -t cloud -p 'test_gateway_advice.py' -v
 python -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
 python -m unittest discover -s scripts -p 'test_*.py' -v
-node --test simulation/*.test.mjs
 pio run -d firmware -e sensor_node -e gateway -e gateway_cloud_compile -e sensor_node_trace -e gateway_trace -e gateway_ai_compile
 ```
 
@@ -96,7 +95,7 @@ The new C++ program has 12 named deterministic scenarios: model-dependent target
 
 `cloud/tests/test_gateway_advice.py` exercises the actual local HTTP API and compiles `ai_refill_probe.cpp`: a **deterministic test provider** generates 120 and 240 mL recommendations through the existing `recommend/apply_advice` path; the returned device JSON is parsed by the same C++ decoder/bridge/controller and produces fake targets 220 and 340 g for a synthetic 100 g cup, then stops at the target. A 400 mL recommendation is rejected locally. This is inspectable software integration with a mock inference engine and fake actuator; it is **not live model inference, ESP32 execution, measured water or physical safety evidence**.
 
-Recorded M4 results: 9 C++ host programs (25 gateway scenarios and 12 AI scenario groups), 6 GPIO compile checks (2 positive / 4 expected failures), 6 cloud configuration cases; cloud 87 tests (82 passed / 5 optional Postgres skipped); measurement/capture Python 24/24; simulator 25/25; all 6 PlatformIO environments built successfully. Earlier PR #8 recorded 8 C++ programs, cloud 79 tests (74 passed / 5 skipped), simulator 25/25, measurement/capture 24/24 after review, and all 5 then-existing firmware environments built. These historical counts are separate snapshots, not additional current runs. See the [M4 validation summary](validation/m4-ai-loop.md) and [PR #8 summary](validation/software-2026-11-17.md). No cloud deployment, live token/API call, real serial session, board flash or pump operation occurred.
+Recorded M4 results: 9 C++ host programs (25 gateway scenarios and 12 AI scenario groups), 6 GPIO compile checks (2 positive / 4 expected failures), 6 cloud configuration cases; cloud 87 tests (82 passed / 5 optional Postgres skipped); measurement/capture Python 24/24; all 6 PlatformIO environments built successfully. Earlier PR #8 recorded 8 C++ programs, cloud 79 tests (74 passed / 5 skipped), measurement/capture 24/24 after review, and all 5 then-existing firmware environments built. These historical counts are separate snapshots, not additional current runs. See the [M4 validation summary](../testing/validation/m4-ai-loop.md) and [PR #8 summary](../testing/validation/software-2026-11-17.md). No cloud deployment, live token/API call, real serial session, board flash or pump operation occurred.
 
 ## Handoff and remaining work
 

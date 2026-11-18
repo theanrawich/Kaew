@@ -19,7 +19,7 @@
 
 **กติกาการบันทึก:** PASS เมื่อผ่านเกณฑ์ที่กำหนดไว้ล่วงหน้าทุกครั้งตามแผน, FAIL เมื่อไม่ผ่าน, BLOCKED เมื่อไม่มีเกณฑ์ อุปกรณ์ หรือหลักฐาน, N/A เฉพาะเมื่อมีเหตุผล ห้ามเปลี่ยนเกณฑ์หลังเห็นผลโดยไม่บันทึก revision และทดสอบซ้ำ บันทึกทั้งผลดิบและเงื่อนไข รวมเหตุที่ยกเลิก
 
-ใช้ [แผนวัดซ้ำ latency/PDR/accuracy/overshoot](PERFORMANCE_TEST_PLAN.md), [CSV ว่าง](measurements/) และ [แบบฟอร์ม run index](measurements/test-runs.csv) สำหรับงานของ Arm ตัวเลขใน unit tests เป็น synthetic ไม่ใช่ผลทดลอง
+ใช้ [แผนวัดซ้ำ latency/PDR/accuracy/overshoot](performance-test-plan.md), [CSV ว่าง](measurements/) และ [แบบฟอร์ม run index](measurements/test-runs.csv) สำหรับงานของ Arm ตัวเลขใน unit tests เป็น synthetic ไม่ใช่ผลทดลอง
 
 แบบบันทึกต่อหนึ่ง test/run (คัดลอกเติมจริง):
 

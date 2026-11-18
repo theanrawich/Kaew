@@ -1,6 +1,6 @@
 # Gateway refill contract — Ratchapol / Theanrawich handoff
 
-17 November 2026. **Physical pump disabled; unvalidated remote requests remain rejected.** The new opt-in, locally confirmed AI pull adapter is documented in [M4 gateway loop](M4_GATEWAY_AI_LOOP.md). This document does not authorize commissioning. Theanrawich's model/reminder logic is unchanged; the cloud adds only a restricted read-only device projection.
+17 November 2026. **Physical pump disabled; unvalidated remote requests remain rejected.** The new opt-in, locally confirmed AI pull adapter is documented in [M4 gateway loop](m4-gateway-ai-loop.md). This document does not authorize commissioning. Theanrawich's model/reminder logic is unchanged; the cloud adds only a restricted read-only device projection.
 
 ## Admission boundary
 
@@ -21,7 +21,7 @@ Lines are ASCII, newline-terminated, at most 127 bytes excluding terminator. CR 
 
 `CAL` and `TARE` are local bench operations in Idle. The operator must confirm the platform was unloaded for calibration zero and the cup is EMPTY for tare. Software cannot establish emptiness, cup identity or capacity from weight alone. Never send invented calibration counts. Calibration data includes version/checksum; only it is persisted. Tare, commands, target and request IDs are volatile.
 
-`AI_REFILL` is a separate default-disabled, one-shot local intent for the current tared cup. It never takes a volume or safety flags from the console: the worker fetches a fresh authenticated device advice projection, and the bridge independently validates it before the same refill checks. It requires safe local conditions even before fetching. The default uncommissioned E-stop/driver configuration therefore blocks real operation. See the [full binding/authentication/expiry contract](M4_GATEWAY_AI_LOOP.md).
+`AI_REFILL` is a separate default-disabled, one-shot local intent for the current tared cup. It never takes a volume or safety flags from the console: the worker fetches a fresh authenticated device advice projection, and the bridge independently validates it before the same refill checks. It requires safe local conditions even before fetching. The default uncommissioned E-stop/driver configuration therefore blocks real operation. See the [full binding/authentication/expiry contract](m4-gateway-ai-loop.md).
 
 ## Proposed typed data for the future adapter
 
@@ -60,11 +60,11 @@ For example, an empty cup of 100 g containing an estimated 50 mL weighs 150 g. A
 ## Remaining handoff to Theanrawich
 
 1. Keep cloud decisions advisory; review TOTAL-volume semantics for the confirmed empty/tared cup. Natural-language *add* instructions need a separate reviewed adapter and confirmation, not direct mapping to this target.
-2. Review/deploy the restricted device-token advice view and local authorization boundary in the [M4 design](M4_GATEWAY_AI_LOOP.md). TLS and read authorization do not replace local intent or hardware interlocks; there is still no general pump-command API.
+2. Review/deploy the restricted device-token advice view and local authorization boundary in the [M4 design](m4-gateway-ai-loop.md). TLS and read authorization do not replace local intent or hardware interlocks; there is still no general pump-command API.
 3. Validate boot/request/cup/nonce echo, decision-age projection and 2-second local deadline on the actual network. No epoch timestamp is copied into `issuedAtMs`, and offline backlog/late replies are never re-stamped as fresh.
 4. Define result/event reporting: proposal ID, requested total, locally accepted target, state/fault/result, gateway boot and timestamp, source, freshness and explicit disabled status. Current cloud publisher still sends **node telemetry only**, not these new dispenser events.
 5. Review the implemented adapter and run live model/network/physical tests after commissioning. The opt-in feature flag alone does not authorize commissioning. No production deployment, board flash or physical activation was performed by this implementation task.
 
 ## Required from Suphachok / hardware team
 
-Supply exact pump/driver/adapter part numbers, ratings and polarity; actual GPIO availability and breakout schematics; independent E-stop power-cut circuit with external fail-safe status bias; verified tank output voltage/polarity and node pin; HX711/load-cell wiring, actual rate and measured calibration; cup safe capacity and post-stop flow. Arm reviews and measures before selecting commissioning limits. See [physical test plan](PERFORMANCE_TEST_PLAN.md) and [wiring holds](wiring.md). These are requested handoffs, not claims that a teammate has already verified them.
+Supply exact pump/driver/adapter part numbers, ratings and polarity; actual GPIO availability and breakout schematics; independent E-stop power-cut circuit with external fail-safe status bias; verified tank output voltage/polarity and node pin; HX711/load-cell wiring, actual rate and measured calibration; cup safe capacity and post-stop flow. Arm reviews and measures before selecting commissioning limits. See [physical test plan](../testing/performance-test-plan.md) and [wiring holds](../hardware/wiring.md). These are requested handoffs, not claims that a teammate has already verified them.

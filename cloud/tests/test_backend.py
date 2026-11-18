@@ -6,10 +6,7 @@ import threading
 import unittest
 from unittest.mock import patch
 from kaew.audio_service import AudioError, GroqWhisperASR
-import subprocess
-import sys
 import time
-import socket
 import sqlite3
 from contextlib import closing
 from pathlib import Path
@@ -17,8 +14,6 @@ from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
 from kaew.server import create_server, migrate
-from tools.outbox import Outbox
-from tools.outbox_worker import OutboxWorker
 from kaew.audio_service import process_audio
 from tests.test_audio import wav_fixture
 
@@ -198,53 +193,10 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(results.count(201), 1)
         self.assertEqual(results.count(200), 7)
 
-    def test_simulator_to_database_pipeline(self):
-        env = dict(os.environ, KAEW_CLOUD_URL=self.url, KAEW_DEVICE_TOKEN='device-secret',
-                   KAEW_OUTBOX_PATH=os.path.join(self.directory.name, 'sender.sqlite3'), KAEW_PYTHON=sys.executable)
-        result = subprocess.run(['node', str(Path(__file__).resolve().parents[1] / 'tools/simulate.mjs')],
-                                env=env, capture_output=True, text=True, timeout=10)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        status, body = self.request('GET', '/api/telemetry', 'admin-secret')
-        self.assertEqual(status, 200)
-        self.assertEqual(body['items'][0]['level'], 'wet')
-        self.assertEqual(body['items'][0]['tds_adc'], 1234)
-        self.assertEqual(body['items'][0]['source'], 'simulated')
-
     def test_dashboard_is_served(self):
         with urllib.request.urlopen(self.url + '/', timeout=3) as res:
             self.assertEqual(res.status, 200)
             self.assertIn(b'Kaew telemetry', res.read())
-
-    def test_offline_outbox_survives_restart_and_flushes(self):
-        path = os.path.join(self.directory.name, 'outbox.sqlite3')
-        outbox = Outbox(path)
-        self.assertTrue(outbox.enqueue(self.sample))
-        self.assertFalse(outbox.enqueue(self.sample))
-        self.assertEqual(outbox.flush('http://127.0.0.1:1', 'device-secret'), 0)
-        self.assertEqual(Outbox(path).count(), 1)
-        self.assertEqual(Outbox(path).flush(self.url, 'device-secret'), 1)
-        self.assertEqual(Outbox(path).count(), 0)
-        self.assertEqual(len(self.request('GET', '/api/telemetry', 'admin-secret')[1]['items']), 1)
-
-    def test_outbox_bounds_conflicts_and_transport_security(self):
-        outbox = Outbox(os.path.join(self.directory.name, 'bounded.sqlite3'), capacity=1)
-        outbox.enqueue(self.sample)
-        with self.assertRaises(ValueError): outbox.enqueue(dict(self.sample, level='dry'))
-        with self.assertRaises(OverflowError): outbox.enqueue(dict(self.sample, seq=2))
-        with self.assertRaises(ValueError): outbox.flush('http://example.com', 'device-secret')
-        self.assertEqual(outbox.count(), 1)
-
-    def test_worker_recovers_persisted_queue_automatically(self):
-        path = os.path.join(self.directory.name, 'worker.sqlite3')
-        Outbox(path).enqueue(self.sample)
-        worker = OutboxWorker(Outbox(path), self.url, 'device-secret', idle_seconds=0.05)
-        worker.start()
-        try:
-            deadline = time.monotonic() + 3
-            while Outbox(path).count() and time.monotonic() < deadline: time.sleep(0.02)
-            self.assertEqual(Outbox(path).count(), 0)
-            self.assertEqual(len(self.request('GET', '/api/telemetry', 'admin-secret')[1]['items']), 1)
-        finally: worker.stop()
 
     def test_drinking_event_and_reminder_are_persisted(self):
         drink = {'event_id':'drink-1','kind':'drink','source':'simulated','volume_ml':120}
@@ -329,24 +281,6 @@ class BackendTest(unittest.TestCase):
         items=self.request('GET','/api/notifications','admin-secret')[1]['items']
         self.assertEqual(items[0]['status'],'legacy_mock')
 
-    def test_worker_reconnects_after_outage(self):
-        sock=socket.socket(); sock.bind(('127.0.0.1',0)); port=sock.getsockname()[1]; sock.close()
-        outbox=Outbox(os.path.join(self.directory.name,'offline.sqlite3')); outbox.enqueue(self.sample)
-        worker=OutboxWorker(outbox, 'http://127.0.0.1:%d'%port, 'device-secret', idle_seconds=.05, max_backoff=.2)
-        worker.start(); server=None; thread=None
-        try:
-            deadline=time.monotonic()+3
-            while worker.failures==0 and time.monotonic()<deadline: time.sleep(.02)
-            self.assertGreater(worker.failures,0); self.assertEqual(outbox.count(),1)
-            server=create_server('127.0.0.1',port,os.path.join(self.directory.name,'recovered.sqlite3'),'device-secret','admin-secret',hydration_provider=None)
-            thread=threading.Thread(target=server.serve_forever,daemon=True); thread.start()
-            deadline=time.monotonic()+4
-            while outbox.count() and time.monotonic()<deadline: time.sleep(.02)
-            self.assertEqual(outbox.count(),0)
-        finally:
-            worker.stop()
-            if server: server.shutdown(); server.server_close(); thread.join()
-
     def test_hydration_goal_is_user_configured_and_persistent(self):
         self.assertEqual(self.request('GET','/api/goal','admin-secret')[1]['goal_ml'],None)
         self.assertEqual(self.request('POST','/api/goal','admin-secret',{'goal_ml':2000})[0],200)
@@ -382,11 +316,9 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(items[0]['status'],'delivered')
         self.assertEqual(items[0]['attempts'],2)
 
-    def test_simulated_uart_to_notification_worker(self):
-        env=dict(os.environ,KAEW_CLOUD_URL=self.url,KAEW_DEVICE_TOKEN='device-secret',KAEW_SIM_LEVEL='dry',
-                 KAEW_OUTBOX_PATH=os.path.join(self.directory.name,'acceptance.sqlite3'),KAEW_PYTHON=sys.executable)
-        run=subprocess.run(['node',str(Path(__file__).resolve().parents[1] / 'tools/simulate.mjs')],env=env,capture_output=True,text=True,timeout=10)
-        self.assertEqual(run.returncode,0,run.stderr)
+    def test_simulated_telemetry_to_notification_worker(self):
+        sample = dict(self.sample, source='simulated', level='dry')
+        self.assertEqual(self.request('POST', '/api/telemetry', 'device-secret', sample)[0], 201)
         deadline=time.monotonic()+4
         while time.monotonic()<deadline:
             jobs=self.request('GET','/api/notifications','admin-secret')[1]['items']

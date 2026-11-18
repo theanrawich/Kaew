@@ -4,11 +4,11 @@
 
 ## Record and acceptance rules
 
-Use [test record template](TEST_RECORD_TEMPLATE.md) for each run and the blank [run index](measurements/test-runs.csv). Record ID, objective, setup, step/procedure revision, expected result, actual result, PASS/FAIL/BLOCKED, raw path, mean/min/max/sample standard deviation/range, operator/date, evidence and exact firmware commit/configuration. Archive the source diff/hash when testing an uncommitted revision. Also record board/driver revisions, power topology, calibration ID, reference instrument resolution/uncertainty, sample rate, network/outage schedule, cup and water level.
+Use [test record template](test-record-template.md) for each run and the blank [run index](measurements/test-runs.csv). Record ID, objective, setup, step/procedure revision, expected result, actual result, PASS/FAIL/BLOCKED, raw path, mean/min/max/sample standard deviation/range, operator/date, evidence and exact firmware commit/configuration. Archive the source diff/hash when testing an uncommitted revision. Also record board/driver revisions, power topology, calibration ID, reference instrument resolution/uncertainty, sample rate, network/outage schedule, cup and water level.
 
 Set numerical tolerances and sample counts **before** collecting results, agreed with the team/instructor. A missing tolerance or reference is BLOCKED, even if logs exist. Do not discard failed/aborted trials; explain exclusions in the run record. Analysis scripts compute statistics and always emit `hardware_verdict=NOT_ASSESSED`; a human compares against the preregistered limits. Never turn a synthetic test fixture into a result row.
 
-Copy header-only CSVs from `docs/measurements/` into a dated evidence folder, then populate with actual readings. The scripts reject blank data, nonfinite values, malformed columns, duplicate trials, incomplete packet captures, counter mismatches, and mixed latency clocks. Store output JSON alongside the raw CSV; it includes the input SHA256 and evidence paths.
+Copy header-only CSVs from `docs/testing/measurements/` into a dated evidence folder, then populate with actual readings. The scripts reject blank data, nonfinite values, malformed columns, duplicate trials, incomplete packet captures, counter mismatches, and mixed latency clocks. Store output JSON alongside the raw CSV; it includes the input SHA256 and evidence paths.
 
 ## A — End-to-end event-to-actuator latency
 

@@ -5,10 +5,9 @@ ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gat
 | Path | Purpose |
 | --- | --- |
 | [firmware/](firmware/README.md) | PlatformIO firmware, protocol, safety and C++ host tests |
-| [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, AI advice, Groq STT and voice tools |
-| [simulation/](simulation/index.html) | JavaScript simulation, browser viewer and protocol tests; also used by `cloud/tools/simulate.mjs` |
+| [cloud/](cloud/README.md) | Python API/dashboard, SQLite/Postgres migrations, AI advice, Groq STT and voice commands |
 | [scripts/](scripts/) | Host test runner and measurement capture/analysis tools |
-| [docs/](docs/) | Wiring, hardware procedures, contracts and historical validation records |
+| [docs/](docs/README.md) | Wiring, hardware procedures, contracts and historical validation records |
 | [render.yaml](render.yaml) | Render service configuration; hosted storage uses Supabase Postgres |
 
 ## Cloud quick start
@@ -22,7 +21,7 @@ export KAEW_DEVICE_TOKEN KAEW_ADMIN_TOKEN
 python3 cloud/server.py
 ```
 
-Leave `DATABASE_URL` unset for SQLite. Open <http://127.0.0.1:8080/> and enter the admin token. The server reads process environment; it does not load `.env` automatically. See [environment examples](cloud/.env.example) and [cloud setup](cloud/README.md) for Postgres, Render, reminders and Groq STT and the WAV voice CLI. SQLite migrations run automatically; Postgres migrations must be applied explicitly before startup.
+Leave `DATABASE_URL` unset for SQLite. Open <http://127.0.0.1:8080/> and enter the admin token. The server reads process environment; it does not load `.env` automatically. See [environment examples](cloud/.env.example) and [cloud setup](cloud/README.md) for Postgres, Render, reminders and Groq STT. SQLite migrations run automatically; Postgres migrations must be applied explicitly before startup.
 
 ## Firmware
 
@@ -33,20 +32,19 @@ pio run -d firmware                     # sensor_node and gateway
 pio run -d firmware -e mic_test          # standalone microphone/STT test
 ```
 
-Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` and `gateway_ai_compile`. See [build/flash instructions](firmware/README.md#build-and-flash), [pin map](docs/wiring.md) and [refill safety contract](docs/GATEWAY_REFILL_CONTRACT.md) before using hardware. Private gateway settings belong in the ignored `firmware/include/cloud_config.local.h`, using the [example](firmware/include/cloud_config.local.h.example). Never commit this header, `.env`, tokens or Wi-Fi credentials.
+Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` and `gateway_ai_compile`. See [build/flash instructions](firmware/README.md#build-and-flash), [pin map](docs/hardware/wiring.md) and [refill safety contract](docs/design/gateway-refill-contract.md) before using hardware. Private gateway settings belong in the ignored `firmware/include/cloud_config.local.h`, using the [example](firmware/include/cloud_config.local.h.example). Never commit this header, `.env`, tokens or Wi-Fi credentials.
 
-## Tests and simulator
+## Tests
 
-Python 3.11+, Node.js 20+ and g++ are required. These match [CI](.github/workflows/firmware.yml):
+Python 3.11+ and g++ are required. Run these checks from the repository root. See the [CI workflow](.github/workflows/firmware.yml) for firmware build targets.
 
 ```bash
 python3 -m unittest discover -s cloud/tests -t cloud -p 'test_*.py' -v
-npm test --prefix simulation
 python3 scripts/run_host_tests.py
 python3 -m unittest discover -s scripts -p 'test_*.py' -v
 pio run -d firmware -e sensor_node -e gateway -e mic_test -e gateway_cloud_compile -e sensor_node_trace -e gateway_trace -e gateway_ai_compile
 ```
 
-Postgres integration tests skip unless `KAEW_TEST_POSTGRES_URL` selects a disposable loopback database; see [Postgres verification](cloud/README.md#local-postgres-verification-and-implementation). JavaScript tests need no dependency installation. For the browser viewer, run `npm ci --prefix simulation`, serve the repository with `python3 -m http.server 8000`, and open <http://localhost:8000/simulation/>.
+Postgres integration tests skip unless `KAEW_TEST_POSTGRES_URL` selects a disposable loopback database; see [Postgres verification](cloud/README.md#local-postgres-verification-and-implementation).
 
-For hardware work, start with the [checkpoint procedure](docs/CHECKPOINT_CRITICAL_PATH.md), [measurement plan](docs/PERFORMANCE_TEST_PLAN.md) and [gateway AI loop](docs/M4_GATEWAY_AI_LOOP.md). Codex contributors should read [AGENTS.md](AGENTS.md).
+For hardware work, start with the [checkpoint procedure](docs/course/checkpoint-critical-path.md), [measurement plan](docs/testing/performance-test-plan.md) and [gateway AI loop](docs/design/m4-gateway-ai-loop.md). Codex contributors should read [AGENTS.md](AGENTS.md).

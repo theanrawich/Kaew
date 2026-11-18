@@ -1,8 +1,8 @@
 # Kaew — ตารางเกณฑ์และหลักฐานที่ต้องสร้าง
 
-> เก็บเกณฑ์และแผนวัดจากการทบทวน 8 พ.ย. 2026; ช่องสถานะเดิมด้านล่างเป็น baseline ณ วันนั้น สถานะซอฟต์แวร์ปัจจุบันดู [README](../README.md) และ [checkpoint](CHECKPOINT_CRITICAL_PATH.md). ยังไม่มีหลักฐานทดสอบฮาร์ดแวร์จริง
+> เก็บเกณฑ์และแผนวัดจากการทบทวน 8 พ.ย. 2026; ช่องสถานะเดิมด้านล่างเป็น baseline ณ วันนั้น สถานะซอฟต์แวร์ปัจจุบันดู [README](../../README.md) และ [checkpoint](checkpoint-critical-path.md). ยังไม่มีหลักฐานทดสอบฮาร์ดแวร์จริง
 
-เพิ่ม 17 พ.ย.: [ผลงาน gateway/testing ของ Arm](M4_GATEWAY_AI_LOOP.md), [software validation ที่รันจริง](validation/software-2026-11-17.md), [แผน ≥3 metrics และ raw templates](PERFORMANCE_TEST_PLAN.md) และ [AI command handoff](GATEWAY_REFILL_CONTRACT.md) ช่วยเตรียมหลักฐาน design/test procedure แต่ยังไม่ถือว่าผ่าน M2/M7 หรือมี physical metrics วัดแล้ว ตาราง baseline ด้านล่างไม่ได้ถูกเปลี่ยนเป็นผลผ่าน
+เพิ่ม 17 พ.ย.: [ผลงาน gateway/testing ของ Arm](../design/m4-gateway-ai-loop.md), [software validation ที่รันจริง](../testing/validation/software-2026-11-17.md), [แผน ≥3 metrics และ raw templates](../testing/performance-test-plan.md) และ [AI command handoff](../design/gateway-refill-contract.md) ช่วยเตรียมหลักฐาน design/test procedure แต่ยังไม่ถือว่าผ่าน M2/M7 หรือมี physical metrics วัดแล้ว ตาราง baseline ด้านล่างไม่ได้ถูกเปลี่ยนเป็นผลผ่าน
 
 ตรวจ 8 พ.ย. 2026 จาก [โจทย์รายวิชาต้นฉบับ](https://docs.google.com/document/d/1eBUKyIknXkPH_oJqtiS-Vm4aKlzjjkmrdMn4oYDUgSw/edit) และไฟล์โครงการที่มีในเครื่อง เอกสารต้นฉบับมีเวลาแก้ไขล่าสุด 8 พ.ย. 11:30 เวลาไทย การตรวจนี้ไม่ยืนยันประกาศแยกใน MyCourseVille, การส่งงาน หรือการอนุมัติจากผู้สอน และไม่ใช่การให้คะแนนแทนอาจารย์
 
@@ -21,8 +21,6 @@
 | M7: safety | แยก pump/tank จาก electronics มีถาด, manual stop; ตรวจไฟบ้านโดย TA/ผู้สอนก่อน demo | CAD และ test plan เป็นร่าง ไม่ใช่ผลทดสอบ วงจรตัดกำลังและพฤติกรรมหลังไฟกลับยังไม่ยืนยัน |
 | M8: Internet Git + ทุกคนมี commit | remote ที่ตั้งอยู่ `https://github.com/theanrawich/Kaew.git`; สมาชิกแต่ละคนมี contribution | `git remote -v` ในเครื่องแสดง origin แล้ว แต่ยังไม่ตรวจสิทธิ์ Internet จากมุมผู้ประเมินหรือยืนยัน commit สมาชิกทุกคน |
 
-มีต้นแบบ telemetry ภายในหน่วยความจำของหน้า simulation สำหรับทดลองคิว/เชื่อมกลับเท่านั้น ไม่ใช่การส่งระหว่างบอร์ดหรือ cloud และไม่ใช่ raw sensor data จริง จึงยังไม่ใช่หลักฐานผ่าน M1, M3, M5 หรือ E4
-
 ## คะแนน 70 — แผนหลักฐาน
 
 | หมวด | คะแนน | หลักฐานที่จะใช้ | ช่องว่าง |
@@ -37,7 +35,7 @@
 | III build quality | 3 | ภาพ/วิดีโอเครื่องประกอบ เดินสาย ยึด และเคลื่อนย้าย | CAD ไม่พิสูจน์ความแข็งแรงหรือความเรียบร้อยของเครื่องจริง |
 | III user experience | 3 | ทดลอง dashboard/alerts กับผู้ใช้และบันทึกผล | ยังไม่มี dashboard/alert เชื่อมข้อมูลจริง |
 | IV test procedure | 3 | แบบทดสอบปกติ ขอบ และ fault พร้อมผลรายครั้ง | `TEST_RECORD_TEMPLATE.md` เป็นฟอร์ม ยังไม่มีผลจริง |
-| IV metrics | 4 | ≥3 จาก latency, packet delivery, sensor accuracy, power, AI accuracy หรือ uptime พร้อมวิธี; ทำซ้ำรายงานค่าเฉลี่ยและ min/max | ยังไม่มี raw measurements จริง; overshoot simulator ไม่ใช่ metric ของเครื่อง |
+| IV metrics | 4 | ≥3 จาก latency, packet delivery, sensor accuracy, power, AI accuracy หรือ uptime พร้อมวิธี; ทำซ้ำรายงานค่าเฉลี่ยและ min/max | ยังไม่มี raw measurements จริง |
 | IV analysis/comparison | 3 | เปรียบเทียบเป้าหมายและระบบอื่นด้วย metrics ที่วัด | ยังไม่มี measurements หรือการเปรียบเทียบที่ครบ |
 | V presentation | 10 | สไลด์ live demo และสมาชิกทุกคนตอบส่วนที่รับผิดชอบได้ | ยังไม่มีหลักฐานซ้อม/demo; เตรียม backup video ตามโจทย์ |
 | VI video/report | 10 | วิดีโอ 3–5 นาที และรายงาน PDF ≤10 หน้า (ตามข้อยกเว้น) ครบ 6 หัวข้อ | ยังไม่มี final video, ผลทดลองและรายงานฉบับสมบูรณ์ที่ตรวจได้ |

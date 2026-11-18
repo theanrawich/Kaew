@@ -1,5 +1,4 @@
 # Build products and local tools
-node_modules/
 .pio/
 .pio-core/
 .kaew-*/

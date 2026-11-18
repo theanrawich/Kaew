@@ -1,6 +1,6 @@
 """Validate real CSV captures and emit descriptive metrics, never a hardware PASS.
 
-Blank templates live in docs/measurements/. No third-party dependencies required.
+Blank templates live in docs/testing/measurements/. No third-party dependencies required.
 """
 import argparse
 import csv
