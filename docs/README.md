@@ -1,10 +1,5 @@
 # Kaew documentation
 
-## Hardware
-
-- [Wiring](hardware/wiring.md) — Pin assignments, interfaces and hardware verification holds.
-- [Shopping list](hardware/shopping-list.md) — Parts, cost estimates and sourcing notes.
-
 ## Design
 
 - [Gateway refill contract](design/gateway-refill-contract.md) — Command validation, interlocks and commissioning prerequisites.

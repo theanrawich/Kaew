@@ -32,7 +32,7 @@ pio run -d firmware                     # sensor_node and gateway
 pio run -d firmware -e mic_test          # standalone microphone/STT test
 ```
 
-Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` and `gateway_ai_compile`. See [build/flash instructions](firmware/README.md#build-and-flash), [pin map](docs/hardware/wiring.md) and [refill safety contract](docs/design/gateway-refill-contract.md) before using hardware. Private gateway settings belong in the ignored `firmware/include/cloud_config.local.h`, using the [example](firmware/include/cloud_config.local.h.example). Never commit this header, `.env`, tokens or Wi-Fi credentials.
+Additional CI environments are `gateway_cloud_compile`, `sensor_node_trace`, `gateway_trace` and `gateway_ai_compile`. See [build/flash instructions](firmware/README.md#build-and-flash) and [refill safety contract](docs/design/gateway-refill-contract.md) before using hardware. Private gateway settings belong in the ignored `firmware/include/cloud_config.local.h`, using the [example](firmware/include/cloud_config.local.h.example). Never commit this header, `.env`, tokens or Wi-Fi credentials.
 
 ## Tests
 
