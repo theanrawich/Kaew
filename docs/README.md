@@ -6,6 +6,7 @@
 
 - [Gateway refill contract](design/gateway-refill-contract.md) — Command validation, interlocks and commissioning prerequisites.
 - [M4 gateway AI loop](design/m4-gateway-ai-loop.md) — How the gateway requests and validates refill advice.
+- [Voice and hydration decisions](design/voice-and-hydration.md) — AI-driven reminders from body weight, voice commands and replies, speaker TTS, Telegram alerts.
 
 ## Testing
 
