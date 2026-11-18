@@ -15,8 +15,8 @@ OneWire oneWire(TEMP_PIN);
 DallasTemperature temp(&oneWire);
 uint32_t started = 0, sequence = 0;
 bool waiting = false;
-// ESP32-S3 N16R8: GPIO26-37 are flash/PSRAM, so UART uses GPIO17 (TX) / GPIO18 (RX).
-constexpr int LINK_RX = 18, LINK_TX = 17;
+// ESP32-S3 N16R8: GPIO26-37 are flash/PSRAM, so UART uses GPIO21 (TX) / GPIO47 (RX).
+constexpr int LINK_RX = 47, LINK_TX = 21;
 uint32_t sessionId = 0, sentCount = 0, ackCount = 0, droppedCount = 0;
 Sender sender;
 FrameParser parser;
