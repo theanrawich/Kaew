@@ -6,11 +6,11 @@
 #include "packet_trace.h"
 
 namespace {
-constexpr int TEMP_PIN = 4;
-// Disabled until the exact TDS board output and GPIO voltage are verified.
-constexpr int TDS_PIN = -1;
-// Do not configure the level input before its output interface is verified.
-constexpr int LEVEL_PIN = -1;
+constexpr int TEMP_PIN = 6;
+// TDS analog output; board must output <= 3.3 V.
+constexpr int TDS_PIN = 4;
+// Digital water-level output.
+constexpr int LEVEL_PIN = 5;
 OneWire oneWire(TEMP_PIN);
 DallasTemperature temp(&oneWire);
 uint32_t started = 0, sequence = 0;
