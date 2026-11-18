@@ -227,6 +227,26 @@ class BackendTest(unittest.TestCase):
         except urllib.error.HTTPError as e:
             return e.code, json.load(e)
 
+    def test_telemetry_reports_current_reminder_with_device_token(self):
+        self.server.stop_reminders.set()
+        self.server.reminder_thread.join()
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('DELETE FROM reminders')
+        path = '/api/telemetry'
+        self.assertEqual(self.request('POST', path, 'device-secret', self.sample),
+                         (201, {'status': 'stored', 'next_reminder_at': None}))
+        due = int(time.time()) + 3600
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('INSERT INTO reminders VALUES (1, 60, ?, 1)', (due + .25,))
+        self.assertEqual(self.request('POST', path, 'device-secret', self.sample),
+                         (200, {'status': 'duplicate', 'next_reminder_at': due + 1}))
+        self.assertEqual(self.request('POST', path, 'device-secret', dict(self.sample, seq=2)),
+                         (201, {'status': 'stored', 'next_reminder_at': due + 1}))
+        for token in (None, 'admin-secret'):
+            self.assertEqual(self.request('POST', path, token, self.sample),
+                             (401, {'error': 'unauthorized'}))
+        self.assertEqual(self.request('GET', '/api/reminder', 'device-secret')[0], 401)
+
     def test_auth_validation_idempotency_and_persistence(self):
         self.assertEqual(self.request('POST', '/api/telemetry', data=self.sample)[0], 401)
         self.assertEqual(self.request('POST', '/api/telemetry', 'admin-secret', self.sample)[0], 401)

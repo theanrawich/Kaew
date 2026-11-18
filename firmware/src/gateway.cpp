@@ -7,7 +7,7 @@
 #include "pump_gpio.h"
 #include "packet_trace.h"
 #include "wire_protocol.h"
-#include "cloud_publisher.h"
+#include "gateway_oled.h"
 #include "drink_detection.h"
 #include "ai_advice_client.h"
 #ifndef KAEW_AUDIO_ENABLED
@@ -29,6 +29,19 @@
 namespace {
 constexpr int HX_DATA = 5, HX_CLOCK = 4;  // HX711 DT=GPIO5, SCK=GPIO4
 constexpr int LINK_RX = 1, LINK_TX = 2;
+constexpr bool availableOledPin(int pin) {
+  // Reserve I2S GPIO6–11 even in builds without audio, plus GPIO12 and the future relay (13).
+  return GPIO_IS_VALID_OUTPUT_GPIO(pin) && pin != HX_DATA && pin != HX_CLOCK &&
+    pin != LINK_RX && pin != LINK_TX && !(pin >= 6 && pin <= 11) && pin != 12 && pin != 13 &&
+    pin != KAEW_PUMP_PIN && pin != KAEW_ESTOP_PIN &&
+    pin != 0 && pin != 3 && pin != 45 && pin != 46 && // boot straps
+    pin != 19 && pin != 20 && pin != 43 && pin != 44 && // USB and UART0
+    !(pin >= 26 && pin <= 37); // flash and PSRAM
+}
+static_assert(KAEW_OLED_SDA != KAEW_OLED_SCL, "OLED SDA and SCL must be distinct");
+static_assert(availableOledPin(KAEW_OLED_SDA) && availableOledPin(KAEW_OLED_SCL),
+              "OLED GPIO conflicts with gateway wiring or reserved pins");
+
 HX711 scale;
 struct RawScaleSample { int32_t raw; uint32_t atMs; };
 QueueHandle_t scaleSamples = nullptr;
@@ -41,6 +54,7 @@ FrameParser parser;
 Receiver receiver;
 Receiver safetyReceiver; // Safety data is independent of outbox backpressure.
 CloudPublisher cloud;
+GatewayOled oled{cloud};
 AiAdviceClient adviceClient;
 #if KAEW_AUDIO_ENABLED
 AudioIO audio;
@@ -178,6 +192,7 @@ void setup() {
     Serial.println("Calibrating background noise. Wait for Listening.");
   }
 #endif
+  oled.begin();
 }
 
 void loop() {

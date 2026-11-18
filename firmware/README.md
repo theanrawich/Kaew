@@ -19,7 +19,7 @@ g++ -std=c++17 -Ifirmware/include firmware/test/safety_test.cpp -o firmware/test
 firmware/test/safety_test.exe
 ```
 
-Use `python scripts/run_host_tests.py` from repository root to run all ten host programs, including `gateway_dispensing_test.cpp` (25 scenarios) and `ai_refill_test.cpp` (12 scenarios), plus the six-case configuration matrix and six GPIO compile checks. Four forbidden GPIO43/44 pump/stop assignments must fail with the reserved-pin assertion; two positive controls must compile. The GPIO fixtures use inert host stubs, not actual commissioning. GPIO43/44 stay reserved for the UART0 console even if a future build switches to USB CDC. The original `bash firmware/test/cloud_config_test.sh` also remains available. Protocol tests check corrupt-frame recovery and clock wraparound; integration covers missing, unknown, dry, malformed and stale tank data. The new suite combines the same scale/command/safety modules used by the gateway with fake hardware. The separate browser plant remains a distinct controller model, with a shared wire codec adapter but no formal equivalence claim.
+Use `python scripts/run_host_tests.py` from repository root to run all eleven host programs, including `gateway_dispensing_test.cpp` (25 scenarios) and `ai_refill_test.cpp` (12 scenarios), plus the six-case configuration matrix and six GPIO compile checks. Four forbidden GPIO43/44 pump/stop assignments must fail with the reserved-pin assertion; two positive controls must compile. The GPIO fixtures use inert host stubs, not actual commissioning. GPIO43/44 stay reserved for the UART0 console even if a future build switches to USB CDC. The original `bash firmware/test/cloud_config_test.sh` also remains available. Protocol tests check corrupt-frame recovery and clock wraparound; integration covers missing, unknown, dry, malformed and stale tank data. The new suite combines the same scale/command/safety modules used by the gateway with fake hardware. The separate browser plant remains a distinct controller model, with a shared wire codec adapter but no formal equivalence claim.
 
 All limits remain illustrative. Idle uses a five-sample median and stable-cup gate; dispensing/settling checks each calibrated sample directly so median delay cannot hide removal/target crossing. HX711 reading runs in a separate acquisition task because the installed library can block after a disconnect race; the main loop uses an eight-sample queue, checks freshness and faults on overflow (reboot/investigation required). Gateway development defaults are 500 ms scale stale, 5 s no progress, 30 s total and 1 s settling; the standalone SafetyController retains its older defaults for existing callers. Validated timing/noise limits, driver feedback, brownout and independent hardware interlocks remain pending. No test here demonstrates actual pump shutoff or water safety. See [physical measurement plan](../docs/testing/performance-test-plan.md).
 
@@ -56,6 +56,33 @@ Node `tx` and `ack` should advance without sustained `dropped` growth. Gateway p
 
 5. Open <https://kaew-cloud.onrender.com/> and authenticate privately using the existing admin dashboard credential (never put that credential in firmware). Confirm new rows show `source=device`, advancing sequence, plausible temperature responding to gentle probe warming, level `unknown`, and TDS `—` (API `65535`). Dashboard refresh is every 5 s; the protected `/api/telemetry` response also contains session IDs if needed. A disconnected temperature probe should yield `—` (API `null`). Queued arrival time does not prove a current measurement.
 6. Disconnect UART: gateway `link_fresh` must become 0 after 5 s and level display remain unknown. Reconnect and confirm new sequence values and dashboard rows. After a node reboot, allow the prior session’s 5 s freshness window to expire. Briefly interrupt Wi-Fi and confirm replay after reconnection; record duration/loss. The 16-slot queue and bounded node retries cannot cover unlimited outages. Power-cut recovery and actual TLS/NTP/Wi-Fi behavior still require board testing. No step authorizes pump operation.
+
+## Gateway OLED
+
+Wire the AA412 128×64 module to the **gateway** with power off.
+
+| OLED | Gateway |
+| --- | --- |
+| VCC | 3.3 V |
+| GND | GND |
+| SDA | GPIO17 |
+| SCL | GPIO18 |
+
+The default is SSD1306 at the 7-bit I²C address `0x3C`. In the
+`[gateway_oled]` section of `platformio.ini`, set `KAEW_OLED_ADDRESS` for
+a different address or `KAEW_OLED_DRIVER=1106` for an SH1106 module.
+`KAEW_OLED_SDA` and `KAEW_OLED_SCL` select the pins. GPIO13 is reserved
+for a future pump relay.
+
+The display alternates every five seconds between the Bangkok clock and date
+and the next hydration reminder. The clock shows **Clock syncing** until the
+gateway has NTP time. The countdown uses `next_reminder_at` from successful
+device-authenticated `POST /api/telemetry` replies, including duplicate
+acknowledgements. The field is UTC epoch seconds or JSON `null`. The OLED
+shows **No reminder** before the first valid reply or when the schedule is
+empty, and **Offline** when its last valid reply is at least 30 seconds old.
+The OLED task exits if the display fails to acknowledge. Reboot the gateway
+after connecting or replacing the display.
 
 ## Experimental gateway publisher
 
