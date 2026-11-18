@@ -11,8 +11,8 @@ import time
 import unittest
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import patch
 from urllib.parse import urlsplit
 from kaew.database import connect, Target
@@ -83,51 +83,28 @@ class PostgresTest(unittest.TestCase):
         self.assertEqual(self.request('POST', '/api/events', event)[0], 200)
         self.assertEqual(self.request('POST', '/api/events', dict(event, volume_ml=130))[0], 409)
         self.assertEqual(self.request('GET', '/api/summary')[1]['drinking_ml'], 120)
-        for goal in (1800, 2000):
-            self.assertEqual(self.request('POST', '/api/goal', {'goal_ml': goal})[0], 200)
-        self.assertEqual(self.request('GET', '/api/goal')[1]['goal_ml'], 2000)
-        result = self.request('POST', '/api/advice', {'include_simulated': False})
-        self.assertEqual(result[0], 200); self.assertFalse(result[1]['actuation_allowed'])
+        for weight in (60,70.5):
+            self.assertEqual(self.request('POST', '/api/profile', {'body_weight_kg':weight})[0],200)
+        self.assertEqual(self.request('GET', '/api/profile')[1],{'body_weight_kg':70.5,'goal_ml':2327})
+        result=self.request('GET', '/api/advice')
+        self.assertEqual(result[0],200); self.assertFalse(result[1]['actuation_allowed'])
         with closing(connect(self.target)) as db, db:
             self.assertIsNotNone(db.execute('SELECT id FROM advice_log').fetchone())
             db.execute("INSERT INTO notifications(reminder_due,provider,created_at) VALUES (?,'mock',?)", (time.time(), time.time()))
         self.assertEqual(self.request('GET', '/api/notifications')[1]['items'][0]['status'], 'legacy_mock')
 
     def test_reminder_and_notification_worker(self):
-        for minutes in (10, 20):
-            result = self.request('POST', '/api/reminder', {'interval_minutes': minutes, 'next_due': time.time()+60})
-            self.assertEqual(result[0], 200)
-        self.assertEqual(self.request('GET', '/api/reminder')[1]['reminder']['interval_minutes'], 20)
-        self.assertEqual(self.request('POST', '/api/voice', {'text': 'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})[0], 200)
+        self.assertEqual(self.request('POST', '/api/profile', {'body_weight_kg':70})[0],200)
         with closing(connect(self.target)) as db, db:
-            self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()['repeat_enabled'], 0)
-            db.execute('UPDATE reminders SET next_due=?', (time.time()-1,))
+            self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()['repeat_enabled'],1)
+            db.execute('UPDATE reminders SET next_due=?',(time.time()-1,))
         deadline = time.monotonic()+5
         while time.monotonic() < deadline:
             jobs = self.request('GET', '/api/notifications')[1]['items']
             if jobs and jobs[0]['status'] == 'delivered': break
             time.sleep(.05)
         self.assertEqual(jobs[0]['status'], 'delivered')
-        self.assertIsNone(self.request('GET', '/api/reminder')[1]['reminder'])
-
-    def test_manual_reminder_writers_share_the_advice_advisory_lock(self):
-        # AI holds this lock from snapshot comparison through its final upsert.
-        # Both manual paths must wait, then apply their newer schedule afterward.
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            with closing(connect(self.target)) as db, db:
-                db.execute('BEGIN IMMEDIATE')
-                futures=[executor.submit(self.request,'POST',path,body) for path,body in (
-                    ('/api/reminder',{'interval_minutes':22,'next_due':time.time()+1320}),
-                    ('/api/voice',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'}))]
-                deadline=time.monotonic()+2
-                waiting=0
-                while time.monotonic()<deadline:
-                    waiting=db.execute("SELECT COUNT(*) AS n FROM pg_locks WHERE locktype='advisory' AND objid=2110356 AND NOT granted").fetchone()['n']
-                    if waiting==2 or any(f.done() for f in futures): break
-                    time.sleep(.02)
-                # Exiting the transaction releases the lock even on assertion failure.
-                self.assertEqual(waiting,2)
-            self.assertEqual([f.result()[0] for f in futures],[200,200])
+        self.assertEqual(self.request('GET', '/api/reminder')[1]['reminder']['repeat_enabled'],1)
 
     def test_transaction_rollback(self):
         with closing(connect(self.target)) as db:

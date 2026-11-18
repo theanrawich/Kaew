@@ -1,11 +1,17 @@
 """Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
-from kaew.audio_service import AudioError, TyphoonASR, TYPHOON_ASR_MODEL, validate_wav
+from kaew.audio_service import (
+    AudioError, EdgeTTS, MAX_TTS_WAV_BYTES, REMINDER_PHRASE, RETRY_PHRASE,
+    TyphoonASR, TYPHOON_ASR_MODEL, validate_wav,
+)
 import hmac
-from collections import deque
+import secrets
+import sys
+from collections import OrderedDict, deque
 from contextlib import closing
 import json
 import math
 import os
+import re
 import sqlite3
 import time
 import threading
@@ -14,7 +20,7 @@ from kaew.notifications import MockProvider, TelegramProvider
 from kaew.voice import parse_text
 from kaew.hydration_ai import recommend, select_provider
 from kaew.gateway_advice import parse_gateway_query, project_advice
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -22,6 +28,59 @@ from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 4096
+FIXED_SPEECH = frozenset((REMINDER_PHRASE, RETRY_PHRASE))
+GATEWAY_REMINDER_WINDOW = 120
+REPLY_AUDIO_TTL = 120
+REPLY_AUDIO_LIMIT = 16
+
+
+class ReplyAudio:
+    """Keep two fixed phrases and up to 16 short-lived command references."""
+    def __init__(self):
+        self.fixed = {}
+        self.replies = OrderedDict()
+        self.lock = threading.Lock()
+        self.synthesis_slots = threading.BoundedSemaphore(2)
+
+    def synthesize(self, tts, phrase):
+        with self.lock:
+            cached = self.fixed.get(phrase)
+        if cached is not None:
+            return cached
+        if not self.synthesis_slots.acquire(blocking=False):
+            return None
+        try:
+            audio = tts.synthesize(phrase)
+            if not isinstance(audio, bytes) or not 44 < len(audio) <= MAX_TTS_WAV_BYTES:
+                raise AudioError('invalid reply WAV size')
+        except AudioError as exc:
+            print('reply TTS failed:', type(exc).__name__, file=sys.stderr)
+            return None
+        finally:
+            self.synthesis_slots.release()
+        if phrase in FIXED_SPEECH:
+            with self.lock:
+                return self.fixed.setdefault(phrase, audio)
+        return audio
+
+    def add(self, audio):
+        ident = secrets.token_hex(16)
+        with self.lock:
+            self.replies[ident] = (time.monotonic() + REPLY_AUDIO_TTL, audio)
+            if len(self.replies) > REPLY_AUDIO_LIMIT:
+                self.replies.popitem(last=False)
+        return ident
+
+    def get(self, ident):
+        with self.lock:
+            entry = self.replies.get(ident)
+            if entry is None:
+                return None
+            if entry[0] <= time.monotonic():
+                del self.replies[ident]
+                return None
+            return entry[1]
+
 
 
 def migrate(path):
@@ -107,28 +166,73 @@ def reminder_snapshot(db):
     return tuple(row[k] for k in ('interval_minutes','next_due','repeat_enabled')) if row else None
 
 
-def apply_advice(server, include_simulated=False, automatic=False, expected_reminder=None):
+def hydration_profile(db):
+    row=db.execute("SELECT value FROM settings WHERE key='body_weight_g'").fetchone()
+    grams=row['value'] if row else None
+    return {
+        'body_weight_kg': grams / 1000 if grams is not None else None,
+        'goal_ml': max(1000, min(4000, (grams * 33 + 500) // 1000)) if grams is not None else None,
+    }
+
+
+def drank_today(db, now):
+    local = datetime.fromtimestamp(now, ZoneInfo('Asia/Bangkok'))
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = db.execute(
+        "SELECT source, COALESCE(SUM(volume_ml),0) AS total FROM events "
+        "WHERE kind='drink' AND received_at>=? AND received_at<? "
+        "AND source IN ('measured','estimated','simulated') GROUP BY source",
+        (start.timestamp(), (start + timedelta(days=1)).timestamp()),
+    )
+    totals = {row['source']: row['total'] for row in rows}
+    measured = [totals[source] for source in ('measured', 'estimated') if source in totals]
+    simulated = not measured and 'simulated' in totals
+    return totals['simulated'] if simulated else sum(measured), simulated
+
+
+def latest_gateway_reminder(server):
+    now = time.time()
+    with closing(connect(server.db_path)) as db:
+        row = db.execute(
+            "SELECT id FROM notification_jobs WHERE kind='reminder' AND created_at>? "
+            "AND created_at<=? ORDER BY created_at DESC, id DESC LIMIT 1",
+            (now - GATEWAY_REMINDER_WINDOW, now),
+        ).fetchone()
+    if row is None:
+        return None
+    return hmac.digest(server.device_token.encode(), row['id'].encode(), 'sha256')[:16].hex()
+
+
+_ANY_REMINDER = object()
+
+
+def apply_advice(server, include_simulated=False, expected_reminder=_ANY_REMINDER):
     """Inference runs outside DB transactions; logging and conditional schedule commit together.
 
     Serialize in-process decisions and compare the reminder snapshot after inference
-    so a concurrent voice/manual reminder is never overwritten by stale inference.
+    so a fired reminder cannot overwrite a more recent decision. An explicit
+    None expects a missing schedule and enables the bootstrap cooldown.
     """
     with server.advice_lock:
+        if expected_reminder is None:
+            now_monotonic = time.monotonic()
+            if now_monotonic < server.next_reminder_bootstrap:
+                return None
+            server.next_reminder_bootstrap = now_monotonic + 60
         now=time.time()
         with closing(connect(server.db_path)) as db:
             before=reminder_snapshot(db)
-            if automatic and ((before and not before[2]) or
-                              (expected_reminder is not None and before!=expected_reminder)):
+            if expected_reminder is not _ANY_REMINDER and before!=expected_reminder:
                 return None
             sources=('measured','estimated','simulated') if include_simulated else ('measured','estimated')
             placeholders=','.join('?' for _ in sources)
             row=db.execute("SELECT COALESCE(SUM(volume_ml),0) AS total,COUNT(*) AS count FROM events WHERE kind='drink' AND received_at>=? AND source IN ("+placeholders+")",(now-86400,*sources)).fetchone()
             last=db.execute("SELECT MAX(received_at) AS last FROM events WHERE kind='drink' AND source IN ("+placeholders+")",sources).fetchone()['last']
-            goal=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
+            profile=hydration_profile(db)
             telemetry_sources=('device','unknown','simulated') if include_simulated else ('device','unknown')
             telemetry=db.execute("SELECT temperature_c,level,source FROM telemetry WHERE source IN ("+','.join('?' for _ in telemetry_sources)+") ORDER BY id DESC LIMIT 1",telemetry_sources).fetchone()
             previous=db.execute("SELECT MAX(created_at) AS last FROM notification_jobs WHERE kind='reminder'").fetchone()['last']
-            context={'goal_ml':goal['value'] if goal else None,'drank_ml':min(row['total'],20000),
+            context={**profile,'drank_ml':min(row['total'],20000),
                      'drink_count':row['count'],'minutes_since_drink':min(max((now-last)/60,0),10080) if last is not None else None,
                      'cup_ml':None,'profile':'balanced','time_of_day':datetime.fromtimestamp(now,ZoneInfo('Asia/Bangkok')).strftime('%H:%M'),
                      'timezone':'Asia/Bangkok','temperature_c':telemetry['temperature_c'] if telemetry else None,
@@ -139,8 +243,8 @@ def apply_advice(server, include_simulated=False, automatic=False, expected_remi
         now=time.time()
         with closing(connect(server.db_path)) as db, db:
             db.execute('BEGIN IMMEDIATE')
-            # A changed reminder supersedes this in-flight decision (including manual requests).
-            scheduled=reminder_snapshot(db)==before
+            # A drink or profile update supersedes a concurrent reminder firing.
+            scheduled=expected_reminder is _ANY_REMINDER or reminder_snapshot(db)==before
             result.update(timestamp=now,scheduled=scheduled,actuation_allowed=False)
             db.execute('INSERT INTO advice_log(created_at,input_json,output_json,simulated,model,fallback) VALUES (?,?,?,?,?,?)',
                        (now,json.dumps(context),json.dumps(result,ensure_ascii=False),int(include_simulated),result['model'],int(result['fallback'])))
@@ -177,14 +281,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlsplit(self.path).path
         if path == '/api/stt': return self.stt()
-        if path in ('/api/events', '/api/reminder', '/api/goal', '/api/voice', '/api/advice'):
+        if path in ('/api/events', '/api/profile', '/api/voice'):
+            device = path == '/api/events' and self.authorized(self.server.device_token)
+            if not device and not self.authorized(self.server.admin_token):
+                return self.reply(401, {'error': 'unauthorized'})
             data = self.read_json()
-            if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
-            if path == '/api/events': return self.add_event(data)
-            if path == '/api/goal': return self.set_goal(data)
-            if path == '/api/voice': return self.voice(data)
-            if path == '/api/advice': return self.advice(data)
-            return self.set_reminder(data)
+            if path == '/api/events': return self.add_event(data, device)
+            if path == '/api/profile': return self.set_profile(data)
+            return self.voice(data)
         if path != '/api/telemetry': return self.reply(404, {'error': 'not_found'})
         data = self.read_json()
         if not self.authorized(self.server.device_token): return self.reply(401, {'error': 'unauthorized'})
@@ -214,15 +318,22 @@ class Handler(BaseHTTPRequestHandler):
             check_sensor_alerts(db, data, now, self.server.provider_name)
         self.reply(201, {'status': 'stored'})
 
-    def add_event(self, data):
+    def add_event(self, data, device):
         if not isinstance(data, dict) or set(data) != {'event_id','kind','source','volume_ml'}:
             return self.reply(400, {'error':'invalid_event'})
         ident, kind, source, volume = data['event_id'], data['kind'], data['source'], data['volume_ml']
         if not isinstance(ident,str) or not ident or len(ident)>80 or kind not in ('drink','fault') or source not in ('measured','estimated','simulated'):
             return self.reply(400, {'error':'invalid_event'})
-        if kind == 'drink' and (type(volume) not in (int,float) or not math.isfinite(volume) or not 0 < volume <= 1000):
+        if kind == 'drink' and (type(volume) not in (int,float) or not 0 < volume <= 1000):
             return self.reply(400, {'error':'invalid_event'})
         if kind == 'fault' and volume is not None: return self.reply(400, {'error':'invalid_event'})
+        # The single provisioned gateway owns this event ID namespace.
+        if device:
+            if (kind != 'drink' or source != 'measured' or volume < 10 or
+                    not re.fullmatch(r'gateway-1:[0-9a-f]{8}:[0-9a-f]{8}:[0-9a-f]{8}', ident)):
+                return self.reply(403, {'error':'invalid_device_event'})
+        elif ident.startswith('gateway-1:'):
+            return self.reply(403, {'error':'reserved_event_id'})
         with closing(connect(self.server.db_path)) as db, db:
             db.execute('BEGIN IMMEDIATE')
             old = db.execute('SELECT kind,source,volume_ml FROM events WHERE id=?',(ident,)).fetchone()
@@ -232,23 +343,21 @@ class Handler(BaseHTTPRequestHandler):
             db.execute('INSERT INTO events VALUES (?,?,?,?,?)',(ident,kind,source,volume,time.time()))
             if kind == 'fault': queue_notification(db,'fault:'+ident,'fault','แก้ว: พบเหตุขัดข้อง โปรดตรวจอุปกรณ์'+(' (ข้อมูลจำลอง)' if source=='simulated' else ''),self.server.provider_name,time.time())
         if kind == 'drink':
-            apply_advice(self.server, include_simulated=(source=='simulated'), automatic=True)
+            apply_advice(self.server, include_simulated=(source=='simulated'))
         return self.reply(201, {'status':'stored'})
 
-    def set_reminder(self, data):
-        if not isinstance(data,dict) or set(data)!={'interval_minutes','next_due'} or type(data['interval_minutes']) is not int or not 1<=data['interval_minutes']<=1440 or type(data['next_due']) not in (int,float) or not math.isfinite(data['next_due']) or not 0<data['next_due']<time.time()+86400*366:
-            return self.reply(400, {'error':'invalid_reminder'})
+    def set_profile(self, data):
+        weight=data.get('body_weight_kg') if isinstance(data,dict) and set(data)=={'body_weight_kg'} else None
+        if type(weight) not in (int,float) or not 20 <= weight <= 250:
+            return self.reply(400, {'error':'invalid_body_weight'})
         with closing(connect(self.server.db_path)) as db, db:
             db.execute('BEGIN IMMEDIATE')
-            db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,1) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(data['interval_minutes'],data['next_due']))
-        return self.reply(200, {'status':'saved'})
-
-    def set_goal(self, data):
-        if not isinstance(data,dict) or set(data)!={'goal_ml'} or type(data['goal_ml']) is not int or not 100 <= data['goal_ml'] <= 10000:
-            return self.reply(400, {'error':'invalid_goal'})
-        with closing(connect(self.server.db_path)) as db, db:
-            db.execute("INSERT INTO settings VALUES ('goal_ml',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",(data['goal_ml'],))
-        return self.reply(200, {'status':'saved'})
+            # Store integer grams for portable fractional kg across SQLite and Postgres.
+            db.execute("INSERT INTO settings VALUES ('body_weight_g',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value",
+                       (round(weight * 1000),))
+            profile=hydration_profile(db)
+        apply_advice(self.server)
+        return self.reply(200, profile)
 
     def stt(self):
         if not self.authorized(self.server.admin_token): return self.reply(401,{'error':'unauthorized'})
@@ -276,7 +385,12 @@ class Handler(BaseHTTPRequestHandler):
             self.server.stt_recent.append({**result, 'elapsed_ms': elapsed_ms, 'at': time.time()})
         if 'error' in result: return self.reply(422,{'error':'stt_failed'})
         if parse_qs(urlsplit(self.path).query).get('command')==['1']:
-            result['command']=self.voice_result({'text':result['text']})
+            command = self.voice_result({'text':result['text']})
+            result['command'] = command
+            if 'reply' in command and command['intent'] != 'no_wake':
+                audio = self.server.reply_audio.synthesize(self.server.tts, command['reply'])
+                if audio is not None:
+                    command['reply_audio_id'] = self.server.reply_audio.add(audio)
         return self.reply(200,result)
 
     def voice(self,data):
@@ -287,21 +401,6 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(data,dict) or set(data)!={'text'}: return {'error':'invalid_voice'}
         intent=parse_text(data['text']); kind=intent['intent']
         if kind=='invalid': return {'error':'invalid_voice'}
-        if kind=='reminder':
-            minutes=intent['minutes']
-            with closing(connect(self.server.db_path)) as db, db:
-                db.execute('BEGIN IMMEDIATE')
-                db.execute('INSERT INTO reminders(id,interval_minutes,next_due,repeat_enabled) VALUES (1,?,?,0) ON CONFLICT (id) DO UPDATE SET interval_minutes=excluded.interval_minutes,next_due=excluded.next_due,repeat_enabled=excluded.repeat_enabled',(minutes,time.time()+minutes*60))
-            return {'intent':kind,'minutes':minutes,'executed':True,'reply':'ได้เลย จะเตือนอีก %d นาที'%minutes}
-        if kind=='level':
-            with closing(connect(self.server.db_path)) as db:
-                row=db.execute('SELECT level,received_at,source FROM telemetry ORDER BY id DESC LIMIT 1').fetchone()
-            # Receipt time is not measurement time; delayed outbox records may already be old.
-            # Expiry can invalidate a value, but cannot establish sensor freshness.
-            level=row['level'] if row and 0<=time.time()-row['received_at']<5 else 'unknown'
-            text={'wet':'ข้อมูลระดับล่าสุดระบุว่าพบระดับน้ำ แต่อาจล่าช้า', 'dry':'ข้อมูลระดับล่าสุดระบุว่าน้ำต่ำ แต่อาจล่าช้า','unknown':'ยังไม่ทราบระดับน้ำ'}[level]
-            if row and row['source']=='simulated': text += ' (ข้อมูลจำลอง)'
-            return {'intent':kind,'level':level,'executed':True,'reply':text}
         if kind=='status':
             with closing(connect(self.server.db_path)) as db:
                 row=db.execute("SELECT last_seen,(SELECT source FROM telemetry WHERE device_id='node-1' ORDER BY id DESC LIMIT 1) AS source FROM devices WHERE id='node-1'").fetchone()
@@ -309,19 +408,56 @@ class Handler(BaseHTTPRequestHandler):
             text='ข้อมูลล่าสุดระบุว่าอุปกรณ์'+('ออนไลน์' if online else 'ออฟไลน์')
             if row and row['source']=='simulated': text+=' (ข้อมูลจำลอง)'
             return {'intent':kind,'online':online,'executed':True,'reply':text}
+        if kind == 'drank_today':
+            with closing(connect(self.server.db_path)) as db:
+                total, simulated = drank_today(db, time.time())
+                goal = hydration_profile(db)['goal_ml']
+            spoken_ml = f'{total:.2f}'.rstrip('0').rstrip('.')
+            text = f'วันนี้ดื่มน้ำไป {spoken_ml} มิลลิลิตร'
+            if simulated:
+                text += ' จากข้อมูลจำลอง'
+            percent = round(total * 100 / goal) if goal else None
+            if goal:
+                text += f' เป้าหมายวันนี้ {goal} มิลลิลิตร คิดเป็น {percent} เปอร์เซ็นต์ของเป้าหมายครับ'
+            else:
+                text += ' ยังไม่ได้ตั้งค่าน้ำหนัก กรุณากรอกน้ำหนักในแดชบอร์ดเพื่อดูเป้าหมายและความคืบหน้าครับ'
+            return {'intent': kind, 'executed': True, 'reply': text,
+                    'drank_ml': total, 'goal_ml': goal, 'percent': percent, 'simulated': simulated}
         if kind=='refill': return {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'}
-        if kind=='stop': return {'intent':kind,'executed':False,'reply':'ยังไม่มีช่องสั่งหยุดผ่านเสียง กรุณาใช้ปุ่มหยุดจริง'}
-        return {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'}
+        return {'intent':kind,'executed':False,'reply':RETRY_PHRASE}
 
-    def advice(self,data):
-        if not isinstance(data,dict) or set(data)!={'include_simulated'} or type(data['include_simulated']) is not bool:
-            return self.reply(400,{'error':'invalid_advice_request'})
-        include=data['include_simulated']
-        result=apply_advice(self.server,include_simulated=include)
-        return self.reply(200,{'advice':result,'simulated_inputs_included':include,'actuation_allowed':False})
+    def get_audio(self, ident):
+        admin = self.authorized(self.server.admin_token)
+        if not admin and not self.authorized(self.server.device_token):
+            return self.reply(401, {'error': 'unauthorized'})
+        if not re.fullmatch(r'[a-f0-9]{32}', ident):
+            return self.reply(404, {'error': 'not_found'})
+        if admin:
+            audio = self.server.reply_audio.get(ident)
+        elif ident == latest_gateway_reminder(self.server):
+            audio = self.server.reply_audio.synthesize(self.server.tts, REMINDER_PHRASE)
+            if audio is None:
+                return self.reply(503, {'error': 'tts_unavailable'})
+        else:
+            audio = None
+        if audio is None:
+            return self.reply(404, {'error': 'not_found'})
+        self.send_response(200)
+        self.send_header('Content-Type', 'audio/wav')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', str(len(audio)))
+        self.end_headers()
+        self.wfile.write(audio)
+
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path.startswith('/api/tts/'):
+            return self.get_audio(path[len('/api/tts/'):])
+        if path == '/api/gateway/reminder':
+            if not self.authorized(self.server.device_token):
+                return self.reply(401, {'error': 'unauthorized'})
+            return self.reply(200, {'reminder_id': latest_gateway_reminder(self.server)})
         if path in ('/', '/stt'):
             body = (ROOT / 'static' / ('stt.html' if path == '/stt' else 'dashboard.html')).read_bytes()
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -329,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
-        if path not in ('/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
+        if path not in ('/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/profile','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
         if path == '/api/advice' and self.authorized(self.server.device_token):
             raw_query = urlsplit(self.path).query
             if not raw_query: return self.reply(401, {'error': 'unauthorized'})
@@ -356,9 +492,9 @@ class Handler(BaseHTTPRequestHandler):
                 if result is not None:
                     result.update(model=row['model'],fallback=bool(row['fallback']),timestamp=row['created_at'],actuation_allowed=False)
                 return self.reply(200,{'advice':result,'actuation_allowed':False})
-            if path == '/api/goal':
-                row=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
-                return self.reply(200, {'goal_ml': row['value'] if row else None})
+            if path in ('/api/profile','/api/goal'):
+                profile=hydration_profile(db)
+                return self.reply(200, profile if path=='/api/profile' else {'goal_ml':profile['goal_ml']})
             if path == '/api/events':
                 query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
                 try:
@@ -421,7 +557,7 @@ def reminder_loop(server):
                 row=db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
                 now=time.time()
                 if row and row['next_due'] <= now:
-                    queue_notification(db,'reminder:'+str(row['next_due']),'reminder','แก้ว: ถึงเวลาดื่มน้ำแล้ว',server.provider_name,now)
+                    queue_notification(db,'reminder:'+str(row['next_due']),'reminder','แก้ว: '+REMINDER_PHRASE,server.provider_name,now)
                     if row['repeat_enabled']:
                         fired=(row['interval_minutes'],now+row['interval_minutes']*60,1)
                         db.execute('UPDATE reminders SET next_due=? WHERE id=1',(fired[1],))
@@ -432,7 +568,9 @@ def reminder_loop(server):
                     queue_notification(db,'offline:'+str(device['last_seen']),'offline','แก้ว: อุปกรณ์ขาดการเชื่อมต่อ'+(' (ข้อมูลจำลอง)' if device['source']=='simulated' else ''),server.provider_name,now)
                     db.execute("INSERT INTO alert_state VALUES ('offline','1') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
             if fired is not None:
-                apply_advice(server,automatic=True,expected_reminder=fired)
+                apply_advice(server,expected_reminder=fired)
+            elif row is None and time.monotonic() >= server.next_reminder_bootstrap:
+                apply_advice(server, expected_reminder=None)
         except sqlite3.Error:
             continue
 
@@ -465,11 +603,19 @@ def create_server(host, port, db_path, device_token, admin_token, provider=None,
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
     server.provider = provider or MockProvider()
     server.hydration_provider = select_provider() if hydration_provider is _ENV_PROVIDER else hydration_provider
+    server.tts = EdgeTTS()
+    server.reply_audio = ReplyAudio()
     server.stt_lock = threading.Lock()
     server.stt_recent = deque(maxlen=50)
     server.advice_lock = threading.Lock()
     server.provider_name = 'telegram' if isinstance(server.provider, TelegramProvider) else 'mock'
     server.stop_reminders = threading.Event()
+    server.next_reminder_bootstrap = float('-inf')
+    try:
+        apply_advice(server, expected_reminder=None)
+    except sqlite3.Error:
+        # The reminder loop retries after the bootstrap cooldown.
+        pass
     server.reminder_thread = threading.Thread(target=reminder_loop,args=(server,),daemon=True)
     server.reminder_thread.start()
     server.delivery_thread = threading.Thread(target=delivery_loop,args=(server,),daemon=True)

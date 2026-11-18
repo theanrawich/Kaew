@@ -2,6 +2,7 @@
 #include <array>
 #include <cstring>
 #include "durable_queue.h"
+#include "cloud_outbox_record.h"
 
 struct MemoryStore : SlotStore {
   std::array<std::array<uint8_t, DURABLE_RECORD_SIZE>, DURABLE_SLOTS> data{};
@@ -26,5 +27,30 @@ int main() {
   p.seq++; assert(again.append(p)==QueueResult::Full);
   store.data[1][0]^=0x80; DurableQueue corrupt(store); assert(!corrupt.recover());
   assert(corrupt.append(p)==QueueResult::StorageError);
+  // Existing on-device telemetry can be replayed after upgrade, alongside
+  // a measured drink whose ID and volume survive a restart.
+  MemoryStore mixedStore;
+  DurableQueue legacy(mixedStore);
+  assert(legacy.recover() && legacy.append(p)==QueueResult::Added);
+  using MixedOutbox = DurableOutbox<CloudOutboxRecord, CloudOutboxRecord>;
+  MixedOutbox mixed(mixedStore);
+  assert(mixed.recover());
+  CloudOutboxRecord drink{{}, {0x11223344, p.session, p.seq, 123}};
+  assert(mixed.append(drink)==QueueResult::Added);
+  assert(mixed.append(drink)==QueueResult::Duplicate);
+  auto changedDrink=drink;
+  changedDrink.drink.volumeMl=124;
+  assert(mixed.append(changedDrink)==QueueResult::Conflict);
+  MixedOutbox rebootMixed(mixedStore);
+  CloudOutboxRecord head{};
+  assert(rebootMixed.recover() && rebootMixed.peek(head));
+  assert(!head.isDrink() && head.telemetry.seq==p.seq);
+  assert(rebootMixed.pop() && rebootMixed.peek(head));
+  assert(head.isDrink() && CloudOutboxRecord::sameId(head,drink) && head.drink.volumeMl==123);
+  uint8_t bytes[FRAME_SIZE];
+  bool ack=false;
+  CloudOutboxRecord::encodeRecord(head,bytes);
+  assert(!decode(bytes,got,ack));
+  assert(rebootMixed.pop() && !rebootMixed.peek(head));
   return 0;
 }

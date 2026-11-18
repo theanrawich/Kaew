@@ -1,6 +1,6 @@
 # Kaew (แก้ว)
 
-ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gateway → Python cloud API and dashboard. AI provides hydration advice; dispensing remains subject to local safety checks. Physical pump commissioning is disabled by default, and software tests do not establish hardware readiness.
+ESP32-S3 smart water dispenser prototype: sensor node → CRC16/ACK UART → gateway → Python cloud API and dashboard. The dashboard accepts body weight to derive a daily hydration goal, and AI schedules reminders after a profile update, measured drink or reminder firing. The gateway estimates drinks from calibrated cup weight changes. Physical pump commissioning is disabled by default, and software tests do not establish hardware readiness.
 
 | Path | Purpose |
 | --- | --- |

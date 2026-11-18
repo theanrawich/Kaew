@@ -1,38 +1,43 @@
 #pragma once
 #include <Arduino.h>
+#include <atomic>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
 #include <esp_system.h>
 #include "cloud_config.h"
+#include "cloud_outbox_record.h"
 #include "nvs_queue_store.h"
 
 // Persistence and network use separate tasks; the control loop never waits for either.
 class CloudPublisher {
   NvsQueueStore store_;
-  DurableQueue durable_{store_};
+  DurableOutbox<CloudOutboxRecord, CloudOutboxRecord> durable_{store_};
   QueueHandle_t pending_=nullptr, acknowledgements_=nullptr;
   SemaphoreHandle_t lock_=nullptr;
-  volatile uint32_t rejected_=0, errors_=0;
+  std::atomic<uint32_t> rejected_{0}, errors_{0};
   bool ready_=false, keepConnected_=false;
   static void persistTask(void *p) { static_cast<CloudPublisher*>(p)->persist(); }
   static void networkTask(void *p) { static_cast<CloudPublisher*>(p)->network(); }
   void persist() {
-    uint32_t last=0; bool wrote=false, haveRecent=false; Packet packet{}, recent{};
+    uint32_t last=0; bool wrote=false, haveRecent=false; CloudOutboxRecord record{}; Packet recent{};
     for (;;) {
-      if(xQueueReceive(pending_,&packet,portMAX_DELAY)!=pdTRUE) continue;
-      if(haveRecent && packet.node==recent.node && packet.session==recent.session && packet.seq==recent.seq) {
+      if(xQueueReceive(pending_,&record,portMAX_DELAY)!=pdTRUE) continue;
+      const Packet &packet=record.telemetry;
+      if(!record.isDrink() && haveRecent && packet.node==recent.node && packet.session==recent.session && packet.seq==recent.seq) {
         uint8_t a[FRAME_SIZE],b[FRAME_SIZE]; encode(packet,false,a); encode(recent,false,b);
         if(memcmp(a,b,FRAME_SIZE)==0) { xQueueSend(acknowledgements_,&packet,portMAX_DELAY); continue; }
         ++errors_; continue; // Same ID with different data is not acknowledged.
       }
       if(wrote) { uint32_t elapsed=uint32_t(millis()-last); if(elapsed<KAEW_DURABLE_MIN_MS) vTaskDelay(pdMS_TO_TICKS(KAEW_DURABLE_MIN_MS-elapsed)); }
-      xSemaphoreTake(lock_,portMAX_DELAY); QueueResult result=durable_.append(packet); xSemaphoreGive(lock_);
+      xSemaphoreTake(lock_,portMAX_DELAY); QueueResult result=durable_.append(record); xSemaphoreGive(lock_);
       if(result==QueueResult::Added || result==QueueResult::Duplicate) {
         if(result==QueueResult::Added) {last=millis();wrote=true;}
-        recent=packet; haveRecent=true;
-        xQueueSend(acknowledgements_,&packet,portMAX_DELAY);
+        if(!record.isDrink()) {
+          recent=packet; haveRecent=true;
+          xQueueSend(acknowledgements_,&packet,portMAX_DELAY);
+        }
       } else if(result==QueueResult::Full) ++rejected_;
       else ++errors_; // No ACK on full, invalid or damaged storage.
     }
@@ -48,8 +53,8 @@ class CloudPublisher {
         configTime(0,0,"pool.ntp.org","time.google.com");
         clockRequested=true;
       }
-      Packet packet{};
-      xSemaphoreTake(lock_,portMAX_DELAY); bool found=durable_.peek(packet); bool healthy=durable_.healthy(); xSemaphoreGive(lock_);
+      CloudOutboxRecord record{};
+      xSemaphoreTake(lock_,portMAX_DELAY); bool found=durable_.peek(record); bool healthy=durable_.healthy(); xSemaphoreGive(lock_);
       if(!healthy && !storageErrorReported) { ++errors_; storageErrorReported=true; }
       if(!found && !keepConnected_) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if(WiFi.status()!=WL_CONNECTED) { WiFi.reconnect(); vTaskDelay(pdMS_TO_TICKS(retryMs+esp_random()%(retryMs/4+1))); retryMs=min(retryMs*2,uint32_t(60000));continue; }
@@ -57,18 +62,33 @@ class CloudPublisher {
       if((!tls && !dev) || !strlen(KAEW_CLOUD_TOKEN) || (tls && !strlen(KAEW_CLOUD_CA))) {vTaskDelay(pdMS_TO_TICKS(10000));continue;}
       if(tls && time(nullptr)<1577836800) {vTaskDelay(pdMS_TO_TICKS(5000));continue;}
       WiFiClient plain; WiFiClientSecure secure; if(tls) secure.setCACert(KAEW_CLOUD_CA);
-      HTTPClient http; bool began=tls ? http.begin(secure,url) : http.begin(plain,url);
+      String requestUrl(url);
+      if(record.isDrink()) {
+        const int path=requestUrl.indexOf('/',tls ? 8 : 7);
+        if(path>=0) requestUrl.remove(path);
+        requestUrl += "/api/events";
+      }
+      HTTPClient http; bool began=tls ? http.begin(secure,requestUrl) : http.begin(plain,requestUrl);
       if(!began) {vTaskDelay(pdMS_TO_TICKS(retryMs));retryMs=min(retryMs*2,uint32_t(60000));continue;}
-      http.setTimeout(3000); http.addHeader("Content-Type","application/json");
+      http.setTimeout(record.isDrink() ? 25000 : 3000);
+      http.addHeader("Content-Type","application/json");
       http.addHeader("Authorization",String("Bearer ")+KAEW_CLOUD_TOKEN);
-      char temp[24]; if(packet.centiC==INT16_MIN)strcpy(temp,"null");else snprintf(temp,sizeof temp,"%.2f",packet.centiC/100.0);
-      const char *level=packet.level==1?"wet":packet.level==2?"dry":"unknown";
-      char body[256]; snprintf(body,sizeof body,"{\"device_id\":\"node-1\",\"session\":%lu,\"seq\":%lu,\"level\":\"%s\",\"temperature_c\":%s,\"tds_adc\":%u,\"source\":\"device\"}",
-        (unsigned long)packet.session,(unsigned long)packet.seq,level,temp,packet.adc);
+      char body[256];
+      if(record.isDrink()) {
+        const auto &drink=record.drink;
+        snprintf(body,sizeof body,"{\"event_id\":\"gateway-1:%08lx:%08lx:%08lx\",\"kind\":\"drink\",\"source\":\"measured\",\"volume_ml\":%u}",
+          (unsigned long)drink.bootHigh,(unsigned long)drink.bootLow,(unsigned long)drink.sequence,drink.volumeMl);
+      } else {
+        const auto &packet=record.telemetry;
+        char temp[24]; if(packet.centiC==INT16_MIN)strcpy(temp,"null");else snprintf(temp,sizeof temp,"%.2f",packet.centiC/100.0);
+        const char *level=packet.level==1?"wet":packet.level==2?"dry":"unknown";
+        snprintf(body,sizeof body,"{\"device_id\":\"node-1\",\"session\":%lu,\"seq\":%lu,\"level\":\"%s\",\"temperature_c\":%s,\"tds_adc\":%u,\"source\":\"device\"}",
+          (unsigned long)packet.session,(unsigned long)packet.seq,level,temp,packet.adc);
+      }
       int result=http.POST((uint8_t*)body,strlen(body)); http.end();
       if(result==200 || result==201) {
-        xSemaphoreTake(lock_,portMAX_DELAY); Packet head{};
-        if(durable_.peek(head) && head.node==packet.node && head.session==packet.session && head.seq==packet.seq) {if(!durable_.pop())++errors_;}
+        xSemaphoreTake(lock_,portMAX_DELAY); CloudOutboxRecord head{};
+        if(durable_.peek(head) && CloudOutboxRecord::sameId(head,record)) {if(!durable_.pop())++errors_;}
         xSemaphoreGive(lock_); retryMs=1000;
       } else {vTaskDelay(pdMS_TO_TICKS(retryMs+esp_random()%(retryMs/4+1)));retryMs=min(retryMs*2,uint32_t(60000));}
     }
@@ -78,7 +98,7 @@ public:
     if(!KAEW_CLOUD_ENABLED)return false;
     keepConnected_ = keepConnected;
     if(!store_.begin() || !durable_.recover()) {++errors_;return false;}
-    lock_=xSemaphoreCreateMutex(); pending_=xQueueCreate(8,sizeof(Packet)); acknowledgements_=xQueueCreate(8,sizeof(Packet));
+    lock_=xSemaphoreCreateMutex(); pending_=xQueueCreate(8,sizeof(CloudOutboxRecord)); acknowledgements_=xQueueCreate(8,sizeof(Packet));
     if(!lock_ || !pending_ || !acknowledgements_) {++errors_;return false;}
     // Fail closed if either task fails to start; no UART ACKs then leave the loop.
     TaskHandle_t persistent=nullptr;
@@ -87,8 +107,14 @@ public:
     ready_=true; return true;
   }
   bool enabled() const {return KAEW_CLOUD_ENABLED;}
-  bool enqueue(const Packet &p) {if(!enabled())return true; if(!ready_ || xQueueSend(pending_,&p,0)!=pdTRUE){++rejected_;return false;} return true;}
+  bool enqueue(const CloudOutboxRecord &record) {
+    if(!enabled()) return true;
+    if(!ready_ || xQueueSend(pending_, &record, 0)!=pdTRUE) { ++rejected_; return false; }
+    return true;
+  }
+  bool enqueue(const Packet &packet) { return enqueue(CloudOutboxRecord{packet, {}}); }
+  bool enqueueDrink(const MeasuredDrink &drink) { return enqueue(CloudOutboxRecord{{}, drink}); }
   bool takeAck(Packet &p) {return ready_ && xQueueReceive(acknowledgements_,&p,0)==pdTRUE;}
-  uint32_t rejected() const {return rejected_;}
-  uint32_t errors() const {return errors_;}
+  uint32_t rejected() const {return rejected_.load();}
+  uint32_t errors() const {return errors_.load();}
 };

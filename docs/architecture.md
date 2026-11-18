@@ -13,12 +13,12 @@ flowchart LR
     MIC["Mic INMP441 (SD 6, SCK 7, WS 8)"]
     SPK["Speaker MAX98357A (DIN 9, BCLK 10, LRC 11)"]
     PUMP["Pump + E-stop (disabled)"]
-    LOGIC["Cup/volume logic + refill safety contract"]
+    LOGIC["Drink detection + refill safety contract"]
     SPEECH["SpeechCapture + WAV upload"]
   end
 
   subgraph Cloud["kaew-cloud (Render, Python)"]
-    API["HTTP API: /api/telemetry, /api/events, /api/stt, /api/advice"]
+    API["HTTP API: /api/telemetry, /api/events, /api/profile, /api/stt, /api/advice"]
     DB[("Postgres (Supabase)")]
     AI["Hydration AI (Groq LLM)"]
     DASH["Dashboard + /stt page"]
@@ -39,15 +39,17 @@ flowchart LR
   API -- "refill advice" --> LOGIC
   API --> DASH
   DASH --> USER
+  USER -- "Body weight (kg)" --> DASH
 ```
 
 ## Data flow
 
 1. The sensor node reads TDS, water level and temperature and sends framed packets to the gateway over UART; the gateway acknowledges each packet.
-2. The gateway combines node data with the load-cell cup/volume reading and publishes telemetry and events to the cloud over HTTPS.
-3. The cloud stores data in Postgres and serves the dashboard.
-4. Voice: the gateway segments speech from the microphone, uploads WAV to `/api/stt?command=1`, the cloud transcribes it with Typhoon ASR and returns a parsed command.
-5. Hydration advice comes from the Groq LLM. The pump stays disabled; voice and advice never actuate it directly.
+2. The gateway publishes node telemetry and detects drinks independently using calibrated HX711 readings. It confirms that the platform unloads and the returned cup settles, then converts a 10–1000 g decrease into an estimated volume at 1 g/mL. Weight increases are ignored. Drinks and telemetry share the durable retry queue.
+3. The device token can post measured drinks to `/api/events` using the single gateway's ID namespace. Event history remains admin-only. The cloud stores data in SQLite or Postgres and serves the dashboard.
+4. The user enters body weight through the dashboard via admin-authenticated `GET/POST /api/profile`. The cloud derives the daily goal at 33 mL/kg, bounded to 1,000–4,000 mL.
+5. The server initializes a missing reminder schedule at startup and checks for a missing row in the reminder loop. Saving weight, recording a new drink and firing a repeating reminder each trigger an AI decision. Groq receives the weight, goal and recent history. If the model is unavailable, the server schedules a deterministic 60-minute interval. The dashboard displays the schedule.
+6. The gateway sends microphone audio to `/api/stt?command=1` for Typhoon ASR and intent parsing. Voice can report device connection status. Voice refill stays blocked and pump commissioning stays disabled.
 
 ## Wiring
 
