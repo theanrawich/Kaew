@@ -1,6 +1,6 @@
 # M4 gateway AI-loop validation — 17 November 2026 (Asia/Bangkok)
 
-Source branch: `feature/ratchapol-ai-refill-loop`, from `d8d164e` on current main after merged PR #8. This record covers the new locally confirmed AI read/validation path; [PR #8 validation](software-2026-11-17.md) remains a historical snapshot. Architecture, contract and limitations are in the [M4 design](../M4_GATEWAY_AI_LOOP.md).
+Source branch: `feature/ratchapol-ai-refill-loop`, from `d8d164e` on current main after merged PR #8. This record covers the new locally confirmed AI read/validation path; [PR #8 validation](software-2026-11-17.md) remains a historical snapshot. Architecture, contract and limitations are in the [M4 design](../../design/m4-gateway-ai-loop.md).
 
 | Executed check | Actual result |
 |---|---|
@@ -8,7 +8,6 @@ Source branch: `feature/ratchapol-ai-refill-loop`, from `d8d164e` on current mai
 | `python -m unittest discover -s cloud -p 'test_*.py' -v` | OK: 87 total, **82 passed / 5 optional Postgres skipped** |
 | HTTP advice → C++ integration (part of cloud suite) | PASS: model-provider fixture suggestions 120/240 mL become fake targets 220/340 g for a synthetic 100 g cup and stop; 400 mL is rejected |
 | `python -m unittest discover -s scripts -p 'test_*.py' -v` | PASS: 24 / 24 |
-| `node --test simulation/*.test.mjs` | PASS: 25 / 25 |
 | `python -m platformio run -d firmware -e sensor_node -e gateway -e gateway_cloud_compile -e sensor_node_trace -e gateway_trace -e gateway_ai_compile` | SUCCESS: all 6 environments |
 | Source/whitespace/local Markdown link checks | PASS before publication |
 

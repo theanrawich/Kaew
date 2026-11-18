@@ -11,9 +11,9 @@
 - Node TDS และ level: `-1` (ยังปิด); gateway pump และ E-stop: `-1` (ยังปิด) ไม่ถือว่า GPIO ที่จองในตารางถูก commission แล้ว
 - I²S ที่เสนอ: microphone GPIO4/5/6 และ amplifier GPIO10/11/12; ปิดโดย default และยังไม่เชื่อม voice pipeline
 
-อ้างอิง [firmware](../firmware/README.md) และ [checkpoint](CHECKPOINT_CRITICAL_PATH.md) ก่อนต่อสาย; ขา UART ที่เพิ่มต้องทวนกับ board revision จริง
+อ้างอิง [firmware](../../firmware/README.md) และ [checkpoint](../course/checkpoint-critical-path.md) ก่อนต่อสาย; ขา UART ที่เพิ่มต้องทวนกับ board revision จริง
 
-ปรับปรุง software 17 พ.ย.: interface ปั๊มย้ายไป `firmware/include/pump_gpio.h` โดย default ขา -1, polarity ไม่กำหนด และ commissioning/local refill เป็น 0 เหมือนเดิม เส้นทางคำสั่งทดสอบด้วย fake actuator แล้ว แต่ไม่เปลี่ยนสถานะ HOLD ของ GPIO15/16 หรือวงจรกำลัง ดู [contract/เงื่อนไขก่อนเปิดจริง](GATEWAY_REFILL_CONTRACT.md) Physical stop ต้องตัดกำลังอย่างอิสระ ไม่ใช้ GPIO แทน
+ปรับปรุง software 17 พ.ย.: interface ปั๊มย้ายไป `firmware/include/pump_gpio.h` โดย default ขา -1, polarity ไม่กำหนด และ commissioning/local refill เป็น 0 เหมือนเดิม เส้นทางคำสั่งทดสอบด้วย fake actuator แล้ว แต่ไม่เปลี่ยนสถานะ HOLD ของ GPIO15/16 หรือวงจรกำลัง ดู [contract/เงื่อนไขก่อนเปิดจริง](../design/gateway-refill-contract.md) Physical stop ต้องตัดกำลังอย่างอิสระ ไม่ใช้ GPIO แทน
 
 ## นิยามจุดร่วม
 
