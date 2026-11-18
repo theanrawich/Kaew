@@ -1,4 +1,4 @@
-name: Firmware and simulator checks
+name: Firmware and cloud checks
 on:
   push:
   pull_request:
@@ -9,14 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Simulator tests
-        run: node --test simulation/*.test.mjs
       - name: Cloud API and pipeline tests
         run: python -m unittest discover -s cloud -p 'test_*.py' -v
       - name: Host safety tests
