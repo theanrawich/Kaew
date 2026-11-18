@@ -117,17 +117,26 @@ def hydration_profile(db):
     }
 
 
-def apply_advice(server, include_simulated=False, expected_reminder=None):
+_ANY_REMINDER = object()
+
+
+def apply_advice(server, include_simulated=False, expected_reminder=_ANY_REMINDER):
     """Inference runs outside DB transactions; logging and conditional schedule commit together.
 
     Serialize in-process decisions and compare the reminder snapshot after inference
-    so a fired reminder cannot overwrite a more recent decision.
+    so a fired reminder cannot overwrite a more recent decision. An explicit
+    None expects a missing schedule and enables the bootstrap cooldown.
     """
     with server.advice_lock:
+        if expected_reminder is None:
+            now_monotonic = time.monotonic()
+            if now_monotonic < server.next_reminder_bootstrap:
+                return None
+            server.next_reminder_bootstrap = now_monotonic + 60
         now=time.time()
         with closing(connect(server.db_path)) as db:
             before=reminder_snapshot(db)
-            if expected_reminder is not None and before!=expected_reminder:
+            if expected_reminder is not _ANY_REMINDER and before!=expected_reminder:
                 return None
             sources=('measured','estimated','simulated') if include_simulated else ('measured','estimated')
             placeholders=','.join('?' for _ in sources)
@@ -149,7 +158,7 @@ def apply_advice(server, include_simulated=False, expected_reminder=None):
         with closing(connect(server.db_path)) as db, db:
             db.execute('BEGIN IMMEDIATE')
             # A drink or profile update supersedes a concurrent reminder firing.
-            scheduled=expected_reminder is None or reminder_snapshot(db)==before
+            scheduled=expected_reminder is _ANY_REMINDER or reminder_snapshot(db)==before
             result.update(timestamp=now,scheduled=scheduled,actuation_allowed=False)
             db.execute('INSERT INTO advice_log(created_at,input_json,output_json,simulated,model,fallback) VALUES (?,?,?,?,?,?)',
                        (now,json.dumps(context),json.dumps(result,ensure_ascii=False),int(include_simulated),result['model'],int(result['fallback'])))
@@ -301,17 +310,6 @@ class Handler(BaseHTTPRequestHandler):
         if not isinstance(data,dict) or set(data)!={'text'}: return {'error':'invalid_voice'}
         intent=parse_text(data['text']); kind=intent['intent']
         if kind=='invalid': return {'error':'invalid_voice'}
-        if kind=='reminder':
-            return {'intent':kind,'executed':False,'reply':'ระบบจะตั้งเวลาเตือนให้โดยอัตโนมัติ'}
-        if kind=='level':
-            with closing(connect(self.server.db_path)) as db:
-                row=db.execute('SELECT level,received_at,source FROM telemetry ORDER BY id DESC LIMIT 1').fetchone()
-            # Receipt time is not measurement time; delayed outbox records may already be old.
-            # Expiry can invalidate a value, but cannot establish sensor freshness.
-            level=row['level'] if row and 0<=time.time()-row['received_at']<5 else 'unknown'
-            text={'wet':'ข้อมูลระดับล่าสุดระบุว่าพบระดับน้ำ แต่อาจล่าช้า', 'dry':'ข้อมูลระดับล่าสุดระบุว่าน้ำต่ำ แต่อาจล่าช้า','unknown':'ยังไม่ทราบระดับน้ำ'}[level]
-            if row and row['source']=='simulated': text += ' (ข้อมูลจำลอง)'
-            return {'intent':kind,'level':level,'executed':True,'reply':text}
         if kind=='status':
             with closing(connect(self.server.db_path)) as db:
                 row=db.execute("SELECT last_seen,(SELECT source FROM telemetry WHERE device_id='node-1' ORDER BY id DESC LIMIT 1) AS source FROM devices WHERE id='node-1'").fetchone()
@@ -320,7 +318,6 @@ class Handler(BaseHTTPRequestHandler):
             if row and row['source']=='simulated': text+=' (ข้อมูลจำลอง)'
             return {'intent':kind,'online':online,'executed':True,'reply':text}
         if kind=='refill': return {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'}
-        if kind=='stop': return {'intent':kind,'executed':False,'reply':'ยังไม่มีช่องสั่งหยุดผ่านเสียง กรุณาใช้ปุ่มหยุดจริง'}
         return {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'}
 
     def do_GET(self):
@@ -436,6 +433,8 @@ def reminder_loop(server):
                     db.execute("INSERT INTO alert_state VALUES ('offline','1') ON CONFLICT (key) DO UPDATE SET value=excluded.value")
             if fired is not None:
                 apply_advice(server,expected_reminder=fired)
+            elif row is None and time.monotonic() >= server.next_reminder_bootstrap:
+                apply_advice(server, expected_reminder=None)
         except sqlite3.Error:
             continue
 
@@ -473,6 +472,12 @@ def create_server(host, port, db_path, device_token, admin_token, provider=None,
     server.advice_lock = threading.Lock()
     server.provider_name = 'telegram' if isinstance(server.provider, TelegramProvider) else 'mock'
     server.stop_reminders = threading.Event()
+    server.next_reminder_bootstrap = float('-inf')
+    try:
+        apply_advice(server, expected_reminder=None)
+    except sqlite3.Error:
+        # The reminder loop retries after the bootstrap cooldown.
+        pass
     server.reminder_thread = threading.Thread(target=reminder_loop,args=(server,),daemon=True)
     server.reminder_thread.start()
     server.delivery_thread = threading.Thread(target=delivery_loop,args=(server,),daemon=True)

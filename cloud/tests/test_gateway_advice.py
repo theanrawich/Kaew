@@ -111,6 +111,8 @@ class GatewayAdviceApiTest(unittest.TestCase):
         self.assertIn('advice',self.request('GET','/api/advice','admin-test')[1])
 
     def test_no_advice_bad_query_and_stale_advice_fail_closed(self):
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('DELETE FROM advice_log')
         self.assertEqual(self.request('GET','/api/advice?'+QUERY,'device-test')[0],409)
         self.assertEqual(self.request('GET','/api/advice?'+QUERY+'&nonce=1','device-test')[0],400)
         self.decision()
@@ -119,8 +121,12 @@ class GatewayAdviceApiTest(unittest.TestCase):
         self.assertEqual(self.request('GET','/api/advice?'+QUERY,'device-test')[0],409)
 
     def test_simulated_decisions_not_exported_and_fallback_marked(self):
+        status, initial = self.request('GET','/api/advice?'+QUERY,'device-test')
+        self.assertEqual(status,200)
         self.decision(simulated=True)
-        self.assertEqual(self.request('GET','/api/advice?'+QUERY,'device-test')[0],409)
+        status, after_simulation = self.request('GET','/api/advice?'+QUERY,'device-test')
+        self.assertEqual(status,200)
+        self.assertEqual(after_simulation['advice_id'],initial['advice_id'])
         self.server.hydration_provider=None
         self.decision()
         status,data=self.request('GET','/api/advice?'+QUERY,'device-test')

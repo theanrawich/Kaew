@@ -95,7 +95,6 @@ class PostgresTest(unittest.TestCase):
 
     def test_reminder_and_notification_worker(self):
         self.assertEqual(self.request('POST', '/api/profile', {'body_weight_kg':70})[0],200)
-        self.assertFalse(self.request('POST', '/api/voice', {'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})[1]['executed'])
         with closing(connect(self.target)) as db, db:
             self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()['repeat_enabled'],1)
             db.execute('UPDATE reminders SET next_due=?',(time.time()-1,))

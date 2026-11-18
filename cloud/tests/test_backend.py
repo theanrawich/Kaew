@@ -4,7 +4,7 @@ import os
 import tempfile
 import threading
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from kaew.audio_service import AudioError, TyphoonASR, TYPHOON_ASR_MODEL
 import time
 import sqlite3
@@ -13,7 +13,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import urllib.error
 import urllib.request
-from kaew.server import create_server, migrate
+from kaew.server import create_server, migrate, reminder_loop
 from kaew.audio_service import process_audio
 from tests.test_audio import wav_fixture
 
@@ -174,14 +174,6 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(body['device']['id'], 'node-1')
         self.assertTrue(body['device']['online'])
 
-    def test_voice_level_does_not_present_stale_observation_as_current(self):
-        self.request('POST','/api/telemetry','device-secret',self.sample)
-        with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('UPDATE telemetry SET received_at=?',(time.time()-3600,))
-        status,body=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่'})
-        self.assertEqual(status,200)
-        self.assertEqual(body['level'],'unknown')
-
     def test_concurrent_retries_are_idempotent(self):
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(lambda _: self.request('POST', '/api/telemetry', 'device-secret', self.sample)[0], range(8)))
@@ -262,10 +254,19 @@ class BackendTest(unittest.TestCase):
         )):
             with self.subTest(body=body):
                 self.assertEqual(request('POST',body)[0],400)
+        contexts = []
+        def model(context):
+            contexts.append(context)
+            return {'next_reminder_minutes':35, 'suggested_ml':200, 'reason':'Recent intake.'}
+        self.server.hydration_provider = model
         for weight,goal in ((20,1000),(70.5,2327),(250,4000)):
             expected={'body_weight_kg':weight,'goal_ml':goal}
             self.assertEqual(request('POST',{'body_weight_kg':weight}),(200,expected))
             self.assertEqual(request('GET'),(200,expected))
+            self.assertEqual(contexts[-1]['body_weight_kg'], weight)
+            self.assertEqual(contexts[-1]['goal_ml'], goal)
+            self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]
+                             ['reminder']['interval_minutes'], 35)
             self.assertEqual(self.request('GET','/api/goal','admin-secret'),(200,{'goal_ml':goal}))
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute("SELECT value FROM settings WHERE key='body_weight_g'").fetchone()[0],250000)
@@ -319,31 +320,8 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(self.request('POST','/api/voice','device-secret',{'text':'แก้ว เติมน้ำให้หน่อย'})[0],401)
         status, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว เติมน้ำให้หน่อย'})
         self.assertEqual(status,200); self.assertEqual(answer['intent'],'refill'); self.assertFalse(answer['executed'])
-        status, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
-        self.assertEqual(answer['intent'],'reminder'); self.assertFalse(answer['executed'])
-        _, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว ตอนนี้น้ำเหลือเท่าไหร่'})
-        self.assertEqual(answer['level'],'unknown')
-        self.request('POST','/api/telemetry','device-secret',self.sample)
-        _, answer=self.request('POST','/api/voice','admin-secret',{'text':'แก้ว น้ำในขวดเป็นอย่างไร'})
-        self.assertEqual(answer['level'],'wet'); self.assertNotIn('มิลลิลิตร',answer['reply'])
-
-    def test_voice_cannot_create_or_change_reminder(self):
-        def reminder():
-            return self.request('GET','/api/reminder','admin-secret')[1]['reminder']
-        self.assertIsNone(reminder())
-        for text in ('เตือนอีก 5 นาที','แก้ว remind อีก ๕ นาที','แก้ว เตือนให้ดื่มน้ำ'):
-            status,answer=self.request('POST','/api/voice','admin-secret',{'text':text})
-            self.assertEqual(status,200)
-            self.assertFalse(answer['executed'])
-            if text.startswith('แก้ว'):
-                self.assertEqual(answer['intent'],'reminder')
-                self.assertIn('อัตโนมัติ',answer['reply'])
-        self.assertIsNone(reminder())
-        self.request('POST','/api/profile','admin-secret',{'body_weight_kg':70})
-        previous=reminder()
-        self.assertIsNotNone(previous)
-        self.request('POST','/api/voice','admin-secret',{'text':'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'})
-        self.assertEqual(reminder(),previous)
+        status, answer=self.request('POST','/api/voice','admin-secret',{'text':42})
+        self.assertEqual((status, answer), (400, {'error':'invalid_voice'}))
 
     def kinds(self):
         return sorted(x['kind'] for x in self.request('GET','/api/notifications','admin-secret')[1]['items'])
@@ -389,12 +367,13 @@ class BackendTest(unittest.TestCase):
             def transcribe(self,audio): return 'แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ'
         class TTS:
             def synthesize(self,text): return wav_fixture()
+        previous = self.request('GET','/api/reminder','admin-secret')[1]
         command=lambda text: self.request('POST','/api/voice','admin-secret',{'text':text})[1]
         out=Path(self.directory.name)/'response.wav'
         result=process_audio(wav_fixture(),ASR(),command,TTS(),out)
-        self.assertFalse(result['executed']); self.assertEqual(result['intent'],'reminder')
+        self.assertFalse(result['executed']); self.assertEqual(result['intent'],'unknown')
         self.assertTrue(out.read_bytes().startswith(b'RIFF'))
-        self.assertIsNone(self.request('GET','/api/reminder','admin-secret')[1]['reminder'])
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1], previous)
 
     def test_three_voice_examples_with_mock_asr_tts_and_real_backend(self):
         class ASR:
@@ -402,11 +381,47 @@ class BackendTest(unittest.TestCase):
             def transcribe(self,audio): return self.text
         class TTS:
             def synthesize(self,text): return wav_fixture()
-        cases=[('แก้ว เติมน้ำให้หน่อย','refill'),('แก้ว อีก 30 นาทีเตือนให้ดื่มน้ำ','reminder'),('แก้ว ตอนนี้น้ำเหลือเท่าไหร่','level')]
+        cases=[('แก้ว เติมน้ำให้หน่อย','refill'),('แก้ว สถานะอุปกรณ์','status'),('สถานะอุปกรณ์','no_wake')]
         for index,(text,intent) in enumerate(cases):
             result=process_audio(wav_fixture(),ASR(text),lambda s:self.request('POST','/api/voice','admin-secret',{'text':s})[1],TTS(),Path(self.directory.name)/('reply%d.wav'%index))
             self.assertEqual(result['intent'],intent); self.assertTrue(result['audio_written'])
             if intent=='refill': self.assertFalse(result['executed'])
+
+    def test_startup_schedules_fallback_and_preserves_it_on_restart(self):
+        reminder = self.request('GET','/api/reminder','admin-secret')[1]['reminder']
+        advice = self.request('GET','/api/advice','admin-secret')[1]['advice']
+        self.assertTrue(advice['fallback'])
+        self.assertTrue(advice['scheduled'])
+        self.assertEqual(advice['suggested_ml'], 200)
+        self.assertEqual(reminder, {'interval_minutes':60, 'repeat_enabled':1,
+                                    'next_due':advice['timestamp'] + 3600})
+        self.assertEqual(self.kinds(), [])
+
+        with create_server('127.0.0.1', 0, self.path, 'device-secret', 'admin-secret',
+                           hydration_provider=None), closing(sqlite3.connect(self.path)) as db:
+            self.assertEqual(db.execute('SELECT next_due FROM reminders').fetchone()[0],
+                             reminder['next_due'])
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0], 1)
+
+    def test_reminder_loop_retries_missing_schedule_after_cooldown(self):
+        self.server.stop_reminders.set()
+        self.server.reminder_thread.join()
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('DELETE FROM reminders')
+        retry_at = self.server.next_reminder_bootstrap
+        stop = Mock()
+        stop.wait.side_effect = (False, False, False, True)
+        with patch.object(self.server, 'stop_reminders', stop), \
+                patch('kaew.server.time', wraps=time) as clock, \
+                patch('kaew.server.recommend', side_effect=[sqlite3.OperationalError(), {
+                    'model':None, 'fallback':True, 'next_reminder_minutes':60,
+                }]) as recommend:
+            clock.monotonic.side_effect = (retry_at, retry_at, retry_at + 59,
+                                           retry_at + 60, retry_at + 60)
+            reminder_loop(self.server)
+            self.assertEqual(recommend.call_count, 2)
+        self.assertEqual(self.request('GET','/api/reminder','admin-secret')[1]
+                         ['reminder']['interval_minutes'], 60)
 
     def test_advice_uses_history_and_never_authorizes_actuation(self):
         self.request('POST','/api/profile','admin-secret',{'body_weight_kg':70})
@@ -427,11 +442,10 @@ class BackendTest(unittest.TestCase):
         self.assertLess(contexts[0]['minutes_since_drink'],1)
         self.assertFalse(result['advice']['fallback']); self.assertFalse(result['actuation_allowed'])
         with closing(sqlite3.connect(self.path)) as db:
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],2)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],3)
 
     def test_advice_schedules_model_and_fallback_and_latest_is_admin_only(self):
         self.assertEqual(self.request('GET','/api/advice','device-secret')[0],401)
-        self.assertIsNone(self.request('GET','/api/advice','admin-secret')[1]['advice'])
         def timeout(c): raise TimeoutError()
         for provider,minutes,fallback in ((lambda c:{'next_reminder_minutes':35,'suggested_ml':220,'reason':'Recent intake.'},35,False),(None,60,True),(lambda c:'invalid JSON',60,True),(timeout,60,True)):
             self.server.hydration_provider=provider
@@ -480,7 +494,7 @@ class BackendTest(unittest.TestCase):
             return {'next_reminder_minutes':40,'suggested_ml':200,'reason':'Next reminder.'}
         self.server.hydration_provider=model
         with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('INSERT INTO reminders VALUES (1,30,?,1)',(time.time()-1,))
+            db.execute('UPDATE reminders SET interval_minutes=30,next_due=? WHERE id=1',(time.time()-1,))
         try:
             self.assertTrue(entered.wait(2))
             # A separate writer succeeds while inference is blocked; fire is durable.
@@ -491,11 +505,11 @@ class BackendTest(unittest.TestCase):
         deadline=time.monotonic()+2
         while time.monotonic()<deadline:
             with closing(sqlite3.connect(self.path)) as db:
-                if db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0]: break
+                if db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0] == 2: break
             time.sleep(.02)
         with closing(sqlite3.connect(self.path)) as db:
             self.assertEqual(db.execute('SELECT repeat_enabled FROM reminders').fetchone()[0],0)
-            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],1)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM advice_log').fetchone()[0],2)
 
     def test_repeating_fire_uses_model_to_schedule_next_and_delivers_once(self):
         contexts=[]
@@ -505,7 +519,7 @@ class BackendTest(unittest.TestCase):
         model.model='mock-reminder-model'
         self.server.hydration_provider=model
         with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute('INSERT INTO reminders VALUES (1,30,?,1)',(time.time()-1,))
+            db.execute('UPDATE reminders SET interval_minutes=30,next_due=? WHERE id=1',(time.time()-1,))
         deadline=time.monotonic()+3
         while time.monotonic()<deadline:
             notes=self.request('GET','/api/notifications','admin-secret')[1]['items']
@@ -519,7 +533,7 @@ class BackendTest(unittest.TestCase):
         decision=self.request('GET','/api/advice','admin-secret')[1]['advice']
         self.assertAlmostEqual(rem['next_due'],decision['timestamp']+42*60)
         with closing(sqlite3.connect(self.path)) as db:
-            model_id,fallback,output=db.execute('SELECT model,fallback,output_json FROM advice_log').fetchone()
+            model_id,fallback,output=db.execute('SELECT model,fallback,output_json FROM advice_log ORDER BY id DESC LIMIT 1').fetchone()
         self.assertEqual(model_id,'mock-reminder-model'); self.assertEqual(fallback,0)
         self.assertFalse(json.loads(output)['actuation_allowed'])
 

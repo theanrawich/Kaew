@@ -48,8 +48,8 @@ flowchart LR
 2. The gateway publishes node telemetry and detects drinks independently using calibrated HX711 readings. It confirms that the platform unloads and the returned cup settles, then converts a 10–1000 g decrease into an estimated volume at 1 g/mL. Weight increases are ignored. Drinks and telemetry share the durable retry queue.
 3. The device token can post measured drinks to `/api/events` using the single gateway's ID namespace. Event history remains admin-only. The cloud stores data in SQLite or Postgres and serves the dashboard.
 4. The user enters body weight through the dashboard via admin-authenticated `GET/POST /api/profile`. The cloud derives the daily goal at 33 mL/kg, bounded to 1,000–4,000 mL.
-5. Saving weight, recording a new drink and firing a repeating reminder each trigger an AI decision. Groq receives the weight, goal and recent history. If the model is unavailable, the server schedules a deterministic 60-minute interval. The dashboard displays the schedule.
-6. The gateway sends microphone audio to `/api/stt?command=1` for Typhoon ASR and intent parsing. Reminder requests receive an automatic-scheduling reply. Voice refill and stop commands stay blocked, and pump commissioning stays disabled.
+5. The server initializes a missing reminder schedule at startup and checks for a missing row in the reminder loop. Saving weight, recording a new drink and firing a repeating reminder each trigger an AI decision. Groq receives the weight, goal and recent history. If the model is unavailable, the server schedules a deterministic 60-minute interval. The dashboard displays the schedule.
+6. The gateway sends microphone audio to `/api/stt?command=1` for Typhoon ASR and intent parsing. Voice can report device connection status. Voice refill stays blocked and pump commissioning stays disabled.
 
 ## Wiring
 
