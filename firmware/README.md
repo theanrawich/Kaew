@@ -153,3 +153,37 @@ while recording continues. Serial output pairs duration, pre-gain RMS, peak,
 clipped sample count and the transcript by clip ID. If the queue fills, the
 firmware logs and drops the newly completed clip. Network operations use 20 s
 timeouts. This build does not initialize gateway controls.
+
+## Wiring self-test
+
+Keep the pump disconnected and leave GPIO13 untouched. Verify that the TDS
+output stays at or below 3.3 V before connecting it to node GPIO4. Use the
+same USB port you already use to flash and open the Serial Monitor. Upload
+both self-test images for the UART check, then open each monitor at 115200
+and reset the board to see its pin table.
+
+```bash
+pio run -d firmware -e node_selftest -t upload --upload-port <NODE_PORT>
+pio device monitor -d firmware -b 115200 --port <NODE_PORT>
+
+pio run -d firmware -e gateway_selftest -t upload --upload-port <GATEWAY_PORT>
+pio device monitor -d firmware -b 115200 --port <GATEWAY_PORT>
+```
+
+Reports appear about every three seconds.
+
+| Report | What to check |
+| --- | --- |
+| DS18B20 missing or disconnected | Check GPIO6 DQ, the 4.7 kΩ pull-up to 3.3 V, and GND. |
+| DS18B20 reads 85 °C or is out of range | At 85 °C, check for failed conversion or intermittent wiring. Outside −55 to 125 °C, check the probe and DQ wiring. |
+| TDS stuck at 0 or 4095 | At 0, check VCC/GND and whether GPIO4 is floating. At 4095, check for a short to 3.3 V or an over-range sensor output. The ADC reading is raw. |
+| HX711 not ready or stuck | Check for swapped DT/SCK and verify VCC/GND. If the raw reading stays identical, check DT/SCK and the load cell wiring. |
+| OLED missing or wrong I²C address | Check for swapped SDA/SCL and verify VCC. If the scan lists an address other than 0x3C, check the address or solder jumper. A responding 0x3C panel should display `Kaew self-test OK`. |
+| Mic silent, constant, or I²S error | Check SD/SCK/WS and tie L/R to GND. |
+| Speaker I²S error | Check DIN/BCLK/LRC. Listen for a quiet beep at boot, during each report, or after sending a key in the gateway monitor. |
+| UART no ping | Run both self-tests and check node GPIO21 TX → gateway GPIO21 RX, node GPIO47 RX ← gateway GPIO47 TX, and common GND. Use GPIO21/47 for this link and leave the board's RX/TX silkscreen pins (GPIO43/44) unused. |
+
+LEVEL and the speaker beep are informational. Dip the level sensor to check
+for a change, and listen to confirm that the speaker makes sound. After
+debugging, re-flash `sensor_node` and `gateway_cloud_compile` (or `gateway`)
+for normal operation.
