@@ -1,6 +1,6 @@
-"""WAV input, Typhoon hosted ASR, and Google Thai TTS adapters."""
-import base64
-import binascii
+"""WAV input, Typhoon hosted ASR, and Edge Thai TTS adapters."""
+import asyncio
+from contextlib import aclosing, closing
 import io
 import json
 import math
@@ -81,29 +81,76 @@ class TyphoonASR:
             raise AudioError('speech recognition failed') from None
 
 
-def google_tts_request(payload,token):
-    request=urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize',data=json.dumps(payload).encode(),
-        headers={'Content-Type':'application/json','Authorization':'Bearer '+token},method='POST')
-    with urllib.request.build_opener(NoRedirect()).open(request,timeout=15) as response:
-        raw=response.read(3_000_001)
-        if len(raw)>3_000_000: raise AudioError('TTS response too large')
-        return json.loads(raw)
+REMINDER_PHRASE = 'ถึงเวลาดื่มน้ำแล้ว'
+RETRY_PHRASE = 'ขออภัย กรุณาพูดอีกครั้ง'
+TTS_RATE = 16000
+MAX_TTS_PCM_BYTES = 15 * TTS_RATE * 2
+MAX_TTS_WAV_BYTES = 44 + MAX_TTS_PCM_BYTES
+MAX_TTS_MP3_BYTES = 128 * 1024
 
 
-class GoogleThaiTTS:
-    def __init__(self,token,voice='th-TH-Standard-A',transport=google_tts_request):
-        if not token or not voice.startswith('th-TH-'): raise AudioError('TTS credentials or Thai voice missing')
-        self.token,self.voice,self.transport=token,voice,transport
+async def edge_tts_request(text, voice):
+    import edge_tts
 
-    def synthesize(self,text):
-        if not isinstance(text,str) or not 0<len(text)<=500: raise AudioError('invalid TTS text')
-        payload={'input':{'text':text},'voice':{'languageCode':'th-TH','name':self.voice},'audioConfig':{'audioEncoding':'LINEAR16','sampleRateHertz':16000}}
-        try:
-            data=self.transport(payload,self.token)
-            audio=base64.b64decode(data['audioContent'],validate=True)
-            inspect_wav(audio)
-            return audio
-        except (Exception, binascii.Error): raise AudioError('Thai speech synthesis failed') from None
+    # The library requests only 24 kHz mono MP3. Bound the compressed input
+    # before decoding and resampling with the miniaudio wheel.
+    audio = bytearray()
+    stream = edge_tts.Communicate(text, voice=voice).stream()
+    async with aclosing(stream):
+        async for chunk in stream:
+            if chunk['type'] == 'audio':
+                audio.extend(chunk['data'])
+                if len(audio) > MAX_TTS_MP3_BYTES:
+                    raise AudioError('TTS response too large')
+    return bytes(audio)
+
+
+def mp3_to_speech_wav(audio):
+    import miniaudio
+
+    if not isinstance(audio, bytes) or not 0 < len(audio) <= MAX_TTS_MP3_BYTES:
+        raise AudioError('invalid TTS response')
+    stream = miniaudio.stream_memory(audio, output_format=miniaudio.SampleFormat.SIGNED16,
+                                     nchannels=1, sample_rate=TTS_RATE)
+    pcm = bytearray()
+    with closing(stream):
+        for samples in stream:
+            if sys.byteorder == 'big':
+                samples.byteswap()
+            pcm.extend(samples.tobytes())
+            if len(pcm) > MAX_TTS_PCM_BYTES:
+                raise AudioError('TTS speech too long')
+    if not pcm:
+        raise AudioError('TTS returned no samples')
+    output = io.BytesIO()
+    with wave.open(output, 'wb') as wav:
+        wav.setparams((1, 2, TTS_RATE, 0, 'NONE', 'not compressed'))
+        wav.writeframes(pcm)
+    return output.getvalue()
+
+
+class EdgeTTS:
+    voices = ('th-TH-NiwatNeural', 'th-TH-PremwadeeNeural')
+    attempt_timeout = 4  # Up to 16 seconds of network time across all attempts.
+
+    def __init__(self, transport=edge_tts_request):
+        self.transport = transport
+
+    def synthesize(self, text):
+        if not isinstance(text, str) or not text.strip() or len(text) > 500:
+            raise AudioError('invalid TTS text')
+        return asyncio.run(self._synthesize(text))
+
+    async def _synthesize(self, text):
+        for voice in self.voices:
+            for _ in range(2):
+                try:
+                    audio = await asyncio.wait_for(self.transport(text, voice),
+                                                   timeout=self.attempt_timeout)
+                    return mp3_to_speech_wav(audio)
+                except Exception as exc:
+                    print('edge tts error:', voice, type(exc).__name__, file=sys.stderr)
+        raise AudioError('Thai speech synthesis failed')
 
 
 def process_audio(audio, asr, command, tts, output_path):

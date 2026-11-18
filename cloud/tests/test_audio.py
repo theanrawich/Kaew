@@ -1,4 +1,5 @@
-import base64
+import asyncio
+from array import array
 import io
 import json
 from kaew import audio_service
@@ -10,7 +11,8 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from kaew.audio_service import validate_wav, GoogleThaiTTS, AudioError, process_audio
+from types import SimpleNamespace
+from kaew.audio_service import validate_wav, AudioError, process_audio
 
 
 def wav_fixture(silent=False):
@@ -69,11 +71,45 @@ class AudioTest(unittest.TestCase):
         with self.assertRaises(AudioError): validate_wav(wav_fixture(True))
         with self.assertRaises(AudioError): validate_wav(b'not wav')
 
-    def test_tts_adapter_returns_playable_wav_and_validates_provider_data(self):
-        def transport(payload, token): return {'audioContent':base64.b64encode(wav_fixture()).decode()}
-        tts=GoogleThaiTTS('test-token',transport=transport)
-        self.assertTrue(tts.synthesize('สวัสดี').startswith(b'RIFF'))
-        with self.assertRaises(AudioError): GoogleThaiTTS('x',transport=lambda a,b:{'audioContent':'invalid'}).synthesize('test')
+    def test_edge_tts_retries_each_voice_and_returns_pcm_wav(self):
+        attempts = []
+        phrase = 'ถึงเวลาดื่มน้ำแล้ว'
+
+        async def transport(text, voice):
+            attempts.append((text, voice))
+            if len(attempts) < 4:
+                raise OSError('provider returned no audio')
+            return b'mocked mp3'
+
+        signed16 = object()
+        def stream_memory(data, *, output_format, nchannels, sample_rate):
+            self.assertEqual((data, output_format, nchannels, sample_rate),
+                             (b'mocked mp3', signed16, 1, 16000))
+            yield array('h', [1000, -1000])
+
+        decoder = SimpleNamespace(stream_memory=stream_memory,
+                                  SampleFormat=SimpleNamespace(SIGNED16=signed16))
+        with patch.dict('sys.modules', {'miniaudio': decoder}):
+            audio = audio_service.EdgeTTS(transport=transport).synthesize(phrase)
+
+        self.assertEqual(attempts, [(phrase, 'th-TH-NiwatNeural')] * 2
+                                  + [(phrase, 'th-TH-PremwadeeNeural')] * 2)
+        self.assertEqual(len(audio), 48)
+        info = audio_service.inspect_wav(audio)
+        self.assertEqual((info['sample_rate'], info['channels'], info['pcm']),
+                         (16000, 1, b'\xe8\x03\x18\xfc'))
+
+    def test_edge_tts_bounds_stalled_transport(self):
+        attempts = []
+
+        async def stalled(text, voice):
+            attempts.append(voice)
+            await asyncio.Event().wait()
+
+        with patch.object(audio_service.EdgeTTS, 'attempt_timeout', 0.01):
+            with self.assertRaisesRegex(AudioError, '^Thai speech synthesis failed$'):
+                audio_service.EdgeTTS(transport=stalled).synthesize('สวัสดี')
+        self.assertEqual(attempts, ['th-TH-NiwatNeural'] * 2 + ['th-TH-PremwadeeNeural'] * 2)
 
     def test_audio_to_command_to_playable_response(self):
         class ASR:

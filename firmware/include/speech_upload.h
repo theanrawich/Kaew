@@ -78,6 +78,8 @@ inline void writeSpeechWavHeader(uint8_t *wav, size_t pcmBytes) {
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <cJSON.h>
+#include <memory>
+#include <new>
 #include <time.h>
 #include "cloud_config.h"
 
@@ -110,7 +112,37 @@ inline void logCommand(const String &label, const cJSON *command) {
   }
 }
 
-inline void sendWav(uint32_t id, uint8_t *wav, size_t size, SpeechUpload mode) {
+inline String cloudAudioBase() {
+  String base(KAEW_CLOUD_URL);
+  if (!base.startsWith("https://") || !KAEW_CLOUD_CA[0] || !KAEW_WIFI_SSID[0]) return {};
+  const int path = base.indexOf('/', 8);
+  if (path >= 0) base.remove(path);
+  if (base.length() <= 8 || base.indexOf('@') >= 0 || base.indexOf('?') >= 0 ||
+      base.indexOf('#') >= 0) return {};
+  return base;
+}
+
+inline bool readResponse(HTTPClient &http, uint8_t *buffer, size_t size, uint32_t start) {
+  auto *stream = http.getStreamPtr();
+  if (!stream) return false;
+  size_t offset = 0;
+  while (offset < size && millis() - start < 10000) {
+    const int available = stream->available();
+    if (available > 0) {
+      const int count = stream->read(buffer + offset, std::min(size - offset, size_t(available)));
+      if (count <= 0) return false;
+      offset += count;
+    } else if (!stream->connected()) {
+      return false;
+    } else {
+      delay(10);
+    }
+  }
+  return offset == size;
+}
+
+inline void sendWav(uint32_t id, uint8_t *wav, size_t size, SpeechUpload mode,
+                    String &replyAudioId) {
   constexpr uint32_t timeoutMs = 20000;
   const String label = String("[clip ") + id + "] ";
   const bool standalone = mode == SpeechUpload::Transcript;
@@ -118,17 +150,9 @@ inline void sendWav(uint32_t id, uint8_t *wav, size_t size, SpeechUpload mode) {
     Serial.println(label + "KAEW_ADMIN_TOKEN is missing or empty; skipping STT.");
     return;
   }
-  String base(KAEW_CLOUD_URL);
-  if (!base.startsWith("https://") || !KAEW_CLOUD_CA[0] || !KAEW_WIFI_SSID[0]) {
-    Serial.println(label + "STT requires HTTPS KAEW_CLOUD_URL, KAEW_CLOUD_CA and WiFi configuration.");
-    return;
-  }
-  int path = base.indexOf('/', 8);
-  if (path >= 0) base.remove(path);
-  // Reject ambiguous authorities rather than forwarding the admin token elsewhere.
-  if (base.length() <= 8 || base.indexOf('@') >= 0 || base.indexOf('?') >= 0 ||
-      base.indexOf('#') >= 0) {
-    Serial.println(label + "Invalid STT base URL.");
+  const String base = cloudAudioBase();
+  if (!base.length()) {
+    Serial.println(label + "STT requires a valid HTTPS KAEW_CLOUD_URL, KAEW_CLOUD_CA and WiFi configuration.");
     return;
   }
   Serial.println(label + "sending...");
@@ -155,28 +179,42 @@ inline void sendWav(uint32_t id, uint8_t *wav, size_t size, SpeechUpload mode) {
   }
   WiFiClientSecure client;
   client.setCACert(KAEW_CLOUD_CA);
-  client.setTimeout(timeoutMs);
   client.setHandshakeTimeout(20);
   HTTPClient http;
   http.setConnectTimeout(timeoutMs);
-  http.setTimeout(timeoutMs);
+  http.setTimeout(standalone ? timeoutMs : 35000);
   http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+  http.useHTTP10();
   if (!http.begin(client, base + (standalone ? "/api/stt" : "/api/stt?command=1"))) {
     Serial.println(label + "Unable to initialize STT request.");
     return;
   }
   http.addHeader("Authorization", String("Bearer ") + KAEW_ADMIN_TOKEN);
   http.addHeader("Content-Type", "audio/wav");
-  int code = http.POST(wav, size);
-  String body = http.getString();
+  const int code = http.POST(wav, size);
+  const int length = http.getSize();
+  std::unique_ptr<char[]> body;
+  if (length > 0 && length <= 6144) {
+    body.reset(new (std::nothrow) char[length + 1]);
+    if (body && readResponse(http, reinterpret_cast<uint8_t *>(body.get()), length, millis()))
+      body[length] = '\0';
+    else
+      body.reset();
+  }
   http.end();
-  cJSON *json = cJSON_Parse(body.c_str());
+  cJSON *json = body ? cJSON_Parse(body.get()) : nullptr;
   const cJSON *text = json ? cJSON_GetObjectItemCaseSensitive(json, "text") : nullptr;
   if (code >= 200 && code < 300 && cJSON_IsString(text)) {
     printSafe(label + "text: " + text->valuestring);
-    if (!standalone) logCommand(label, cJSON_GetObjectItemCaseSensitive(json, "command"));
+    if (!standalone) {
+      const cJSON *command = cJSON_GetObjectItemCaseSensitive(json, "command");
+      logCommand(label, command);
+      const cJSON *audioId = cJSON_GetObjectItemCaseSensitive(command, "reply_audio_id");
+      if (cJSON_IsString(audioId) && std::strlen(audioId->valuestring) == 32)
+        replyAudioId = audioId->valuestring;
+    }
   } else {
-    printSafe(label + "HTTP " + code + " " + body);
+    printSafe(label + "HTTP " + code + " " + (body ? body.get() : "missing or invalid response"));
   }
   cJSON_Delete(json);
 }

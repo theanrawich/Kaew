@@ -1,7 +1,12 @@
 """Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
-from kaew.audio_service import AudioError, TyphoonASR, TYPHOON_ASR_MODEL, validate_wav
+from kaew.audio_service import (
+    AudioError, EdgeTTS, MAX_TTS_WAV_BYTES, REMINDER_PHRASE, RETRY_PHRASE,
+    TyphoonASR, TYPHOON_ASR_MODEL, validate_wav,
+)
 import hmac
-from collections import deque
+import secrets
+import sys
+from collections import OrderedDict, deque
 from contextlib import closing
 import json
 import math
@@ -15,7 +20,7 @@ from kaew.notifications import MockProvider, TelegramProvider
 from kaew.voice import parse_text
 from kaew.hydration_ai import recommend, select_provider
 from kaew.gateway_advice import parse_gateway_query, project_advice
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -23,6 +28,59 @@ from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 4096
+FIXED_SPEECH = frozenset((REMINDER_PHRASE, RETRY_PHRASE))
+GATEWAY_REMINDER_WINDOW = 120
+REPLY_AUDIO_TTL = 120
+REPLY_AUDIO_LIMIT = 16
+
+
+class ReplyAudio:
+    """Keep two fixed phrases and up to 16 short-lived command references."""
+    def __init__(self):
+        self.fixed = {}
+        self.replies = OrderedDict()
+        self.lock = threading.Lock()
+        self.synthesis_slots = threading.BoundedSemaphore(2)
+
+    def synthesize(self, tts, phrase):
+        with self.lock:
+            cached = self.fixed.get(phrase)
+        if cached is not None:
+            return cached
+        if not self.synthesis_slots.acquire(blocking=False):
+            return None
+        try:
+            audio = tts.synthesize(phrase)
+            if not isinstance(audio, bytes) or not 44 < len(audio) <= MAX_TTS_WAV_BYTES:
+                raise AudioError('invalid reply WAV size')
+        except AudioError as exc:
+            print('reply TTS failed:', type(exc).__name__, file=sys.stderr)
+            return None
+        finally:
+            self.synthesis_slots.release()
+        if phrase in FIXED_SPEECH:
+            with self.lock:
+                return self.fixed.setdefault(phrase, audio)
+        return audio
+
+    def add(self, audio):
+        ident = secrets.token_hex(16)
+        with self.lock:
+            self.replies[ident] = (time.monotonic() + REPLY_AUDIO_TTL, audio)
+            if len(self.replies) > REPLY_AUDIO_LIMIT:
+                self.replies.popitem(last=False)
+        return ident
+
+    def get(self, ident):
+        with self.lock:
+            entry = self.replies.get(ident)
+            if entry is None:
+                return None
+            if entry[0] <= time.monotonic():
+                del self.replies[ident]
+                return None
+            return entry[1]
+
 
 
 def migrate(path):
@@ -115,6 +173,34 @@ def hydration_profile(db):
         'body_weight_kg': grams / 1000 if grams is not None else None,
         'goal_ml': max(1000, min(4000, (grams * 33 + 500) // 1000)) if grams is not None else None,
     }
+
+
+def drank_today(db, now):
+    local = datetime.fromtimestamp(now, ZoneInfo('Asia/Bangkok'))
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = db.execute(
+        "SELECT source, COALESCE(SUM(volume_ml),0) AS total FROM events "
+        "WHERE kind='drink' AND received_at>=? AND received_at<? "
+        "AND source IN ('measured','estimated','simulated') GROUP BY source",
+        (start.timestamp(), (start + timedelta(days=1)).timestamp()),
+    )
+    totals = {row['source']: row['total'] for row in rows}
+    measured = [totals[source] for source in ('measured', 'estimated') if source in totals]
+    simulated = not measured and 'simulated' in totals
+    return totals['simulated'] if simulated else sum(measured), simulated
+
+
+def latest_gateway_reminder(server):
+    now = time.time()
+    with closing(connect(server.db_path)) as db:
+        row = db.execute(
+            "SELECT id FROM notification_jobs WHERE kind='reminder' AND created_at>? "
+            "AND created_at<=? ORDER BY created_at DESC, id DESC LIMIT 1",
+            (now - GATEWAY_REMINDER_WINDOW, now),
+        ).fetchone()
+    if row is None:
+        return None
+    return hmac.digest(server.device_token.encode(), row['id'].encode(), 'sha256')[:16].hex()
 
 
 _ANY_REMINDER = object()
@@ -299,7 +385,12 @@ class Handler(BaseHTTPRequestHandler):
             self.server.stt_recent.append({**result, 'elapsed_ms': elapsed_ms, 'at': time.time()})
         if 'error' in result: return self.reply(422,{'error':'stt_failed'})
         if parse_qs(urlsplit(self.path).query).get('command')==['1']:
-            result['command']=self.voice_result({'text':result['text']})
+            command = self.voice_result({'text':result['text']})
+            result['command'] = command
+            if 'reply' in command and command['intent'] != 'no_wake':
+                audio = self.server.reply_audio.synthesize(self.server.tts, command['reply'])
+                if audio is not None:
+                    command['reply_audio_id'] = self.server.reply_audio.add(audio)
         return self.reply(200,result)
 
     def voice(self,data):
@@ -317,11 +408,56 @@ class Handler(BaseHTTPRequestHandler):
             text='ข้อมูลล่าสุดระบุว่าอุปกรณ์'+('ออนไลน์' if online else 'ออฟไลน์')
             if row and row['source']=='simulated': text+=' (ข้อมูลจำลอง)'
             return {'intent':kind,'online':online,'executed':True,'reply':text}
+        if kind == 'drank_today':
+            with closing(connect(self.server.db_path)) as db:
+                total, simulated = drank_today(db, time.time())
+                goal = hydration_profile(db)['goal_ml']
+            spoken_ml = f'{total:.2f}'.rstrip('0').rstrip('.')
+            text = f'วันนี้ดื่มน้ำไป {spoken_ml} มิลลิลิตร'
+            if simulated:
+                text += ' จากข้อมูลจำลอง'
+            percent = round(total * 100 / goal) if goal else None
+            if goal:
+                text += f' เป้าหมายวันนี้ {goal} มิลลิลิตร คิดเป็น {percent} เปอร์เซ็นต์ของเป้าหมายครับ'
+            else:
+                text += ' ยังไม่ได้ตั้งค่าน้ำหนัก กรุณากรอกน้ำหนักในแดชบอร์ดเพื่อดูเป้าหมายและความคืบหน้าครับ'
+            return {'intent': kind, 'executed': True, 'reply': text,
+                    'drank_ml': total, 'goal_ml': goal, 'percent': percent, 'simulated': simulated}
         if kind=='refill': return {'intent':kind,'executed':False,'reply':'ยังสั่งเติมไม่ได้ ระบบจ่ายน้ำยังไม่พร้อม'}
-        return {'intent':kind,'executed':False,'reply':'ขออภัย กรุณาพูดอีกครั้ง'}
+        return {'intent':kind,'executed':False,'reply':RETRY_PHRASE}
+
+    def get_audio(self, ident):
+        admin = self.authorized(self.server.admin_token)
+        if not admin and not self.authorized(self.server.device_token):
+            return self.reply(401, {'error': 'unauthorized'})
+        if not re.fullmatch(r'[a-f0-9]{32}', ident):
+            return self.reply(404, {'error': 'not_found'})
+        if admin:
+            audio = self.server.reply_audio.get(ident)
+        elif ident == latest_gateway_reminder(self.server):
+            audio = self.server.reply_audio.synthesize(self.server.tts, REMINDER_PHRASE)
+            if audio is None:
+                return self.reply(503, {'error': 'tts_unavailable'})
+        else:
+            audio = None
+        if audio is None:
+            return self.reply(404, {'error': 'not_found'})
+        self.send_response(200)
+        self.send_header('Content-Type', 'audio/wav')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', str(len(audio)))
+        self.end_headers()
+        self.wfile.write(audio)
+
 
     def do_GET(self):
         path = urlsplit(self.path).path
+        if path.startswith('/api/tts/'):
+            return self.get_audio(path[len('/api/tts/'):])
+        if path == '/api/gateway/reminder':
+            if not self.authorized(self.server.device_token):
+                return self.reply(401, {'error': 'unauthorized'})
+            return self.reply(200, {'reminder_id': latest_gateway_reminder(self.server)})
         if path in ('/', '/stt'):
             body = (ROOT / 'static' / ('stt.html' if path == '/stt' else 'dashboard.html')).read_bytes()
             self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
@@ -421,7 +557,7 @@ def reminder_loop(server):
                 row=db.execute('SELECT interval_minutes,next_due,repeat_enabled FROM reminders WHERE id=1').fetchone()
                 now=time.time()
                 if row and row['next_due'] <= now:
-                    queue_notification(db,'reminder:'+str(row['next_due']),'reminder','แก้ว: ถึงเวลาดื่มน้ำแล้ว',server.provider_name,now)
+                    queue_notification(db,'reminder:'+str(row['next_due']),'reminder','แก้ว: '+REMINDER_PHRASE,server.provider_name,now)
                     if row['repeat_enabled']:
                         fired=(row['interval_minutes'],now+row['interval_minutes']*60,1)
                         db.execute('UPDATE reminders SET next_due=? WHERE id=1',(fired[1],))
@@ -467,6 +603,8 @@ def create_server(host, port, db_path, device_token, admin_token, provider=None,
     server.db_path, server.device_token, server.admin_token = db_path, device_token, admin_token
     server.provider = provider or MockProvider()
     server.hydration_provider = select_provider() if hydration_provider is _ENV_PROVIDER else hydration_provider
+    server.tts = EdgeTTS()
+    server.reply_audio = ReplyAudio()
     server.stt_lock = threading.Lock()
     server.stt_recent = deque(maxlen=50)
     server.advice_lock = threading.Lock()

@@ -89,7 +89,7 @@ Admin `GET/POST /api/profile` returns `body_weight_kg` and the derived `goal_ml`
 
 For Telegram, explicitly configure both `KAEW_TELEGRAM_TOKEN` and `KAEW_TELEGRAM_CHAT_ID` in the server process environment. This enables real outgoing notifications to that chat. Never commit or print the token. The adapter uses Telegram's HTTPS `sendMessage` API; integration tests inject a mock transport and **no real Telegram delivery has been verified**. A crash after Telegram accepts a message but before SQLite records success may cause a duplicate on retry. Run only one service instance per database; multi-process notification leasing is not implemented. Existing jobs remain bound to their original provider and are not silently redirected if configuration changes.
 
-The admin-authenticated `/api/voice` endpoint accepts text transcripts. With the wake word `แก้ว`, it reports device connection status, declines refill requests, and returns `unknown` for other commands. Text without the wake word returns `no_wake`. Invalid inputs receive HTTP 400. Voice refill remains blocked and firmware actuation remains disabled.
+The admin-authenticated `/api/voice` endpoint accepts text transcripts. With the wake word `แก้ว`, it reports device connection status or today’s water intake, and declines refill requests. For example, `แก้ว วันนี้ดื่มไปเท่าไหร่` reads the Asia/Bangkok calendar-day total, the weight-based goal used by the hydration adviser, and progress toward that goal. It uses measured and estimated drinks when available and labels any simulated-only total. Other wake-word commands return `unknown`. Text without the wake word returns `no_wake`. Invalid inputs receive HTTP 400. Voice refill remains blocked and firmware actuation remains disabled.
 
 ## Closed-loop AI reminders (M4)
 
@@ -109,7 +109,7 @@ The default **`openai/gpt-oss-20b`** was confirmed in Groq's live models list on
 
 After review/merge the operator must apply Postgres **002** in Supabase, set the **`GROQ_API_KEY` secret on `kaew-cloud` in Render**, then deploy from **`prod` (or the reviewed branch)**. Existing database/admin/device secrets remain private. No AI key is required to start, and no AI secrets have been added as mandatory Blueprint inputs. The server reads process environment and does not load `.env` itself. No live SQL or deployment is performed by this change. Software tests establish scheduling and mock delivery; hardware and live Telegram delivery still require checkpoint evidence.
 
-## Typhoon speech-to-text
+## Gateway speech
 
 Set `TYPHOON_API_KEY` privately in the server environment. On Render, set it
 on the `kaew-cloud` service. The server uses the hosted
@@ -121,6 +121,18 @@ The response contains `text` and `model`. Add `?command=1` to process the
 transcript through the same command logic as `/api/voice`. A missing key
 returns 503 (`stt_unavailable`). Transcription failures return 422
 (`stt_failed`).
+
+Install `cloud/requirements.txt` for spoken replies. EdgeTTS tries Niwat
+then Premwadee, twice per voice, and miniaudio decodes MP3 in-process.
+When speech succeeds, the command includes `reply_audio_id`. Use the same
+admin bearer token to GET `/api/tts/<id>` within two minutes. The download
+is mono 16-bit PCM WAV at 16 kHz, up to 15 seconds. The JSON reply works
+on its own when synthesis is unavailable or when the wake word is absent.
+
+With its device token, the gateway polls `GET /api/gateway/reminder` for
+`reminder_id`. It can fetch that ID from `/api/tts/<id>` using the device
+token for two minutes after the reminder fires. The two fixed Thai phrases
+are cached in memory. Command downloads are held in a 16-entry bounded cache.
 
 At `/stt`, enter the admin token (whitespace and surrounding quotes are trimmed;
 it is stored in sessionStorage). This display-only page polls `/api/stt/recent`

@@ -1,2 +1,5 @@
 # Only needed when DATABASE_URL selects Postgres. SQLite local dev is stdlib-only.
 psycopg[binary]==3.3.9
+# Thai speech output and in-process MP3 decoding/resampling.
+edge-tts==7.3.1
+miniaudio==1.73

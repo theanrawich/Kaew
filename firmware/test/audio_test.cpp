@@ -2,6 +2,7 @@
 #include <cstring>
 #include "speech_capture.h"
 #include "speech_upload.h"
+#include "speech_playback.h"
 int main() {
   assert(pcm32to16(0)==0); assert(pcm32to16(65536)==1);
   assert(pcm32to16(-65536)==-1);
@@ -31,6 +32,28 @@ int main() {
   };
   static_assert(sizeof expected == sizeof header, "WAV header size");
   assert(std::memcmp(header, expected, sizeof header) == 0);
+  const size_t wavSize = sizeof header + sizeof quiet;
+  assert(validReplyWav(header, wavSize));
+  assert(!validReplyWav(header, wavSize - 1));
+  assert(!validReplyWav(header, wavSize + 2));
+  assert(!validReplyWav(header, maxReplyWavBytes + 2));
+  header[22] = 2; // Stereo and incorrect sample-rate metadata are rejected.
+  assert(!validReplyWav(header, wavSize));
+  header[22] = 1;
+  header[24] = 0;
+  assert(!validReplyWav(header, wavSize));
+  writeSpeechWavHeader(header, 3);
+  assert(!validReplyWav(header, sizeof header + 3));
+
+  ReminderPlayback reminders;
+  assert(!reminders.take(nullptr));
+  assert(!reminders.take("../wrong"));
+  assert(!reminders.take("00000000000000000000000000000000/"));
+  assert(!reminders.take("A0000000000000000000000000000000"));
+  assert(reminders.take("00000000000000000000000000000000"));
+  assert(!reminders.take("00000000000000000000000000000000"));
+  assert(reminders.take("00000000000000000000000000000001"));
+  assert(!reminders.take("00000000000000000000000000000001"));
   int16_t frame[SpeechCapture::frameSamples];
   static int16_t clip[SpeechCapture::maxSamples];
   SpeechCapture capture;

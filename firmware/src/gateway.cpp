@@ -159,7 +159,7 @@ void setup() {
   if (!scaleSamples || xTaskCreatePinnedToCore(acquireScale, "kaew-scale", 3072, nullptr, 1, nullptr, 0) != pdPASS)
     Serial.println("scale acquisition unavailable; dispensing remains blocked");
 #if KAEW_AUDIO_ENABLED
-  const bool cloudReady = cloud.begin(KAEW_ADMIN_TOKEN[0] && KAEW_WIFI_SSID[0]);
+  const bool cloudReady = cloud.begin(KAEW_WIFI_SSID[0] && (KAEW_ADMIN_TOKEN[0] || KAEW_CLOUD_TOKEN[0]));
 #else
   cloud.begin();
 #endif
@@ -167,10 +167,11 @@ void setup() {
 #if KAEW_AUDIO_ENABLED
   if (KAEW_CLOUD_ENABLED && !cloudReady)
     Serial.println("STT upload unavailable; cloud publisher failed to start.");
-  const auto upload = cloudReady ? SpeechUpload::Command : SpeechUpload::Disabled;
+  const auto upload = cloudReady && KAEW_ADMIN_TOKEN[0] ? SpeechUpload::Command : SpeechUpload::Disabled;
+  const bool reminders = cloudReady && KAEW_CLOUD_TOKEN[0];
   if (!audio.begin()) {
     Serial.println("audio driver init failed");
-  } else if (!speech.begin(upload, true)) {
+  } else if (!speech.begin(upload, true, reminders)) {
     audio.stop();
     Serial.println("Microphone pipeline initialization failed.");
   } else {

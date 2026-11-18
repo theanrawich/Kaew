@@ -78,14 +78,22 @@ INMP441 filtering and utterance detection as `mic_test`. INMP441 microphone
 SD=GPIO6, SCK=GPIO7, WS=GPIO8. MAX98357A speaker DIN=GPIO9, BCLK=GPIO10,
 LRC=GPIO11. Verify these provisional pins against the actual hardware.
 
-Capture runs in its own FreeRTOS task with PSRAM clip storage. When
-`KAEW_CLOUD_ENABLED` is also enabled, a separate task normalizes queued clips and
-posts WAV to `/api/stt?command=1` via the publisher's Wi-Fi connection. A full
-queue drops the newest clip. Set `KAEW_ADMIN_TOKEN` privately for this optional
-STT path. It requires HTTPS, a verified CA, and synchronized time. The gateway
-logs the transcript and command result. Voice has no access to gateway pump
-controls. `gateway_cloud_compile` builds both paths. I²S timing and resource
-contention with telemetry still require board testing.
+Capture runs in its own FreeRTOS task with PSRAM clip storage. When the
+publisher is enabled, a separate speech worker normalizes queued clips and
+posts WAV to `/api/stt?command=1`. A full queue drops the newest clip. Set
+`KAEW_ADMIN_TOKEN` privately to enable voice commands. The gateway logs the
+transcript and command result, then fetches any spoken reply from `/api/tts/<id>`.
+It also checks `/api/gateway/reminder` about every five seconds when idle using
+the device token. It attempts each newly observed reminder once and skips
+repeated polls for that ID, including after a failed fetch.
+
+Both paths require HTTPS, a verified CA, and synchronized time. The worker
+validates and downloads each 16 kHz PCM reply into bounded PSRAM before
+playing it through the MAX98357A. It pauses capture during playback and
+discards microphone DMA samples before resuming. Missing audio leaves the
+logged text reply available. Voice has no access to gateway pump controls.
+`gateway_cloud_compile` builds both paths. I²S timing and resource contention
+with telemetry still require board testing.
 
 ## Mic + STT test
 

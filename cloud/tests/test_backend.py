@@ -1,3 +1,5 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import http.client
 import json
 import os
@@ -48,12 +50,92 @@ class BackendTest(unittest.TestCase):
 
     def test_stt_success_failure_and_shared_command(self):
         asr=TyphoonASR('test-placeholder',transport=lambda *a:json.dumps({'text':'แก้ว เติมน้ำให้หน่อย'}).encode())
-        with patch.dict(os.environ,{'TYPHOON_API_KEY':'test-placeholder'}), patch('kaew.server.TyphoonASR',return_value=asr):
+        with patch.dict(os.environ,{'TYPHOON_API_KEY':'test-placeholder'}), patch('kaew.server.TyphoonASR',return_value=asr), \
+                patch.object(self.server, 'tts', Mock(synthesize=Mock(side_effect=AudioError('offline')))):
             code,result=self.stt_request(path='/api/stt?command=1')
             self.assertEqual(code,200)
             self.assertEqual(result['model'],TYPHOON_ASR_MODEL)
             self.assertEqual(result['command'],self.request('POST','/api/voice','admin-secret',{'text':result['text']})[1])
             self.assertEqual(self.stt_request(body=wav_fixture(True)),(422,{'error':'stt_failed'}))
+
+    def test_drank_today_uses_bangkok_midnight_and_weight_goal(self):
+        day = datetime(2026, 11, 18, tzinfo=ZoneInfo('Asia/Bangkok')).timestamp()
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("INSERT INTO settings VALUES ('body_weight_g', 60000)")
+            db.executemany("INSERT INTO events VALUES (?, 'drink', ?, ?, ?)", [
+                ('yesterday', 'measured', 500, day - 1),
+                ('today', 'measured', 400, day),
+                ('estimated', 'estimated', 95.25, day + 1),
+                ('simulated', 'simulated', 300, day + 2),
+                ('future', 'measured', 800, day + 86400),
+            ])
+        def ask(text):
+            return self.request('POST','/api/voice','admin-secret',{'text':text})[1]
+
+        with patch('kaew.server.time.time', return_value=day + 60):
+            for phrase in ('วันนี้ดื่มไปเท่าไหร่','ดื่มน้ำไปกี่','ดื่มไปเท่าไร','วันนี้ดื่มน้ำไปแล้วกี่มิลลิลิตร'):
+                result = ask('แก้ว ' + phrase)
+                self.assertEqual(result['intent'], 'drank_today')
+                self.assertIn('495.25 มิลลิลิตร', result['reply'])
+                self.assertIn('1980 มิลลิลิตร', result['reply'])
+                self.assertIn('25 เปอร์เซ็นต์', result['reply'])
+            self.assertEqual(ask('วันนี้ดื่มไปเท่าไหร่')['intent'], 'no_wake')
+            self.assertEqual(ask('แก้ว เมื่อวานดื่มไปเท่าไหร่')['intent'], 'unknown')
+            self.assertEqual(ask('แก้ว ดื่มน้ำกี่โมง')['intent'], 'unknown')
+            with closing(sqlite3.connect(self.path)) as db, db:
+                db.execute("DELETE FROM settings WHERE key='body_weight_g'")
+                db.execute("DELETE FROM events WHERE source IN ('estimated','measured')")
+            result = ask('แก้วดื่มไปเท่าไร')
+            self.assertIn('300 มิลลิลิตร', result['reply'])
+            self.assertIn('ข้อมูลจำลอง', result['reply'])
+            self.assertIn('ยังไม่ได้ตั้งค่าน้ำหนัก', result['reply'])
+            self.assertIn('กรุณากรอกน้ำหนัก', result['reply'])
+
+    def test_stt_audio_is_downloadable_by_admin_and_caches_retry_phrase(self):
+        audio = wav_fixture()
+        with patch.dict(os.environ, {'TYPHOON_API_KEY':'fixture'}), \
+                patch('kaew.server.TyphoonASR') as asr, \
+                patch.object(self.server, 'tts', Mock(synthesize=Mock(return_value=audio))) as tts:
+            asr.return_value.transcribe.return_value = 'แก้ว สวัสดี'
+            for _ in range(2):
+                code, result = self.stt_request(path='/api/stt?command=1')
+                self.assertEqual(code, 200)
+                path = '/api/tts/' + result['command']['reply_audio_id']
+                self.assertEqual(self.request('GET', path, 'device-secret')[0], 404)
+                self.assertEqual(self.request('GET', path, None)[0], 401)
+                req = urllib.request.Request(self.url+path, headers={'Authorization':'Bearer admin-secret'})
+                with urllib.request.urlopen(req, timeout=3) as res:
+                    self.assertEqual(res.headers['Content-Type'], 'audio/wav')
+                    self.assertEqual(res.read(), audio)
+            asr.return_value.transcribe.return_value = 'สวัสดี'
+            code, result = self.stt_request(path='/api/stt?command=1')
+            self.assertEqual(code, 200)
+            self.assertEqual(result['command']['intent'], 'no_wake')
+            self.assertNotIn('reply_audio_id', result['command'])
+            tts.synthesize.assert_called_once_with('ขออภัย กรุณาพูดอีกครั้ง')
+
+    def test_only_recent_fired_reminders_are_available_to_gateway(self):
+        path = '/api/gateway/reminder'
+        self.assertEqual(self.request('GET', path, 'admin-secret')[0], 401)
+        self.assertEqual(self.request('GET', path, 'device-secret'), (200, {'reminder_id':None}))
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute('UPDATE reminders SET next_due=? WHERE id=1', (time.time()-1,))
+        for _ in range(30):
+            _, result = self.request('GET', path, 'device-secret')
+            if result['reminder_id']:
+                break
+            time.sleep(.05)
+        self.assertIsNotNone(result['reminder_id'])
+        audio_path = '/api/tts/' + result['reminder_id']
+        with patch.object(self.server, 'tts', Mock(synthesize=Mock(return_value=wav_fixture()))) as tts:
+            req = urllib.request.Request(self.url+audio_path, headers={'Authorization':'Bearer device-secret'})
+            for _ in range(2):
+                with urllib.request.urlopen(req, timeout=3) as res:
+                    self.assertEqual(res.read(), wav_fixture())
+            tts.synthesize.assert_called_once_with('ถึงเวลาดื่มน้ำแล้ว')
+        with patch('kaew.server.time.time', return_value=time.time()+121):
+            self.assertEqual(self.request('GET', path, 'device-secret'), (200, {'reminder_id':None}))
+            self.assertEqual(self.request('GET', audio_path, 'device-secret')[0], 404)
 
     def test_stt_recent_admin_only(self):
         self.assertEqual(self.request('GET','/api/stt/recent','admin-secret'),(200,{'items':[]}))
