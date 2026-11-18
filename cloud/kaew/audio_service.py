@@ -1,10 +1,9 @@
-"""WAV input, Groq and Typhoon hosted ASR, and Google Thai TTS adapters."""
+"""WAV input, Typhoon hosted ASR, and Google Thai TTS adapters."""
 import base64
 import binascii
 import io
 import json
 import math
-import re
 import struct
 import sys
 import secrets
@@ -39,26 +38,32 @@ def validate_wav(audio):
     return info
 
 
-def groq_stt_request(url,headers,body):
+def hosted_stt_request(url,headers,body):
     request=urllib.request.Request(url,data=body,headers=headers,method='POST')
     with urllib.request.build_opener(NoRedirect()).open(request,timeout=15) as response:
         return response.read(65_537)
 
 
-class _HostedASR:
-    def __init__(self, api_key, model, transport):
+TYPHOON_ASR_MODEL = 'typhoon-asr-realtime'
+
+
+class TyphoonASR:
+    url = 'https://api.opentyphoon.ai/v1/audio/transcriptions'
+
+    def __init__(self, api_key, transport=None):
         if not isinstance(api_key,str) or not api_key.strip() or any(ord(c)<33 or ord(c)>126 for c in api_key):
             raise AudioError('invalid ASR credentials')
-        self.api_key, self.model = api_key, model
-        self.transport = transport or groq_stt_request
+        self.api_key = api_key
+        self.model = TYPHOON_ASR_MODEL
+        self.transport = transport or hosted_stt_request
 
     def transcribe(self,audio: bytes)->str:
         validate_wav(audio)
         boundary='kaew-'+secrets.token_hex(24)
         while boundary.encode() in audio: boundary='kaew-'+secrets.token_hex(24)
-        parts=[]
-        for name,value in (('model',self.model), *self.options):
-            parts.append(('--'+boundary+'\r\nContent-Disposition: form-data; name="'+name+'"\r\n\r\n'+value+'\r\n').encode())
+        parts = [
+            f'--{boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\n{self.model}\r\n'.encode()
+        ]
         parts.append(('--'+boundary+'\r\nContent-Disposition: form-data; name="file"; filename="audio.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode()+audio+b'\r\n')
         parts.append(('--'+boundary+'--\r\n').encode())
         headers={'Authorization':'Bearer '+self.api_key,'Content-Type':'multipart/form-data; boundary='+boundary,'User-Agent':'KaewCloud/0.1'}
@@ -72,32 +77,8 @@ class _HostedASR:
             if not text or len(text)>500: raise ValueError()
             return text
         except Exception as exc:
-            print(f'{self.provider} stt error:',type(exc).__name__,getattr(exc,'code',''),file=sys.stderr)
+            print('typhoon stt error:',type(exc).__name__,getattr(exc,'code',''),file=sys.stderr)
             raise AudioError('speech recognition failed') from None
-
-
-class GroqWhisperASR(_HostedASR):
-    url = 'https://api.groq.com/openai/v1/audio/transcriptions'
-    provider = 'groq'
-
-    def __init__(self,api_key,model='whisper-large-v3-turbo',language='th',transport=None):
-        super().__init__(api_key, model, transport)
-        if any(not isinstance(value,str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,100}',value) for value in (model,language)):
-            raise AudioError('invalid ASR configuration')
-        self.language = language
-        self.options = (('language', language), ('response_format', 'json'), ('temperature', '0'))
-
-
-TYPHOON_ASR_MODEL = 'typhoon-asr-realtime'
-
-
-class TyphoonASR(_HostedASR):
-    url = 'https://api.opentyphoon.ai/v1/audio/transcriptions'
-    provider = 'typhoon'
-    options = ()
-
-    def __init__(self, api_key, transport=None):
-        super().__init__(api_key, TYPHOON_ASR_MODEL, transport)
 
 
 def google_tts_request(payload,token):

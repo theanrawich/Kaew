@@ -7,6 +7,8 @@
 
 ## Testing
 
+- [Cloud speech-to-text](../cloud/README.md#typhoon-speech-to-text) — ESP32 transcript testing with `TYPHOON_API_KEY` configured on the cloud server.
+
 - [Performance test plan](testing/performance-test-plan.md) — Procedures for repeatable latency, delivery, accuracy and volume measurements.
 - [Test record template](testing/test-record-template.md) — Run metadata and evidence to capture.
 - [Accuracy CSV](testing/measurements/accuracy.csv) — Blank sensor accuracy template.

@@ -5,7 +5,7 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
-from kaew.audio_service import AudioError, GroqWhisperASR
+from kaew.audio_service import AudioError, TyphoonASR, TYPHOON_ASR_MODEL
 import time
 import sqlite3
 from contextlib import closing
@@ -28,7 +28,7 @@ class BackendTest(unittest.TestCase):
         except urllib.error.HTTPError as e: return e.code,json.load(e)
 
     def test_stt_auth_limits_and_unavailable(self):
-        with patch.dict(os.environ,{'GROQ_API_KEY':''}):
+        with patch.dict(os.environ,{'TYPHOON_API_KEY':''}):
             for token in (None,'device-secret'):
                 self.assertEqual(self.stt_request(token)[0],401)
             self.assertEqual(self.stt_request(),(503,{'error':'stt_unavailable'}))
@@ -47,11 +47,11 @@ class BackendTest(unittest.TestCase):
             finally: connection.close()
 
     def test_stt_success_failure_and_shared_command(self):
-        asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'แก้ว เติมน้ำให้หน่อย'}).encode())
-        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo'}), patch('kaew.server.GroqWhisperASR',return_value=asr):
+        asr=TyphoonASR('test-placeholder',transport=lambda *a:json.dumps({'text':'แก้ว เติมน้ำให้หน่อย'}).encode())
+        with patch.dict(os.environ,{'TYPHOON_API_KEY':'test-placeholder'}), patch('kaew.server.TyphoonASR',return_value=asr):
             code,result=self.stt_request(path='/api/stt?command=1')
             self.assertEqual(code,200)
-            self.assertEqual(result['model'],'whisper-large-v3-turbo')
+            self.assertEqual(result['model'],TYPHOON_ASR_MODEL)
             self.assertEqual(result['command'],self.request('POST','/api/voice','admin-secret',{'text':result['text']})[1])
             self.assertEqual(self.stt_request(body=wav_fixture(True)),(422,{'error':'stt_failed'}))
 
@@ -60,38 +60,34 @@ class BackendTest(unittest.TestCase):
         for token in (None,'device-secret'):
             self.assertEqual(self.request('GET','/api/stt/recent',token)[0],401)
 
-    def test_stt_comparison_uses_same_audio_and_retains_partial_results(self):
+    def test_stt_recent_records_typhoon_attempts(self):
         audio = wav_fixture()
-        environment = {'GROQ_API_KEY': 'groq-fixture', 'TYPHOON_API_KEY': 'typhoon-fixture'}
-        with patch.dict(os.environ, environment), \
-                patch('kaew.server.GroqWhisperASR') as groq, patch('kaew.server.TyphoonASR') as typhoon:
-            groq.return_value.transcribe.return_value = 'เติมน้ำ'
-            typhoon.return_value.transcribe.return_value = 'เติมน้ำให้หน่อย'
-            self.assertEqual(self.stt_request(body=audio)[1]['text'], 'เติมน้ำ')
-            groq.return_value.transcribe.assert_called_once_with(audio)
+        transcript = {'text': 'เติมน้ำให้หน่อย', 'model': TYPHOON_ASR_MODEL}
+        with patch.dict(os.environ, {'TYPHOON_API_KEY': 'typhoon-fixture'}), \
+                patch('kaew.server.TyphoonASR') as typhoon:
+            typhoon.return_value.transcribe.return_value = transcript['text']
+            self.assertEqual(self.stt_request(body=audio), (200, transcript))
+            typhoon.assert_called_once_with('typhoon-fixture')
             typhoon.return_value.transcribe.assert_called_once_with(audio)
 
-            groq.return_value.transcribe.side_effect = AudioError('fixture failure')
-            self.assertEqual(self.stt_request(body=audio), (422, {'error': 'stt_failed'}))
             typhoon.return_value.transcribe.side_effect = AudioError('fixture failure')
-            groq.return_value.transcribe.side_effect = None
-            self.assertEqual(self.stt_request(body=audio)[0], 200)
+            self.assertEqual(self.stt_request(body=audio, path='/api/stt?command=1'),
+                             (422, {'error': 'stt_failed'}))
             self.assertEqual(self.stt_request(body=wav_fixture(True))[0], 422)
-            self.assertEqual(typhoon.return_value.transcribe.call_count, 3)
+            self.assertEqual(typhoon.return_value.transcribe.call_count, 2)
 
-        latest, groq_failed, success = self.request('GET','/api/stt/recent','admin-secret')[1]['items']
-        self.assertEqual(latest['typhoon']['error'], 'stt_failed')
-        self.assertEqual(groq_failed['error'], 'stt_failed')
-        self.assertEqual(groq_failed['typhoon']['text'], 'เติมน้ำให้หน่อย')
-        self.assertEqual(success['typhoon']['model'], 'typhoon-asr-realtime')
-        for item in (latest, groq_failed, success):
+        failed, success = self.request('GET', '/api/stt/recent', 'admin-secret')[1]['items']
+        self.assertEqual(failed['error'], 'stt_failed')
+        self.assertEqual(failed['model'], TYPHOON_ASR_MODEL)
+        for key, value in transcript.items():
+            self.assertEqual(success[key], value)
+        for item in (failed, success):
             self.assertGreaterEqual(item['elapsed_ms'], 0)
-            self.assertGreaterEqual(item['typhoon']['elapsed_ms'], 0)
 
-    def test_stt_recent_success_only_newest_first_and_cap(self):
-        asr=GroqWhisperASR('test-placeholder',transport=lambda *a:json.dumps({'text':'ESP32 transcript'}).encode())
+    def test_stt_recent_newest_first_and_cap(self):
+        asr=TyphoonASR('test-placeholder',transport=lambda *a:json.dumps({'text':'ESP32 transcript'}).encode())
         before=time.time()
-        with patch.dict(os.environ,{'GROQ_API_KEY':'test-placeholder','KAEW_STT_MODEL':'whisper-large-v3-turbo','TYPHOON_API_KEY':''}), patch('kaew.server.GroqWhisperASR',return_value=asr):
+        with patch.dict(os.environ,{'TYPHOON_API_KEY':'test-placeholder'}), patch('kaew.server.TyphoonASR',return_value=asr):
             for index in range(52):
                 with patch.object(asr,'transcribe',return_value='transcript %d'%index):
                     self.assertEqual(self.stt_request()[0],200)
@@ -101,9 +97,8 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(len(result['items']),50)
         self.assertEqual([item['text'] for item in result['items']],['transcript %d'%i for i in range(51,1,-1)])
         for item in result['items']:
-            self.assertEqual(set(item),{'text','model','at','elapsed_ms','typhoon'})
-            self.assertEqual(item['typhoon']['error'],'not_configured')
-            self.assertEqual(item['model'],'whisper-large-v3-turbo')
+            self.assertEqual(set(item),{'text','model','at','elapsed_ms'})
+            self.assertEqual(item['model'],TYPHOON_ASR_MODEL)
             self.assertLessEqual(before,item['at'])
             self.assertLessEqual(item['at'],time.time())
 

@@ -35,6 +35,7 @@ Use `python3` if your system has no `python` alias. The server reads process env
 | `PORT` | Provided automatically by Render; do not add a fixed port in Dashboard. |
 | `PYTHON_VERSION` | Blueprint sets `3.11.11`. |
 | `PYTHONDONTWRITEBYTECODE` | Blueprint sets `1`. |
+| `TYPHOON_API_KEY` | Optional **secret** at startup. Required for speech-to-text at `/api/stt`. |
 | `GROQ_API_KEY` | Optional **secret**; enables the primary Groq Chat Completions provider. Missing key does not prevent startup. |
 | `KAEW_AI_MODEL` | Optional non-secret model id, default `openai/gpt-oss-20b`. Used for Groq and optional OpenRouter. Set `openai/gpt-oss-120b` for the stronger Groq production option. |
 | `OPENROUTER_API_KEY` | Optional **secret** secondary provider, used when Groq is absent or fails validation/transport. Same model id; availability and charges may differ on OpenRouter. |
@@ -88,10 +89,6 @@ For Telegram, explicitly configure both `KAEW_TELEGRAM_TOKEN` and `KAEW_TELEGRAM
 
 The admin-authenticated `/api/voice` endpoint accepts Thai text transcripts, not microphone audio. It handles wake-word-prefixed reminder and level queries, and explicitly declines refill and remote stop: no voice path can operate the pump. Reminders created by voice are one-shot and replace the existing reminder. The most recent level reports an observed switch state and may be delayed; it does not estimate remaining volume. There is no hardware audio or wake-word integration yet. Calendar-day statistics, production TLS/deployment and physical integration remain outstanding. Firmware actuation remains disabled.
 
-## Groq speech-to-text
-
-The server uses `GroqWhisperASR` for `/api/stt` when `GROQ_API_KEY` is configured. Input must be mono 16-bit PCM 16 kHz WAV, at most 15 seconds, with audible speech. Audio is sent to Groq; the endpoint returns a transcript by default; `?command=1` also processes voice intent through the same logic as `/api/voice`.
-
 ## Closed-loop AI reminders (M4)
 
 Gateway integration adds a read-only device view: `GET /api/advice?gateway=1&boot_session=...&request_id=...&cup_session=...&nonce=...` with the existing device token returns only version, echoed identifiers, advice ID/age, suggested mL, model-backed status and `actuation_allowed:false`. It excludes simulated-input decisions, rejects missing/stale data and exposes no history/reason. Device credentials cannot trigger inference or admin actions. Existing admin GET/POST remain unchanged. See [full contract, consent/freshness gates and deployment handoff](../docs/design/m4-gateway-ai-loop.md). This source change has not been deployed to production by the implementation task.
@@ -110,25 +107,22 @@ The default **`openai/gpt-oss-20b`** was confirmed in Groq's live models list on
 
 After review/merge the operator must apply Postgres **002** in Supabase, set the **`GROQ_API_KEY` secret on `kaew-cloud` in Render**, then deploy from **`prod` (or the reviewed branch)**. Existing database/admin/device secrets remain private. No AI key is required to start, and no AI secrets have been added as mandatory Blueprint inputs. The server reads process environment and does not load `.env` itself. No live SQL or deployment is performed by this change. Software tests establish scheduling and mock delivery; hardware and live Telegram delivery still require checkpoint evidence.
 
-### Cloud speech recognition
+## Typhoon speech-to-text
 
-Set `GROQ_API_KEY` privately to enable Groq Whisper; optionally set
-`KAEW_STT_MODEL` (default `whisper-large-v3-turbo`). No extra dependencies are needed.
-POST raw `audio/wav` to `/api/stt` with the admin Bearer token; device tokens are
-rejected. Input must be non-silent mono 16-bit 16 kHz PCM WAV, at most 15 seconds
-and 2,000,000 bytes. The response contains `text` and `model`; add `?command=1`
-to process the transcript through the same command logic as `/api/voice`.
-Missing credentials return 503; recognition failures return 422.
+Set `TYPHOON_API_KEY` privately in the server environment. On Render, set it
+on the `kaew-cloud` service. The server uses the hosted
+[`typhoon-asr-realtime` file transcription API](https://docs.opentyphoon.ai/en/asr/).
+
+POST raw `audio/wav` to `/api/stt` with the admin Bearer token. Input must be
+non-silent mono 16-bit 16 kHz PCM WAV, at most 15 seconds and 2,000,000 bytes.
+The response contains `text` and `model`. Add `?command=1` to process the
+transcript through the same command logic as `/api/voice`. A missing key
+returns 503 (`stt_unavailable`). Transcription failures return 422
+(`stt_failed`).
 
 At `/stt`, enter the admin token (whitespace and surrounding quotes are trimmed;
 it is stored in sessionStorage). This display-only page polls `/api/stt/recent`
 every two seconds and shows ESP32 clips newest first with Bangkok times.
-Set `TYPHOON_API_KEY` privately on the same server (on Render, use the
-`kaew-cloud` service environment) to compare Groq with the hosted
-[`typhoon-asr-realtime` file transcription API](https://docs.opentyphoon.ai/en/asr/).
-Both providers receive the same WAV in parallel. Each elapsed time measures
-the server-side transcription call, including the provider network round trip.
-`/api/stt` still uses the Groq transcript for its response and command parsing.
-The admin-only history includes each provider's transcript or error, model,
-and elapsed milliseconds when attempted. The last 50 entries are kept in
-memory and clear on restart.
+The admin-only history keeps the last 50 Typhoon attempts in memory until
+restart. Each entry includes the transcript or error, model, timestamp, and
+elapsed milliseconds including the provider network round trip.
