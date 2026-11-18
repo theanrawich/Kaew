@@ -1,8 +1,7 @@
 """Checkpoint telemetry service: local HTTP or private HTTP behind a trusted HTTPS edge."""
-from kaew.audio_service import AudioError, GroqWhisperASR, TyphoonASR, TYPHOON_ASR_MODEL, validate_wav
+from kaew.audio_service import AudioError, TyphoonASR, TYPHOON_ASR_MODEL, validate_wav
 import hmac
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 import json
 import math
@@ -23,15 +22,6 @@ from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_BODY = 4096
-
-
-def timed_transcription(create_asr, audio, model):
-    started = time.perf_counter()
-    try:
-        result = {'text': create_asr().transcribe(audio)}
-    except AudioError:
-        result = {'error': 'stt_failed'}
-    return {**result, 'model': model, 'elapsed_ms': round((time.perf_counter() - started) * 1000)}
 
 
 def migrate(path):
@@ -268,32 +258,25 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError: return self.reply(400,{'error':'invalid_audio'})
         if length>2_000_000: return self.reply(413,{'error':'audio_too_large'})
         if length<1: return self.reply(400,{'error':'invalid_audio'})
-        key=os.environ.get('GROQ_API_KEY','')
+        key=os.environ.get('TYPHOON_API_KEY','')
         if not key: return self.reply(503,{'error':'stt_unavailable'})
         audio=self.rfile.read(length)
         if len(audio)!=length: return self.reply(400,{'error':'invalid_audio'})
-        model=os.environ.get('KAEW_STT_MODEL','whisper-large-v3-turbo')
         try: validate_wav(audio)
         except AudioError: return self.reply(422,{'error':'stt_failed'})
-        typhoon_key = os.environ.get('TYPHOON_API_KEY', '')
-        if typhoon_key:
-            with ThreadPoolExecutor(max_workers=1) as comparison:
-                typhoon_result = comparison.submit(
-                    timed_transcription, lambda: TyphoonASR(typhoon_key), audio, TYPHOON_ASR_MODEL
-                )
-                groq = timed_transcription(lambda: GroqWhisperASR(key, model=model), audio, model)
-                typhoon = typhoon_result.result()
-        else:
-            groq = timed_transcription(lambda: GroqWhisperASR(key, model=model), audio, model)
-            typhoon = {'model': TYPHOON_ASR_MODEL, 'error': 'not_configured'}
-        if 'text' in groq or typhoon_key:
-            with self.server.stt_lock:
-                self.server.stt_recent.append({**groq, 'typhoon': typhoon, 'at': time.time()})
-        if 'error' in groq: return self.reply(422,{'error':'stt_failed'})
-        text = groq['text']
-        result={'text':text,'model':model}
+
+        started = time.perf_counter()
+        result = {'model': TYPHOON_ASR_MODEL}
+        try:
+            result['text'] = TyphoonASR(key).transcribe(audio)
+        except AudioError:
+            result['error'] = 'stt_failed'
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
+        with self.server.stt_lock:
+            self.server.stt_recent.append({**result, 'elapsed_ms': elapsed_ms, 'at': time.time()})
+        if 'error' in result: return self.reply(422,{'error':'stt_failed'})
         if parse_qs(urlsplit(self.path).query).get('command')==['1']:
-            result['command']=self.voice_result({'text':text})
+            result['command']=self.voice_result({'text':result['text']})
         return self.reply(200,result)
 
     def voice(self,data):
