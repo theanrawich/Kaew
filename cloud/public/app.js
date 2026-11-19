@@ -40,10 +40,48 @@ async function loadTranscripts() {
     $('voice-status').querySelector('span').textContent = data.history?.length ? 'รับข้อความจาก Gateway แล้ว' : 'รอรับเสียงจาก Gateway';
   } catch { $('voice-status').querySelector('span').textContent = 'เชื่อมต่อไม่ได้'; }
 }
-if (location.pathname === '/voice') {
-  loadTranscripts();
-  setInterval(loadTranscripts, 2000);
+let voicePollTimer = null;
+function syncVoicePolling(active) {
+  if (active && voicePollTimer === null) {
+    loadTranscripts();
+    voicePollTimer = setInterval(loadTranscripts, 2000);
+  } else if (!active && voicePollTimer !== null) {
+    clearInterval(voicePollTimer);
+    voicePollTimer = null;
+  }
 }
+
+const ttsText = $('tts-text');
+ttsText.addEventListener('input', () => { $('tts-char-count').textContent = String(ttsText.value.length); });
+$('tts-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const text = ttsText.value.trim();
+  if (!text) return;
+  const button = $('tts-submit');
+  const status = $('tts-status');
+  button.disabled = true;
+  button.textContent = 'กำลังสร้างเสียง…';
+  status.textContent = 'กำลังแปลงข้อความด้วย Edge TTS';
+  status.classList.remove('tts-error', 'tts-success');
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice: $('tts-voice').value }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'สร้างเสียงไม่สำเร็จ');
+    status.textContent = 'สร้างเสียงแล้ว · รอ Gateway ดึงไปเล่น';
+    status.classList.add('tts-success');
+    ttsText.value = '';
+    $('tts-char-count').textContent = '0';
+  } catch (error) {
+    status.textContent = error.message || 'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';
+    status.classList.add('tts-error');
+  } finally {
+    button.disabled = false;
+    button.innerHTML = 'สร้างเสียงและส่งเข้าคิว <span>→</span>';
+  }
+});
 function drawRows(target, rows, columns) {
   if (!rows.length) { target.innerHTML = `<tr><td colspan="${columns}" class="empty">ยังไม่มีข้อมูลจากเซนเซอร์</td></tr>`; return; }
   target.innerHTML = rows.map((r, i) => `<tr>${columns === 4 ? `<td>${r.sensor}</td><td><b>${Number(r.value).toLocaleString()}</b></td><td>${r.unit}</td><td>${formatTime(r.timestamp)}</td>` : `<td>${rows.length - i}</td><td>${r.sensor}</td><td><b>${Number(r.value).toLocaleString()}</b></td><td>${r.unit}</td><td>${formatTime(r.timestamp)}</td>`}</tr>`).join('');
@@ -109,12 +147,13 @@ sensorEvents.onmessage = ({ data }) => render(JSON.parse(data));
 sensorEvents.onopen = () => { $('sensor-status').textContent = 'เชื่อมต่อแล้ว'; };
 sensorEvents.onerror = () => { $('sensor-status').textContent = 'กำลังเชื่อมต่อใหม่'; };
 function navigate(view) {
-  const current = ['dashboard', 'sensor', 'voice'].includes(view) ? view : 'dashboard';
-  for (const page of ['dashboard', 'sensor', 'voice']) $(`${page}-view`).classList.toggle('hidden', current !== page);
-  $('crumb').textContent = current[0].toUpperCase() + current.slice(1);
+  const current = ['dashboard', 'sensor', 'voice', 'tts'].includes(view) ? view : 'dashboard';
+  for (const page of ['dashboard', 'sensor', 'voice', 'tts']) $(`${page}-view`).classList.toggle('hidden', current !== page);
+  $('crumb').textContent = current === 'tts' ? 'Text To Speech' : current[0].toUpperCase() + current.slice(1);
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.view === current));
+  syncVoicePolling(current === 'voice');
 }
-document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); navigate(link.dataset.view); history.replaceState(null, '', link.dataset.view === 'voice' ? '/voice' : `/#${link.dataset.view}`); }));
+document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); navigate(link.dataset.view); history.replaceState(null, '', link.dataset.view === 'voice' ? '/voice' : link.dataset.view === 'tts' ? '/tts' : `/#${link.dataset.view}`); }));
 document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => { navigate(button.dataset.go); history.replaceState(null, '', `/#${button.dataset.go}`); }));
-navigate(location.pathname === '/voice' ? 'voice' : location.hash.slice(1));
-window.addEventListener('popstate', () => navigate(location.pathname === '/voice' ? 'voice' : location.hash.slice(1)));
+navigate(location.pathname === '/voice' ? 'voice' : location.pathname === '/tts' ? 'tts' : location.hash.slice(1));
+window.addEventListener('popstate', () => navigate(location.pathname === '/voice' ? 'voice' : location.pathname === '/tts' ? 'tts' : location.hash.slice(1)));

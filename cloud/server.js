@@ -2,6 +2,8 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EdgeTTS } from 'node-edge-tts';
+import { MPEGDecoder } from 'mpg123-decoder';
 
 const root = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const port = Number(process.env.PORT || 3000);
@@ -11,6 +13,9 @@ const latestBySensor = Object.create(null);
 const dashboardSensors = new Set(["HX711", "TDS", "Temperature", "Water Level"]);
 const streams = new Set();
 const voiceHistory = [];
+const ttsQueue = [];
+let ttsPending = 0;
+let nextTtsId = 1;
 
 function sensorEvent() {
   return `data: ${JSON.stringify({ latest, latestBySensor, count: history.length })}\n\n`;
@@ -103,10 +108,102 @@ async function transcribeTyphoon(wav) {
   return text;
 }
 
+async function synthesizeEdgeWav(text, voice) {
+  const edgeTts = new EdgeTTS({
+    voice,
+    lang: 'th-TH',
+    timeout: 30000,
+  });
+  const mp3Chunks = [];
+  let mp3Length = 0;
+  for await (const chunk of edgeTts.streamAudio(text)) {
+    if (!Buffer.isBuffer(chunk)) continue;
+    mp3Length += chunk.length;
+    if (mp3Length > 4 * 1024 * 1024) throw new Error('ไฟล์เสียงที่สร้างมีขนาดใหญ่เกินไป');
+    mp3Chunks.push(chunk);
+  }
+  if (!mp3Length) throw new Error('Edge TTS ไม่ได้ส่งข้อมูลเสียงกลับมา');
+  const decoder = new MPEGDecoder();
+  await decoder.ready;
+  let decoded;
+  try { decoded = decoder.decode(Buffer.concat(mp3Chunks, mp3Length)); }
+  finally { decoder.free(); }
+  const channels = decoded.channelData;
+  if (!decoded.samplesDecoded || !channels.length) throw new Error('ถอดรหัสเสียง Edge TTS ไม่สำเร็จ');
+  const sourceRate = decoded.sampleRate;
+  const sourceLength = decoded.samplesDecoded;
+  const targetLength = Math.floor(sourceLength * 16000 / sourceRate);
+  const pcm = Buffer.alloc(targetLength * 2);
+  for (let i = 0; i < targetLength; i++) {
+    const sourcePosition = i * sourceRate / 16000;
+    const leftIndex = Math.min(Math.floor(sourcePosition), sourceLength - 1);
+    const rightIndex = Math.min(leftIndex + 1, sourceLength - 1);
+    const fraction = sourcePosition - leftIndex;
+    let sample = 0;
+    for (const channel of channels) sample += channel[leftIndex] * (1 - fraction) + channel[rightIndex] * fraction;
+    sample /= channels.length;
+    const value = Math.max(-1, Math.min(1, sample));
+    pcm.writeInt16LE(value < 0 ? value * 0x8000 : value * 0x7fff, i * 2);
+  }
+  const wavHeader = Buffer.alloc(44);
+  wavHeader.write('RIFF', 0); wavHeader.writeUInt32LE(36 + pcm.length, 4); wavHeader.write('WAVEfmt ', 8);
+  wavHeader.writeUInt32LE(16, 16); wavHeader.writeUInt16LE(1, 20); wavHeader.writeUInt16LE(1, 22);
+  wavHeader.writeUInt32LE(16000, 24); wavHeader.writeUInt32LE(32000, 28); wavHeader.writeUInt16LE(2, 32); wavHeader.writeUInt16LE(16, 34);
+  wavHeader.write('data', 36); wavHeader.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([wavHeader, pcm]);
+}
+
 http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, Content-Type' }); return res.end(); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === '/api/sensors/events' && req.method === 'GET') return openSensorStream(res);
+  if (url.pathname === '/api/tts' && req.method === 'POST') {
+    let raw;
+    try { raw = await readBody(req, 16 * 1024); }
+    catch (error) {
+      return error instanceof RangeError
+        ? send(res, 413, { error: 'คำขอยาวเกินไป' })
+        : send(res, 400, { error: 'อ่านคำขอไม่สำเร็จ' });
+    }
+    let data;
+    try { data = JSON.parse(raw.toString('utf8')); }
+    catch { return send(res, 400, { error: 'JSON ไม่ถูกต้อง' }); }
+    const text = typeof data?.text === 'string' ? data.text.trim() : '';
+    const voice = String(data?.voice || 'th-TH-PremwadeeNeural');
+    const supportedVoices = new Set(['th-TH-PremwadeeNeural', 'th-TH-NiwatNeural']);
+    if (!text) return send(res, 400, { error: 'กรุณาพิมพ์ข้อความก่อนสร้างเสียง' });
+    if (text.length > 2000) return send(res, 400, { error: 'ข้อความยาวได้ไม่เกิน 2000 ตัวอักษร' });
+    if (!supportedVoices.has(voice)) return send(res, 400, { error: 'ไม่รองรับเสียงที่เลือก' });
+    if (ttsQueue.length + ttsPending >= 10) return send(res, 429, { error: 'คิวเสียงเต็ม กรุณารอให้ Gateway รับเสียงก่อน' });
+    ttsPending += 1;
+    try {
+      const audio = await synthesizeEdgeWav(text, voice);
+      const item = { id: String(nextTtsId++), text, voice, audio, createdAt: new Date().toISOString() };
+      ttsQueue.push(item);
+      return send(res, 202, { id: item.id, status: 'queued', queueLength: ttsQueue.length });
+    } catch (error) {
+      console.error('Edge TTS synthesis failed:', error.message);
+      return send(res, 502, { error: 'Edge TTS สร้างเสียงไม่สำเร็จ ลองใหม่อีกครั้ง' });
+    } finally { ttsPending -= 1; }
+  }
+  if (url.pathname === '/api/tts/next' && req.method === 'GET') {
+    const deviceToken = process.env.KAEW_DEVICE_TOKEN;
+    if (!deviceToken) return send(res, 503, { error: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า KAEW_DEVICE_TOKEN' });
+    const bearer = /^Bearer\s+(.+)$/i.exec(req.headers.authorization || '');
+    if (!bearer || bearer[1] !== deviceToken) return send(res, 401, { error: 'Bearer token ไม่ถูกต้อง' });
+    const item = ttsQueue.shift();
+    if (!item) { res.writeHead(204, { 'Cache-Control': 'no-store' }); return res.end(); }
+    res.writeHead(200, {
+      'Content-Type': 'audio/wav',
+      'Content-Length': item.audio.length,
+      'Cache-Control': 'no-store',
+      'X-TTS-Job-Id': item.id,
+      'X-TTS-Voice': item.voice,
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    return res.end(item.audio);
+  }
   if (url.pathname === '/api/stt/typhoon' && req.method === 'POST') {
     const deviceToken = process.env.KAEW_DEVICE_TOKEN;
     if (!deviceToken) return send(res, 503, { error: 'เซิร์ฟเวอร์ยังไม่ได้ตั้งค่า KAEW_DEVICE_TOKEN' });
@@ -154,7 +251,7 @@ http.createServer(async (req, res) => {
       return send(res, 201, latest);
     } catch { return send(res, 400, { error: 'JSON ไม่ถูกต้อง' }); }
   }
-  const path = url.pathname === '/' || url.pathname === '/voice' ? '/index.html' : url.pathname;
+  const path = url.pathname === '/' || url.pathname === '/voice' || url.pathname === '/tts' ? '/index.html' : url.pathname;
   if (path.includes('..')) return send(res, 400, { error: 'Bad path' });
   try {
     const content = await readFile(join(root, path));

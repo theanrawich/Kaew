@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node cloud/server.js" },
-  "engines": { "node": ">=20" }
+  "scripts": {
+    "start": "node cloud/server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "mpg123-decoder": "^1.0.3",
+    "node-edge-tts": "^1.2.12"
+  }
 }

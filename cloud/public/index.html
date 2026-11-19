@@ -5,7 +5,7 @@
   <aside class="sidebar">
     <a class="brand" href="#dashboard"><span class="brand-mark">k.</span><span><b>kaew</b><small>DEVICE CONSOLE</small></span></a>
     <div class="nav-label">WORKSPACE</div>
-    <nav><a class="nav-link active" href="#dashboard" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</a><a class="nav-link" href="#sensor" data-view="sensor"><span class="nav-icon">⌁</span>Sensor<span class="nav-dot"></span></a><a class="nav-link" href="/voice" data-view="voice"><span class="nav-icon voice-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M8 7v10M16 6v12M4 10v4M20 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Voice</a></nav>
+    <nav><a class="nav-link active" href="#dashboard" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</a><a class="nav-link" href="#sensor" data-view="sensor"><span class="nav-icon">⌁</span>Sensor<span class="nav-dot"></span></a><a class="nav-link" href="/voice" data-view="voice"><span class="nav-icon voice-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M8 7v10M16 6v12M4 10v4M20 9v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span>Voice</a><a class="nav-link" href="/tts" data-view="tts"><span class="nav-icon tts-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 8h8M8 11.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span>Text To Speech</a></nav>
     <div class="sidebar-bottom"><span class="pulse"></span><span>ระบบพร้อมใช้งาน</span><small>v1.0</small></div>
   </aside>
   <main class="main">
@@ -29,6 +29,19 @@
       <div class="voice-toolbar"><div class="voice-toolbar-copy"><span class="voice-mic">◖</span><div><b>Voice transcription</b><small>แสดงข้อความใหม่ล่าสุดก่อน · สูงสุด 50 รายการ</small></div></div><div class="voice-toolbar-actions"><div class="voice-count"><b id="voice-count">0</b><span>/ 50 รายการ</span></div></div></div>
       <div class="transcript-list" id="transcript-list" aria-live="polite"></div>
       <footer>KAЕW DEVICE CONSOLE <span>VOICE TRANSCRIPTION</span></footer>
+    </section>
+    <section class="page tts-page hidden" id="tts-view">
+      <div class="heading"><div><div class="eyebrow">แปลงข้อความเป็นเสียง</div><h1>Text To Speech<span>.</span></h1><p>พิมพ์ข้อความเพื่อสร้างเสียง Edge TTS และส่งเข้าคิวให้ Hardware</p></div><div class="voice-live"><i></i><span>Edge TTS</span></div></div>
+      <article class="tts-panel">
+        <form id="tts-form">
+          <label class="tts-label" for="tts-text">ข้อความที่ต้องการให้อุปกรณ์พูด</label>
+          <textarea id="tts-text" name="text" maxlength="2000" placeholder="พิมพ์ข้อความภาษาไทยที่ต้องการให้ลำโพงพูด…" required></textarea>
+          <div class="tts-form-footer"><span class="tts-counter"><b id="tts-char-count">0</b> / 2000 ตัวอักษร</span><label class="tts-voice-label" for="tts-voice">เสียงพูด<select id="tts-voice" name="voice"><option value="th-TH-PremwadeeNeural">Premwadee · ผู้หญิง</option><option value="th-TH-NiwatNeural">Niwat · ผู้ชาย</option></select></label></div>
+          <div class="tts-submit-row"><span class="tts-status" id="tts-status" aria-live="polite">เสียงจะถูกส่งเข้าคิว รอ Gateway ดึงไปเล่น</span><button class="primary tts-submit" id="tts-submit" type="submit">สร้างเสียงและส่งเข้าคิว <span>→</span></button></div>
+        </form>
+      </article>
+      <div class="tts-info"><span class="tts-info-icon">⌁</span><span><b>ส่งออกทางลำโพง Hardware</b><small>เสียงจะถูกสร้างเป็น WAV PCM 16 kHz แล้วรอ Gateway มารับที่คิว</small></span></div>
+      <footer>KAЕW DEVICE CONSOLE <span>EDGE TEXT TO SPEECH</span></footer>
     </section>
   </main><script src="/app.js"></script>
 </body></html>
