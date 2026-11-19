@@ -8,11 +8,11 @@ endif
 
 gateway:
 ifeq ($(filter upload monitor,$(MAKECMDGOALS)),)
-	$(PIO) run -e gateway
+	$(PIO) run -d firmware -e gateway
 endif
 
 upload:
-	$(PIO) run -e gateway -t upload $(if $(PORT),--upload-port "$(PORT)")
+	$(PIO) run -d firmware -e gateway -t upload $(if $(PORT),--upload-port "$(PORT)")
 
 monitor:
-	$(PIO) device monitor -e gateway $(if $(PORT),--port "$(PORT)")
+	$(PIO) device monitor -d firmware -e gateway $(if $(PORT),--port "$(PORT)")
