@@ -218,7 +218,49 @@ function renderChipLists(id,items,makeChip){
  if(details.hidden)details.open=false;
 }
 
-let token=''; async function refresh(){if(!token)return;try{const headers={Authorization:'Bearer '+token};const paths=['status','telemetry','events','summary','notifications','reminder','advice','profile'];const now=new Date(),since=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime()/1000;const responses=await Promise.all([...paths.map(p=>fetch('/api/'+p+(p==='events'?'?since='+since:''),{headers})),fetch('/api/events',{headers})]);if(responses.some(r=>!r.ok))throw Error('เข้าสู่ระบบไม่สำเร็จ');const [s,t,e,summary,notes,rem,ai,profile,recentEvents]=await Promise.all(responses.map(r=>r.json()));renderProfile(profile);document.querySelector('#status').textContent=s.device.id+' · '+(s.device.online?'ออนไลน์':'ออฟไลน์');const rows=document.querySelector('#rows');rows.replaceChildren(...t.items.map(item=>{const tr=document.createElement('tr');for(const value of [new Date(item.received_at*1000).toLocaleString(),item.source,item.level,item.temperature_c??'—',(item.tds_adc===65535?'—':item.tds_adc),item.seq]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}return tr}));document.querySelector('#drinking').textContent='24 ชั่วโมงล่าสุด · วัดจริง '+(summary.by_source.measured||0)+' มล. · ประมาณ '+(summary.by_source.estimated||0)+' มล. · จำลอง '+(summary.by_source.simulated||0)+' มล.';renderChipLists('events',recentEvents.items,eventChip);document.querySelector('#reminder').textContent=rem.reminder?'เตือนครั้งถัดไป '+new Date(rem.reminder.next_due*1000).toLocaleString():'ยังไม่ได้ตั้งเตือน';renderChipLists('notifications',notes.items,notificationChip);const a=ai.advice;document.querySelector('#ai-advice').textContent=a?.next_reminder_minutes?('อีก '+a.next_reminder_minutes+' นาที · แนะนำ '+a.suggested_ml+' มล. · '+a.reason+' · '+(a.fallback?'ค่าเริ่มต้น (fallback)':'โมเดล')+(a.model?' · '+a.model:'')+' · '+new Date(a.timestamp*1000).toLocaleString()+(a.scheduled===false?' · มีเวลาเตือนใหม่กว่า จึงไม่ได้เปลี่ยนเวลา':'')):'ยังไม่มีคำแนะนำ';document.querySelector('#message').textContent='เชื่อมต่อแล้ว';chartData.telemetry=t.items;chartData.events=e.items;chartData.notifications=notes.items;chartData.reminder=rem.reminder;chartData.advice=a;renderCharts();}catch(e){document.querySelector('#message').textContent='เชื่อมต่อไม่ได้: '+e.message;}}
+function applyTelemetry(items){
+ const rows=document.querySelector('#rows');rows.replaceChildren(...items.map(item=>{const tr=document.createElement('tr');for(const value of [new Date(item.received_at*1000).toLocaleString(),item.source,item.level,item.temperature_c??'—',(item.tds_adc===65535?'—':item.tds_adc),item.seq]){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}return tr}));
+ telemetryVersion++;chartData.telemetry=items;renderTelemetry();
+}
+let streamController=null,streamGeneration=0,streamLive=false,telemetryVersion=0;
+async function startTelemetryStream(){
+ const generation=++streamGeneration;streamLive=false;
+ if(streamController)streamController.abort();
+ while(token&&generation===streamGeneration){
+  const controller=new AbortController();streamController=controller;
+  let watchdog;
+  const touch=()=>{clearTimeout(watchdog);watchdog=setTimeout(()=>controller.abort(),25000)};
+  touch();
+  try{
+   const response=await fetch('/api/telemetry/stream',{headers:{Authorization:'Bearer '+token},signal:controller.signal});
+   if(!response.ok)throw Error('stream '+response.status);
+   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';
+   try{while(generation===streamGeneration){
+    const {value,done}=await reader.read();if(done)throw Error('stream closed');
+    buffer+=decoder.decode(value,{stream:true});let boundary;
+    while((boundary=buffer.indexOf('\n\n'))>=0){
+     const frame=buffer.slice(0,boundary);buffer=buffer.slice(boundary+2);
+     if(generation!==streamGeneration)return;
+     if(frame.startsWith(':'))touch();
+     if(frame.startsWith('event: telemetry\n')){
+      const data=frame.split('\n').find(line=>line.startsWith('data: '));
+      if(data){
+       const snapshot=JSON.parse(data.slice(6));
+       applyTelemetry(snapshot.items);applyScale(snapshot.scale);
+       streamLive=true;touch();
+       document.querySelector('#message').textContent='เชื่อมต่อข้อมูลสดแล้ว';
+      }
+     }
+    }
+   }}finally{await reader.cancel().catch(()=>{});reader.releaseLock()}
+  }catch(error){
+   if(generation!==streamGeneration)return;
+   streamLive=false;document.querySelector('#message').textContent='ข้อมูลสดขาดการเชื่อมต่อ กำลังเชื่อมต่อใหม่…';
+  }finally{clearTimeout(watchdog)}
+  await new Promise(resolve=>setTimeout(resolve,2000));
+ }
+}
+let token=''; async function refresh(){if(!token)return;const requestToken=token,requestGeneration=streamGeneration,requestVersion=telemetryVersion;try{const headers={Authorization:'Bearer '+token};const paths=['status','telemetry','events','summary','notifications','reminder','advice','profile'];const now=new Date(),since=new Date(now.getFullYear(),now.getMonth(),now.getDate()-6).getTime()/1000;const responses=await Promise.all([...paths.map(p=>fetch('/api/'+p+(p==='events'?'?since='+since:''),{headers})),fetch('/api/events',{headers})]);if(responses.some(r=>!r.ok))throw Error('เข้าสู่ระบบไม่สำเร็จ');const [s,t,e,summary,notes,rem,ai,profile,recentEvents]=await Promise.all(responses.map(r=>r.json()));if(token!==requestToken||requestGeneration!==streamGeneration)return;renderProfile(profile);document.querySelector('#status').textContent=s.device.id+' · '+(s.device.online?'ออนไลน์':'ออฟไลน์');if(!streamLive&&requestVersion===telemetryVersion)applyTelemetry(t.items);document.querySelector('#drinking').textContent='24 ชั่วโมงล่าสุด · วัดจริง '+(summary.by_source.measured||0)+' มล. · ประมาณ '+(summary.by_source.estimated||0)+' มล. · จำลอง '+(summary.by_source.simulated||0)+' มล.';renderChipLists('events',recentEvents.items,eventChip);document.querySelector('#reminder').textContent=rem.reminder?'เตือนครั้งถัดไป '+new Date(rem.reminder.next_due*1000).toLocaleString():'ยังไม่ได้ตั้งเตือน';renderChipLists('notifications',notes.items,notificationChip);const a=ai.advice;document.querySelector('#ai-advice').textContent=a?.next_reminder_minutes?('อีก '+a.next_reminder_minutes+' นาที · แนะนำ '+a.suggested_ml+' มล. · '+a.reason+' · '+(a.fallback?'ค่าเริ่มต้น (fallback)':'โมเดล')+(a.model?' · '+a.model:'')+' · '+new Date(a.timestamp*1000).toLocaleString()+(a.scheduled===false?' · มีเวลาเตือนใหม่กว่า จึงไม่ได้เปลี่ยนเวลา':'')):'ยังไม่มีคำแนะนำ';if(!streamController)document.querySelector('#message').textContent='เชื่อมต่อแล้ว';chartData.events=e.items;chartData.notifications=notes.items;chartData.reminder=rem.reminder;chartData.advice=a;renderCharts();}catch(e){document.querySelector('#message').textContent='เชื่อมต่อไม่ได้: '+e.message;}}
 const weightInput=document.querySelector('#body-weight');
 function renderProfile(profile){
  confirmedGoal=profile.goal_ml;
@@ -240,10 +282,25 @@ document.querySelector('#profile-form').onsubmit=async event=>{
  }catch(e){document.querySelector('#message').textContent=e.message}
  finally{button.disabled=false}
 };
+let latestScale=null,scaleReceivedAt=0,scaleVersion=0;
+function applyScale(scale){
+ latestScale=scale;scaleReceivedAt=Date.now();scaleVersion++;renderScale();
+}
+function renderScale(){
+ const scale=latestScale;
+ const age=scale?scale.age_s+(Date.now()-scaleReceivedAt)/1000:0;
+ const grams=document.querySelector('#scale-g'),cup=document.querySelector('#scale-cup'),status=document.querySelector('#scale-status');
+    const fresh = scale && age <= 10;
+    grams.textContent = fresh ? scale.weight_g.toFixed(1) : '—';
+    cup.textContent = fresh ? (scale.cup ? 'มี' : 'ไม่มี') : '—';
+    status.textContent = !scale ? 'ยังไม่มีข้อมูลน้ำหนักจาก gateway' :
+      !fresh ? 'ไม่มีข้อมูลใหม่ ('+Math.round(age)+' วินาทีที่แล้ว)' :
+      (scale.stable ? 'ค่านิ่ง' : 'กำลังรอให้นิ่ง') + (scale.calibrated ? '' : ' · ยังไม่ได้สอบเทียบ');
+}
 let scaleRequest = null;
 async function refreshScale() {
-  if (!token || scaleRequest === token) return;
-  const requestToken = token;
+  if (!token || streamLive || scaleRequest === token) return;
+  const requestToken = token,requestGeneration=streamGeneration,requestVersion=scaleVersion;
   scaleRequest = requestToken;
   const grams = document.querySelector('#scale-g');
   const cup = document.querySelector('#scale-cup');
@@ -256,15 +313,10 @@ async function refreshScale() {
     });
     if (!response.ok) throw Error();
     const {scale} = await response.json();
-    if (token !== requestToken) return;
-    const fresh = scale && scale.age_s <= 10;
-    grams.textContent = fresh ? scale.weight_g.toFixed(1) : '—';
-    cup.textContent = fresh ? (scale.cup ? 'มี' : 'ไม่มี') : '—';
-    status.textContent = !scale ? 'ยังไม่มีข้อมูลน้ำหนักจาก gateway' :
-      !fresh ? 'ไม่มีข้อมูลใหม่ ('+Math.round(scale.age_s)+' วินาทีที่แล้ว)' :
-      (scale.stable ? 'ค่านิ่ง' : 'กำลังรอให้นิ่ง') + (scale.calibrated ? '' : ' · ยังไม่ได้สอบเทียบ');
+    if (token !== requestToken || requestGeneration!==streamGeneration) return;
+    if(!streamLive&&requestVersion===scaleVersion)applyScale(scale);
   } catch {
-    if (token === requestToken) {
+    if (token === requestToken && requestGeneration===streamGeneration && !streamLive && requestVersion===scaleVersion) {
       grams.textContent = cup.textContent = '—';
       status.textContent = 'โหลดน้ำหนักไม่ได้';
     }
@@ -273,8 +325,9 @@ async function refreshScale() {
     if (scaleRequest === requestToken) scaleRequest = null;
   }
 }
-document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';document.querySelector('#profile-form').reset();await Promise.all([refresh(), refreshScale()])};
+document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';document.querySelector('#profile-form').reset();startTelemetryStream();await Promise.all([refresh(), refreshScale()])};
 setInterval(refreshScale,3000);
+setInterval(renderScale,1000);
 setInterval(refresh,5000);
 renderCharts();
 if(typeof ResizeObserver!=='undefined'){const chartObserver=new ResizeObserver(()=>renderCharts());document.querySelectorAll('section').forEach(section=>chartObserver.observe(section))}

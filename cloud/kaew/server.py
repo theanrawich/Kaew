@@ -469,6 +469,40 @@ class Handler(BaseHTTPRequestHandler):
                        "ON CONFLICT (key) DO UPDATE SET value=excluded.value", (json.dumps(reading),))
         return self.reply(201, {'status': 'stored'})
 
+    def telemetry_stream(self):
+        # Re-query committed data so streams also see writes from other processes.
+        self.connection.settimeout(10)
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache, no-store')
+        self.send_header('X-Accel-Buffering', 'no')
+        self.end_headers()
+        previous = None
+        heartbeat = time.monotonic()
+        try:
+            with closing(connect(self.server.db_path)) as db:
+                while not self.server.stop_reminders.is_set():
+                    rows = db.execute('SELECT * FROM telemetry ORDER BY id DESC LIMIT 100').fetchall()
+                    scale_row = db.execute("SELECT value FROM alert_state WHERE key='scale_latest'").fetchone()
+                    scale = json.loads(scale_row['value']) if scale_row else None
+                    latest = (rows[0]['id'] if rows else 0, scale_row['value'] if scale_row else None)
+                    if latest != previous:
+                        if scale is not None:
+                            scale['age_s'] = round(max(0, time.time() - scale['at']), 1)
+                        payload = json.dumps({'items': [dict(row) for row in rows], 'scale': scale}, allow_nan=False, separators=(',', ':'))
+                        self.wfile.write(('event: telemetry\ndata: '+payload+'\n\n').encode())
+                        self.wfile.flush()
+                        previous = latest
+                        heartbeat = time.monotonic()
+                    elif time.monotonic() - heartbeat >= 15:
+                        self.wfile.write(b': heartbeat\n\n')
+                        self.wfile.flush()
+                        heartbeat = time.monotonic()
+                    self.server.stop_reminders.wait(0.5)
+        except (OSError, sqlite3.Error):
+            pass  # Disconnected or slow reader; release this handler.
+        self.close_connection = True
+
     def do_GET(self):
         path = urlsplit(self.path).path
         if path.startswith('/api/tts/'):
@@ -483,6 +517,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-store'); self.send_header('Content-Length', str(len(body)))
             self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
+        if path == '/api/telemetry/stream':
+            if not self.authorized(self.server.admin_token): return self.reply(401, {'error': 'unauthorized'})
+            return self.telemetry_stream()
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
         if path not in ('/api/scale', '/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/profile','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
         if path == '/api/advice' and self.authorized(self.server.device_token):
