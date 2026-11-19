@@ -1,4 +1,8 @@
+ifeq ($(OS),Windows_NT)
+PIO ?= pio
+else
 PIO ?= $(shell command -v pio 2>/dev/null || printf '%s' 'uv tool run --from platformio==6.1.19 pio')
+endif
 
 .PHONY: gateway upload monitor
 
