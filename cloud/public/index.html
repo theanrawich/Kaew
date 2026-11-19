@@ -5,7 +5,7 @@
   <aside class="sidebar">
     <a class="brand" href="#dashboard"><span class="brand-mark">k.</span><span><b>kaew</b><small>DEVICE CONSOLE</small></span></a>
     <div class="nav-label">WORKSPACE</div>
-    <nav><a class="nav-link active" href="#dashboard" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</a><a class="nav-link" href="#sensor" data-view="sensor"><span class="nav-icon">⌁</span>Sensor<span class="nav-dot"></span></a></nav>
+    <nav><a class="nav-link active" href="#dashboard" data-view="dashboard"><span class="nav-icon">▦</span>Dashboard</a><a class="nav-link" href="#sensor" data-view="sensor"><span class="nav-icon">⌁</span>Sensor<span class="nav-dot"></span></a><a class="nav-link" href="#voice" data-view="voice"><span class="nav-icon">◖</span>Voice</a></nav>
     <div class="sidebar-bottom"><span class="pulse"></span><span>ระบบพร้อมใช้งาน</span><small>v1.0</small></div>
   </aside>
   <main class="main">
@@ -24,5 +24,11 @@
       <article class="weight-card" data-sensor-card="temp"><div class="weight-label"><span class="weight-symbol temp-symbol">℃</span><span>อุณหภูมิ</span></div><div class="weight-reading" id="temp-value">— <small>°C</small></div><div class="weight-divider"></div><div class="weight-footer"><span class="weight-device"><i></i><b id="temp-name">รอข้อมูลจาก Temp</b></span><span id="temp-time">ยังไม่ได้รับข้อมูล</span></div></article>
       <article class="weight-card water-card" data-sensor-card="water"><div class="weight-label"><span class="weight-symbol water-symbol">≈</span><span>ระดับน้ำ</span></div><div class="water-reading unknown" id="water-value">รอข้อมูล</div><div class="weight-divider"></div><div class="weight-footer"><span class="weight-device"><i></i><b id="water-name">รอข้อมูลจาก Water Level</b></span><span id="water-time">ยังไม่ได้รับข้อมูล</span></div></article>
     </div><footer>KAЕW DEVICE CONSOLE <span>อัปเดตเมื่อได้รับข้อมูล</span></footer></section>
+    <section class="page voice-page hidden" id="voice-view">
+      <div class="heading"><div><div class="eyebrow">แปลงเสียงเป็นข้อความ</div><h1>Voice<span>.</span></h1><p>ข้อความถอดเสียงล่าสุดจากการรับเสียง</p></div><div class="voice-live"><i></i><span>พร้อมรับเสียง</span></div></div>
+      <div class="voice-toolbar"><div class="voice-toolbar-copy"><span class="voice-mic">◖</span><div><b>Voice transcription</b><small>แสดงข้อความใหม่ล่าสุดก่อน · สูงสุด 100 รายการ</small></div></div><div class="voice-count"><b id="voice-count">0</b><span>/ 100 รายการ</span></div></div>
+      <div class="transcript-list" id="transcript-list" aria-live="polite"></div>
+      <footer>KAЕW DEVICE CONSOLE <span>VOICE TRANSCRIPTION</span></footer>
+    </section>
   </main><script src="/app.js"></script>
 </body></html>
