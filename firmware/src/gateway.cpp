@@ -2,6 +2,7 @@
 #include <HX711.h>
 
 #include "sensor_publisher.h"
+#include "microphone_capture.h"
 
 HX711 scale;
 constexpr float calibrationFactor = 735.7f;
@@ -13,6 +14,9 @@ void setup() {
   Serial.println("Keep the scale unloaded for tare");
 #if __has_include("gateway_wifi.h")
   beginSensorPublisher();
+#ifdef KAEW_GATEWAY_VOICE_ENABLED
+  if (!startMicrophoneCapture()) Serial.println("Voice unavailable: check KAEW_DEVICE_TOKEN, PSRAM and I2S");
+#endif
 #else
   Serial.println("Cloud upload disabled: configure include/gateway_wifi.h");
 #endif
