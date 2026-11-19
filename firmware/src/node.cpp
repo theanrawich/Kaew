@@ -10,10 +10,6 @@ constexpr int LEVEL_PIN = KAEW_LEVEL_PIN;
 
 OneWire oneWire(TEMP_PIN);
 DallasTemperature temperature(&oneWire);
-#if __has_include("gateway_wifi.h")
-constexpr uint32_t publishIntervalMs = 5000;
-uint32_t lastPublishMs = 0;
-#endif
 }
 
 void setup() {
@@ -53,12 +49,9 @@ void loop() {
 
   Serial.printf("temp_c=%s tds_adc=%s water_level=%s\n", tempText, tdsText, waterLevel);
 #if __has_include("gateway_wifi.h")
-  if (started - lastPublishMs >= publishIntervalMs) {
-    lastPublishMs = started;
-    if (tdsAdc >= 0) publishSensor(tdsAdc, "ADC", "TDS");
-    if (validTemperature) publishSensor(tempC, "°C", "Temperature");
-    if (LEVEL_PIN >= 0) publishSensor(wet ? 1 : 0, "", "Water Level");
-  }
+  if (tdsAdc >= 0) publishSensor(tdsAdc, "ADC", "TDS");
+  if (validTemperature) publishSensor(tempC, "°C", "Temperature");
+  if (LEVEL_PIN >= 0) publishSensor(wet ? 1 : 0, "", "Water Level");
 #endif
   const uint32_t elapsed = millis() - started;
   if (elapsed < 1000) delay(1000 - elapsed);
