@@ -182,6 +182,10 @@ class Handler(BaseHTTPRequestHandler):
             if path == '/api/voice': return self.voice(data)
             if path == '/api/advice': return self.advice(data)
             return self.set_reminder(data)
+        if path == '/api/scale':
+            data = self.read_json()
+            if not self.authorized(self.server.device_token): return self.reply(401, {'error': 'unauthorized'})
+            return self.add_scale(data)
         if path != '/api/telemetry': return self.reply(404, {'error': 'not_found'})
         data = self.read_json()
         if not self.authorized(self.server.device_token): return self.reply(401, {'error': 'unauthorized'})
@@ -231,7 +235,19 @@ class Handler(BaseHTTPRequestHandler):
         if kind == 'drink':
             apply_advice(self.server, include_simulated=(source=='simulated'), automatic=True)
         return self.reply(201, {'status':'stored'})
-
+    def add_scale(self, data):
+        # Latest gateway load-cell reading (live value, not history). Stored as JSON in alert_state.
+        if (not isinstance(data, dict) or set(data) != {'weight_g', 'stable', 'cup', 'calibrated'}
+                or type(data['weight_g']) not in (int, float) or not math.isfinite(data['weight_g'])
+                or not -50 <= data['weight_g'] <= 1100
+                or any(type(data[k]) is not bool for k in ('stable', 'cup', 'calibrated'))):
+            return self.reply(400, {'error': 'invalid_scale'})
+        row = {'weight_g': round(float(data['weight_g']), 1), 'stable': data['stable'],
+               'cup': data['cup'], 'calibrated': data['calibrated'], 'at': time.time()}
+        with closing(connect(self.server.db_path)) as db, db:
+            db.execute("INSERT INTO alert_state VALUES ('scale_latest',?) ON CONFLICT (key) DO UPDATE SET value=excluded.value", (json.dumps(row),))
+        return self.reply(201, {'status': 'stored'})
+    
     def set_reminder(self, data):
         if not isinstance(data,dict) or set(data)!={'interval_minutes','next_due'} or type(data['interval_minutes']) is not int or not 1<=data['interval_minutes']<=1440 or type(data['next_due']) not in (int,float) or not math.isfinite(data['next_due']) or not 0<data['next_due']<time.time()+86400*366:
             return self.reply(400, {'error':'invalid_reminder'})
@@ -293,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
-        if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
+        if path not in ('/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/goal','/api/advice','/api/scale'): return self.reply(404, {'error': 'not_found'})
         if path == '/api/advice' and self.authorized(self.server.device_token):
             raw_query = urlsplit(self.path).query
             if not raw_query: return self.reply(401, {'error': 'unauthorized'})
@@ -316,6 +332,11 @@ class Handler(BaseHTTPRequestHandler):
                 if result is not None:
                     result.update(model=row['model'],fallback=bool(row['fallback']),timestamp=row['created_at'],actuation_allowed=False)
                 return self.reply(200,{'advice':result,'actuation_allowed':False})
+            if path == '/api/scale':
+                row = db.execute("SELECT value FROM alert_state WHERE key='scale_latest'").fetchone()
+                if not row: return self.reply(200, {'scale': None})
+                scale = json.loads(row['value']); scale['age_s'] = round(max(0, time.time() - scale['at']), 1)
+                return self.reply(200, {'scale': scale})
             if path == '/api/goal':
                 row=db.execute("SELECT value FROM settings WHERE key='goal_ml'").fetchone()
                 return self.reply(200, {'goal_ml': row['value'] if row else None})
