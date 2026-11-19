@@ -281,6 +281,10 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlsplit(self.path).path
         if path == '/api/stt': return self.stt()
+        if path == '/api/scale':
+            if not self.authorized(self.server.device_token):
+                return self.reply(401, {'error': 'unauthorized'})
+            return self.add_scale(self.read_json())
         if path in ('/api/events', '/api/profile', '/api/voice'):
             device = path == '/api/events' and self.authorized(self.server.device_token)
             if not device and not self.authorized(self.server.admin_token):
@@ -452,6 +456,19 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(audio)
 
 
+    def add_scale(self, data):
+        if not isinstance(data, dict) or set(data) != {'weight_g', 'stable', 'cup', 'calibrated'}:
+            return self.reply(400, {'error': 'invalid_scale'})
+        weight = data['weight_g']
+        if (type(weight) not in (int, float) or not -50 <= weight <= 1100
+                or any(type(data[key]) is not bool for key in ('stable', 'cup', 'calibrated'))):
+            return self.reply(400, {'error': 'invalid_scale'})
+        reading = dict(data, weight_g=round(float(weight), 1), at=time.time())
+        with closing(connect(self.server.db_path)) as db, db:
+            db.execute("INSERT INTO alert_state (key,value) VALUES ('scale_latest',?) "
+                       "ON CONFLICT (key) DO UPDATE SET value=excluded.value", (json.dumps(reading),))
+        return self.reply(201, {'status': 'stored'})
+
     def do_GET(self):
         path = urlsplit(self.path).path
         if path.startswith('/api/tts/'):
@@ -467,7 +484,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Security-Policy', "default-src 'self'; connect-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com")
             self.end_headers(); self.wfile.write(body); return
         if path == '/api/health': return self.reply(200, {'status': 'ok'})
-        if path not in ('/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/profile','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
+        if path not in ('/api/scale', '/api/stt/recent', '/api/status', '/api/telemetry','/api/events','/api/summary','/api/notifications','/api/reminder','/api/profile','/api/goal','/api/advice'): return self.reply(404, {'error': 'not_found'})
         if path == '/api/advice' and self.authorized(self.server.device_token):
             raw_query = urlsplit(self.path).query
             if not raw_query: return self.reply(401, {'error': 'unauthorized'})
@@ -488,6 +505,12 @@ class Handler(BaseHTTPRequestHandler):
                 items = list(reversed(self.server.stt_recent))
             return self.reply(200, {'items':items})
         with closing(connect(self.server.db_path)) as db, db:
+            if path == '/api/scale':
+                row = db.execute("SELECT value FROM alert_state WHERE key='scale_latest'").fetchone()
+                scale = json.loads(row['value']) if row else None
+                if scale is not None:
+                    scale['age_s'] = round(max(0, time.time() - scale['at']), 1)
+                return self.reply(200, {'scale': scale})
             if path == '/api/advice':
                 row=db.execute('SELECT output_json,model,fallback,created_at FROM advice_log ORDER BY id DESC LIMIT 1').fetchone()
                 result=json.loads(row['output_json']) if row else None

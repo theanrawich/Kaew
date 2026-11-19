@@ -451,6 +451,23 @@ class BackendTest(unittest.TestCase):
         self.request('POST','/api/telemetry','device-secret',dict(self.sample,tds_adc=65535))
         self.assertIn('sensor_error',self.kinds())
 
+    def test_scale_reading_is_device_write_admin_read(self):
+        ok = {'weight_g': 187.34, 'stable': True, 'cup': True, 'calibrated': True}
+        self.assertEqual(self.request('GET', '/api/scale', 'admin-secret')[1], {'scale': None})
+        self.assertEqual(self.request('POST', '/api/scale', 'admin-secret', ok)[0], 401)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', dict(ok, weight_g=5000))[0], 400)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', dict(ok, stable='yes'))[0], 400)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', {'weight_g': 1})[0], 400)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', ok)[0], 201)
+        self.assertEqual(self.request('GET', '/api/scale', 'device-secret')[0], 401)
+        scale = self.request('GET', '/api/scale', 'admin-secret')[1]['scale']
+        self.assertEqual((scale['weight_g'], scale['stable'], scale['cup']), (187.3, True, True))
+        self.assertLess(scale['age_s'], 5)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', dict(ok, weight_g=10**400))[0], 400)
+        self.assertEqual(self.request('POST', '/api/scale', 'device-secret', dict(ok, weight_g=0, cup=False))[0], 201)
+        latest = self.request('GET', '/api/scale', 'admin-secret')[1]['scale']
+        self.assertEqual((latest['weight_g'], latest['cup']), (0, False))
+
     def test_connection_loss_enqueues_only_one_alert(self):
         self.request('POST','/api/telemetry','device-secret',self.sample)
         with closing(sqlite3.connect(self.path)) as db, db:
