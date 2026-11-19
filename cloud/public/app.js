@@ -12,7 +12,7 @@ function showWeight(id, value, unit) {
 
 const sensorCards = {
   hx711: { value: 'hx711-value', name: 'hx711-name', time: 'hx711-time', unit: 'g', match: /hx711|weight|load.?cell/i },
-  tds: { value: 'tds-value', name: 'tds-name', time: 'tds-time', unit: 'ppm', match: /tds/i },
+  tds: { value: 'tds-value', name: 'tds-name', time: 'tds-time', unit: 'ADC', match: /tds/i },
   temp: { value: 'temp-value', name: 'temp-name', time: 'temp-time', unit: '°C', match: /temp|thermo/i },
   water: { value: 'water-value', name: 'water-name', time: 'water-time', match: /water.?level|water|level|float.?switch/i },
 };
@@ -47,17 +47,17 @@ function updateSensorCard(key, reading) {
   $(card.time).textContent = formatTime(reading.timestamp);
 }
 
-function render({ latest, count }) {
+function render({ latest, latestBySensor = {}, count }) {
   $('device-count').innerHTML = `${latest ? '1' : '0'} <small>ตัว</small>`;
   $('reading-count').innerHTML = `${count} <small>ครั้ง</small>`;
   if (latest) {
     const value = Number(latest.value).toLocaleString();
     showWeight('dash-value', value, latest.unit);
     $('dash-time').textContent = `รับข้อมูล ${formatTime(latest.timestamp)}`;
-    const key = identifySensor(latest);
-    if (key) {
-      updateSensorCard(key, latest);
-    }
+  }
+  for (const reading of [...Object.values(latestBySensor), latest].filter(Boolean)) {
+    const key = identifySensor(reading);
+    if (key) updateSensorCard(key, reading);
   }
 }
 const sensorEvents = new EventSource('/api/sensors/events');

@@ -7,10 +7,12 @@ const root = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
 const port = Number(process.env.PORT || 3000);
 let latest = null;
 const history = [];
+const latestBySensor = Object.create(null);
+const dashboardSensors = new Set(["HX711", "TDS", "Temperature", "Water Level"]);
 const streams = new Set();
 
 function sensorEvent() {
-  return `data: ${JSON.stringify({ latest, count: history.length })}\n\n`;
+  return `data: ${JSON.stringify({ latest, latestBySensor, count: history.length })}\n\n`;
 }
 
 function openSensorStream(res) {
@@ -38,7 +40,7 @@ http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type' }); return res.end(); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === '/api/sensors/events' && req.method === 'GET') return openSensorStream(res);
-  if (url.pathname === '/api/sensors' && req.method === 'GET') return send(res, 200, { latest, history });
+  if (url.pathname === '/api/sensors' && req.method === 'GET') return send(res, 200, { latest, latestBySensor, history });
   if (url.pathname === '/api/sensors' && req.method === 'POST') {
     let raw = '';
     for await (const chunk of req) raw += chunk;
@@ -47,6 +49,7 @@ http.createServer(async (req, res) => {
       const value = Number(data.value ?? data.hx711_raw);
       if (!Number.isFinite(value)) return send(res, 400, { error: 'ส่ง value เป็นตัวเลข' });
       latest = { value, unit: String(data.unit || 'raw'), sensor: String(data.sensor || 'HX711'), timestamp: new Date().toISOString() };
+      if (dashboardSensors.has(latest.sensor)) latestBySensor[latest.sensor] = latest;
       history.push(latest); if (history.length > 100) history.shift();
       const event = sensorEvent();
       for (const stream of streams) {
