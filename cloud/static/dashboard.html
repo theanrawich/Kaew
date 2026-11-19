@@ -103,6 +103,7 @@ details{margin-top:24px;min-width:0}summary{cursor:pointer;font-weight:700;borde
 </style></head><body><main><header><p class="eyebrow">KAEW / CLOUD DASHBOARD</p><h1>Kaew telemetry</h1><p>ข้อมูลเซนเซอร์ที่บันทึกจริงในฐานข้อมูลทดลอง · ไม่ใช่เครื่องมือประเมินความปลอดภัยของน้ำ</p></header>
 <section class="connection"><div class="controls"><label>Admin token <input id="token" type="password" autocomplete="off"></label> <button id="connect">เชื่อมต่อ</button></div><p id="message">ยังไม่ได้เชื่อมต่อ</p><p id="status"></p></section>
 <section class="history"><span class="section-tag">01 / TELEMETRY</span><h2>ข้อมูลย้อนหลัง</h2><small>100 รายการล่าสุด · ADC เป็นค่าดิบ · ระดับน้ำเป็นสถานะจุดเดียว</small><div id="telemetry-chart" class="chart" role="img" aria-label="Temperature and ADC over time"></div><div class="legend"><span><i class="swatch" style="--fill:#ffe500"></i>Temp °C (ซ้าย)</span><span><i class="swatch" style="--fill:#c3f53c"></i>ADC (ขวา)</span><span><i class="swatch" style="--fill:#56e5f5"></i>wet</span><span><i class="swatch" style="--fill:#ff78c8"></i>dry</span><span><i class="swatch" style="--fill:#bbb"></i>unknown</span></div><details><summary>ข้อมูลดิบ / Raw data</summary><div class="scroll" tabindex="0" role="region" aria-label="ข้อมูลย้อนหลัง"><table><thead><tr><th>เวลารับ</th><th>แหล่ง</th><th>ระดับ</th><th>อุณหภูมิ °C</th><th>ADC ดิบ</th><th>ลำดับ</th></tr></thead><tbody id="rows"></tbody></table></div></details></section>
+<section class="scale-card"><h2>น้ำหนักแก้ว</h2><div class="number-tiles"><div class="number-tile"><strong id="scale-g">—</strong>กรัม / Weight</div><div class="number-tile"><strong id="scale-cup">—</strong>แก้ว / Cup</div></div><p id="scale-status">ยังไม่มีข้อมูล</p></section>
 <section class="drinking-card"><span class="section-tag">02 / HYDRATION</span><h2>การดื่มและเหตุการณ์</h2><p id="drinking">ยังไม่มีข้อมูล</p><form id="profile-form" class="controls"><label>น้ำหนักตัว (กก.) <input id="body-weight" type="number" min="20" max="250" step="any" required></label> <button id="save-profile">บันทึกน้ำหนัก</button></form><p id="goal-status"></p><div class="chart-layout"><div id="today-chart" class="chart" role="img" aria-label="Today’s drink volume and daily goal"></div><div id="hydration-chart" class="chart" role="img" aria-label="Drink volume by source for the last seven local days"></div></div><div class="legend"><span><i class="swatch" style="--fill:#c3f53c"></i>วัดจริง / measured</span><span><i class="swatch" style="--fill:#56e5f5"></i>ประมาณ / estimated</span><span><i class="swatch" style="--fill:#ff78c8"></i>จำลอง / simulated</span></div><ul id="events-recent" class="chip-list" aria-label="เหตุการณ์ล่าสุด / Latest events"></ul><details id="events-history" class="chip-history" hidden><summary>ดูทั้งหมด / All events</summary><ul id="events" class="chip-list" aria-label="All events"></ul></details></section>
 <section class="reminder-card"><span class="section-tag">03 / REMINDERS</span><h2>เวลาเตือนอัตโนมัติ</h2><p id="reminder"></p><div class="chart" aria-label="เวลาที่เหลือก่อนเตือนครั้งถัดไป"><strong id="countdown">ยังไม่ได้ตั้งเตือน</strong><div class="countdown-track" aria-hidden="true"><div id="countdown-fill" class="countdown-fill"></div></div><small>แถบแสดงเวลาที่ผ่านไปในรอบเตือน</small></div><div class="reminder-upcoming"><h3>Upcoming / เวลาเตือนถัดไป</h3><ul id="reminder-upcoming" class="upcoming-list"></ul><small>Projected from current interval / คำนวณจากรอบเตือนปัจจุบัน</small></div><div id="notification-stats" class="notification-stats" aria-label="Loaded notification statistics"></div><div class="notification-panel"><h3>Notifications / 7 วันล่าสุด</h3><div class="legend"><span><i class="swatch" style="--fill:#c3f53c"></i>Delivered</span><span><i class="swatch" style="--fill:#ffe500"></i>Pending</span><span><i class="swatch" style="--fill:#ff5a5a"></i>Failed / error</span><span><i class="swatch" style="--fill:#ddd"></i>Other / mock</span></div><div id="notification-chart" role="img" aria-label="Notifications per local day"></div><small id="notification-window"></small><small>Loaded notifications · local calendar days / เฉพาะข้อมูลที่โหลด</small></div><p><small>สถานะ mock เป็นการทดสอบในระบบ ไม่ใช่การส่งจริง</small></p><ul id="notifications-recent" class="chip-list" aria-label="การแจ้งเตือนล่าสุด / Latest notifications"></ul><details id="notifications-history" class="chip-history" hidden><summary>ดูทั้งหมด / All notifications</summary><ul id="notifications" class="chip-list" aria-label="All notifications"></ul></details></section>
 <section class="advice-card"><span class="section-tag">04 / AI ADVICE</span><h2>AI เตือนครั้งถัดไป</h2><div class="number-tiles"><div class="number-tile"><strong id="advice-minutes">—</strong>นาที / Next reminder</div><div class="number-tile"><strong id="advice-volume">—</strong>มล. / Suggested</div></div><p id="ai-advice">ยังไม่มีคำแนะนำ</p><p><small>ปริมาณน้ำเป็นเพียงคำแนะนำ · AI ไม่ควบคุมปั๊ม · ไม่ใช่คำแนะนำทางการแพทย์</small></p></section>
@@ -239,7 +240,41 @@ document.querySelector('#profile-form').onsubmit=async event=>{
  }catch(e){document.querySelector('#message').textContent=e.message}
  finally{button.disabled=false}
 };
-document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';document.querySelector('#profile-form').reset();await refresh()};
+let scaleRequest = null;
+async function refreshScale() {
+  if (!token || scaleRequest === token) return;
+  const requestToken = token;
+  scaleRequest = requestToken;
+  const grams = document.querySelector('#scale-g');
+  const cup = document.querySelector('#scale-cup');
+  const status = document.querySelector('#scale-status');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 2500);
+  try {
+    const response = await fetch('/api/scale', {
+      headers: {Authorization: 'Bearer '+requestToken}, signal: controller.signal
+    });
+    if (!response.ok) throw Error();
+    const {scale} = await response.json();
+    if (token !== requestToken) return;
+    const fresh = scale && scale.age_s <= 10;
+    grams.textContent = fresh ? scale.weight_g.toFixed(1) : '—';
+    cup.textContent = fresh ? (scale.cup ? 'มี' : 'ไม่มี') : '—';
+    status.textContent = !scale ? 'ยังไม่มีข้อมูลน้ำหนักจาก gateway' :
+      !fresh ? 'ไม่มีข้อมูลใหม่ ('+Math.round(scale.age_s)+' วินาทีที่แล้ว)' :
+      (scale.stable ? 'ค่านิ่ง' : 'กำลังรอให้นิ่ง') + (scale.calibrated ? '' : ' · ยังไม่ได้สอบเทียบ');
+  } catch {
+    if (token === requestToken) {
+      grams.textContent = cup.textContent = '—';
+      status.textContent = 'โหลดน้ำหนักไม่ได้';
+    }
+  } finally {
+    clearTimeout(timeout);
+    if (scaleRequest === requestToken) scaleRequest = null;
+  }
+}
+document.querySelector('#connect').onclick=async()=>{token=document.querySelector('#token').value;document.querySelector('#token').value='';document.querySelector('#profile-form').reset();await Promise.all([refresh(), refreshScale()])};
+setInterval(refreshScale,3000);
 setInterval(refresh,5000);
 renderCharts();
 if(typeof ResizeObserver!=='undefined'){const chartObserver=new ResizeObserver(()=>renderCharts());document.querySelectorAll('section').forEach(section=>chartObserver.observe(section))}

@@ -9,6 +9,7 @@
 #include <esp_timer.h>
 #include <cJSON.h>
 #include "cloud_config.h"
+#include "scale_upload.h"
 #include "cloud_outbox_record.h"
 #include "nvs_queue_store.h"
 #include "reminder_countdown.h"
@@ -65,8 +66,42 @@ class CloudPublisher {
   }
 
   bool ready_=false, keepConnected_=false;
+  QueueHandle_t scaleUpdates_=nullptr;
+  uint32_t scaleStaleMs_=0;
   static void persistTask(void *p) { static_cast<CloudPublisher*>(p)->persist(); }
   static void networkTask(void *p) { static_cast<CloudPublisher*>(p)->network(); }
+  static void scaleTask(void *p) { static_cast<CloudPublisher*>(p)->publishScale(); }
+
+  void publishScale() {
+    String url(KAEW_CLOUD_URL);
+    const bool tls = url.startsWith("https://");
+    if (!(tls ? strlen(KAEW_CLOUD_CA) : KAEW_ALLOW_DEV_HTTP && url.startsWith("http://"))
+        || !strlen(KAEW_CLOUD_TOKEN)) { vTaskDelete(nullptr); return; }
+    const int path = url.indexOf('/', tls ? 8 : 7);
+    if (path >= 0) url.remove(path);
+    url += "/api/scale";
+    for (;;) {
+      vTaskDelay(pdMS_TO_TICKS(2000));
+      if (WiFi.status() != WL_CONNECTED || (tls && time(nullptr) < CLOCK_MIN_EPOCH)) continue;
+      ScaleUpload sample{};
+      if (xQueueReceive(scaleUpdates_, &sample, 0) != pdTRUE) continue;
+      char body[96];
+      if (!formatScaleUpload(sample, millis(), scaleStaleMs_, body, sizeof body)) continue;
+
+      WiFiClient plain;
+      WiFiClientSecure secure;
+      if (tls) secure.setCACert(KAEW_CLOUD_CA);
+      HTTPClient http;
+      if (!(tls ? http.begin(secure, url) : http.begin(plain, url))) continue;
+      http.setConnectTimeout(3000);
+      http.setTimeout(3000);
+      http.addHeader("Content-Type", "application/json");
+      http.addHeader("Authorization", String("Bearer ") + KAEW_CLOUD_TOKEN);
+      http.POST(reinterpret_cast<uint8_t*>(body), strlen(body));
+      http.end();
+    }
+  }
+
   void persist() {
     uint32_t last=0; bool wrote=false, haveRecent=false; CloudOutboxRecord record{}; Packet recent{};
     for (;;) {
@@ -103,7 +138,7 @@ class CloudPublisher {
       CloudOutboxRecord record{};
       xSemaphoreTake(lock_,portMAX_DELAY); bool found=durable_.peek(record); bool healthy=durable_.healthy(); xSemaphoreGive(lock_);
       if(!healthy && !storageErrorReported) { ++errors_; storageErrorReported=true; }
-      if(!found && !keepConnected_) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
+      if(!found && !keepConnected_ && !scaleUpdates_) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if(WiFi.status()!=WL_CONNECTED) { WiFi.reconnect(); vTaskDelay(pdMS_TO_TICKS(retryMs+esp_random()%(retryMs/4+1))); retryMs=min(retryMs*2,uint32_t(60000));continue; }
       if(!found) {vTaskDelay(pdMS_TO_TICKS(1000));continue;}
       if((!tls && !dev) || !strlen(KAEW_CLOUD_TOKEN) || (tls && !strlen(KAEW_CLOUD_CA))) {vTaskDelay(pdMS_TO_TICKS(10000));continue;}
@@ -150,16 +185,22 @@ public:
     return snapshot;
   }
 
-  bool begin(bool keepConnected = false) {
+  bool begin(bool keepConnected = false, uint32_t scaleStaleMs = 0) {
     if(!KAEW_CLOUD_ENABLED)return false;
     keepConnected_ = keepConnected;
     if(!store_.begin() || !durable_.recover()) {++errors_;return false;}
     lock_=xSemaphoreCreateMutex(); pending_=xQueueCreate(8,sizeof(CloudOutboxRecord)); acknowledgements_=xQueueCreate(8,sizeof(Packet));
     if(!lock_ || !pending_ || !acknowledgements_) {++errors_;return false;}
+    scaleStaleMs_ = scaleStaleMs;
+    if (scaleStaleMs_) scaleUpdates_ = xQueueCreate(1, sizeof(ScaleUpload));
     // Fail closed if either task fails to start; no UART ACKs then leave the loop.
     TaskHandle_t persistent=nullptr;
     if(xTaskCreatePinnedToCore(persistTask,"kaew-store",4096,this,1,&persistent,0)!=pdPASS) {++errors_;return false;}
     if(xTaskCreatePinnedToCore(networkTask,"kaew-cloud",8192,this,1,nullptr,0)!=pdPASS) {vTaskDelete(persistent);++errors_;return false;}
+    if (scaleStaleMs_ && (!scaleUpdates_ ||
+        xTaskCreatePinnedToCore(scaleTask, "kaew-scale-cloud", 8192, this, 1, nullptr, 0) != pdPASS)) {
+      ++errors_;
+    }
     ready_=true; return true;
   }
   bool enabled() const {return KAEW_CLOUD_ENABLED;}
@@ -170,6 +211,9 @@ public:
   }
   bool enqueue(const Packet &packet) { return enqueue(CloudOutboxRecord{packet, {}}); }
   bool enqueueDrink(const MeasuredDrink &drink) { return enqueue(CloudOutboxRecord{{}, drink}); }
+  void enqueueScale(const ScaleUpload &sample) {
+    if (ready_ && scaleUpdates_) xQueueOverwrite(scaleUpdates_, &sample);
+  }
   bool takeAck(Packet &p) {return ready_ && xQueueReceive(acknowledgements_,&p,0)==pdTRUE;}
   uint32_t rejected() const {return rejected_.load();}
   uint32_t errors() const {return errors_.load();}
