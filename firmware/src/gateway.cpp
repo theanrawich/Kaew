@@ -9,6 +9,8 @@
 #include "wire_protocol.h"
 #include "gateway_oled.h"
 #include "drink_detection.h"
+#include "boot_tared_scale.h"
+
 #include "ai_advice_client.h"
 #ifndef KAEW_AUDIO_ENABLED
 #define KAEW_AUDIO_ENABLED 0
@@ -49,6 +51,7 @@ std::atomic<bool> scaleOverflow{false};
 Preferences preferences;
 Calibration calibration{};
 ScaleProcessor scaleInputs;
+BootTaredScale bootScale;
 DrinkDetector drinkDetector;
 FrameParser parser;
 Receiver receiver;
@@ -173,9 +176,9 @@ void setup() {
   if (!scaleSamples || xTaskCreatePinnedToCore(acquireScale, "kaew-scale", 3072, nullptr, 1, nullptr, 0) != pdPASS)
     Serial.println("scale acquisition unavailable; dispensing remains blocked");
 #if KAEW_AUDIO_ENABLED
-  const bool cloudReady = cloud.begin(KAEW_WIFI_SSID[0] && (KAEW_ADMIN_TOKEN[0] || KAEW_CLOUD_TOKEN[0]));
+  const bool cloudReady = cloud.begin(KAEW_WIFI_SSID[0] && (KAEW_ADMIN_TOKEN[0] || KAEW_CLOUD_TOKEN[0]), KAEW_SCALE_STALE_MS);
 #else
-  cloud.begin();
+  cloud.begin(false, KAEW_SCALE_STALE_MS);
 #endif
   adviceClient.begin();
 #if KAEW_AUDIO_ENABLED
@@ -197,11 +200,16 @@ void setup() {
 
 void loop() {
   controlTick(); // Includes E-stop/freshness even if serial input never terminates.
+  static RawScaleSample latest{};
+  static bool haveRaw = false, haveBootWeight = false;
   bool scaleReady = false;
-  long raw = 0;
   RawScaleSample sample{};
   for (unsigned n = 0; n < 8 && scaleSamples && xQueueReceive(scaleSamples, &sample, 0) == pdTRUE; ++n) {
-    scaleReady = true; raw = sample.raw;
+    if (haveRaw && uint32_t(sample.atMs - latest.atMs) >= KAEW_SCALE_STALE_MS)
+      bootScale.resetWindow();
+    latest = sample;
+    haveRaw = scaleReady = true;
+    haveBootWeight = !scaleInputs.calibrated() && bootScale.accept(sample.raw);
     const bool wasActive = activeScale();
     scaleInputs.accept(sample.raw, sample.atMs, wasActive);
     controlTick(); // Each queued removal is checked, not overwritten by a later sample.
@@ -216,6 +224,15 @@ void loop() {
     }
   }
   controlTick(); // Raw cup removal/target crossing is applied in this iteration.
+
+  if (scaleReady && !scaleOverflow.load() && validScaleRaw(latest.raw)) {
+    if (scaleInputs.calibrated()) {
+      cloud.enqueueScale({toGrams(calibration, latest.raw), latest.atMs,
+                          scaleInputs.stable(), scaleInputs.cupPresent()});
+    } else if (haveBootWeight) {
+      cloud.enqueueScale({bootScale.grams(), latest.atMs, bootScale.stable(), bootScale.cup()});
+    }
+  }
 
   // Work budgets stop continuous UART/console input starving safety updates.
   Packet persisted{};
@@ -258,9 +275,15 @@ void loop() {
   controlTick();
   if (uint32_t(inputs.nowMs - lastPrint) >= 1000 && Serial.availableForWrite() >= 64) {
     float volume = 0; bool known = scaleInputs.tare().volume(inputs.cupPresent, inputs.weightG, volume);
+    const bool fresh = haveRaw && validScaleRaw(latest.raw) && !scaleOverflow.load() &&
+                       uint32_t(inputs.nowMs - latest.atMs) < KAEW_SCALE_STALE_MS;
+    const bool bootWeight = fresh && !inputs.calibrated && haveBootWeight;
+    const float displayWeight = bootWeight ? bootScale.grams() : inputs.weightG;
     // Finite diagnostic output can still affect timing; measure on the board.
-    Serial.printf("hx711_ready=%d hx711_raw=%ld calibrated=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=%s state=%u fault=%u boot=%lu now_ms=%lu trace_dropped=%lu\n",
-      scaleReady, raw, inputs.calibrated, inputs.weightG, scaleInputs.stable(), inputs.cupPresent, known, volume,
+    Serial.printf("hx711_ready=%d hx711_raw=%ld calibrated=%d boot_tared=%d weight=%.1f stable=%d cup=%d volume_known=%d volume_ml=%.1f link_fresh=%d level=%u rx=%lu dup=%lu rejected=%lu cloud_reject=%lu cloud_error=%lu pump=%s state=%u fault=%u boot=%lu now_ms=%lu trace_dropped=%lu\n",
+      fresh, static_cast<long>(latest.raw), inputs.calibrated, bootWeight, displayWeight,
+      bootWeight ? bootScale.stable() : scaleInputs.stable(),
+      bootWeight ? bootScale.cup() : inputs.cupPresent, known, volume,
       receiver.fresh(inputs.nowMs), receiver.fresh(inputs.nowMs) ? receiver.latest().level : 0,
       static_cast<unsigned long>(accepted), static_cast<unsigned long>(duplicates), static_cast<unsigned long>(rejected),
       static_cast<unsigned long>(cloud.rejected()), static_cast<unsigned long>(cloud.errors()),

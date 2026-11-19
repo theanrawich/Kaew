@@ -10,6 +10,8 @@ Provisional UART pins: node (ESP32-S3) TX GPIO21 → gateway RX GPIO21, node RX 
 
 Gateway loads a versioned, checksum-protected HX711 calibration from NVS. For bench commissioning only, observe an unloaded raw value and a stable raw value with a known mass, then send `CAL <unloaded_raw> <loaded_raw> <known_mass_g>` over the gateway serial console. Verify with independent known masses before relying on it. With a stable empty cup present, `TARE` sets a volatile cup tare; volume uses the approximation 1 g/mL. Removal, instability, recalibration or reboot clears tare. This is preliminary filtering and cup detection with illustrative thresholds, not validated control. NVS corruption fails closed; actual write, interruption and reboot behavior needs hardware testing.
 
+If no saved calibration exists, the gateway displays weight using 735.7 counts/g and an empty-platform tare at boot. Keep the platform empty for the first ten HX711 conversions. The gateway then averages ten conversions and zeros values within 0.2 g of zero. Serial logs show `boot_tared=1` while this reading is available. With cloud publishing configured, the gateway also sends the live display reading to `/api/scale`. Dispensing and measured drink events require the saved calibration.
+
 Install PlatformIO Core (`python3 -m pip install platformio==6.2.0` in a virtual environment if required) and run `pio run -d firmware`. The pinned platform and libraries are in `platformio.ini`. The S3 board definition is a candidate for N16R8; verify the received board and flash/PSRAM configuration before flashing.
 
 The portable controller and protocol can be exercised on a host with:
