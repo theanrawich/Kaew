@@ -10,6 +10,43 @@ function showWeight(id, value, unit) {
   $(id).replaceChildren(`${value} `, label);
 }
 
+const sensorCards = {
+  hx711: { value: 'hx711-value', name: 'hx711-name', time: 'hx711-time', unit: 'g', match: /hx711|weight|load.?cell/i },
+  tds: { value: 'tds-value', name: 'tds-name', time: 'tds-time', unit: 'ppm', match: /tds/i },
+  temp: { value: 'temp-value', name: 'temp-name', time: 'temp-time', unit: '°C', match: /temp|thermo/i },
+  water: { value: 'water-value', name: 'water-name', time: 'water-time', match: /water.?level|water|level|float.?switch/i },
+};
+
+function identifySensor(reading) {
+  const name = String(reading.sensor || '').trim();
+  const unit = String(reading.unit || '').trim().toLowerCase();
+  for (const [key, card] of Object.entries(sensorCards)) {
+    if (card.match.test(name) || (key === 'tds' && unit === 'ppm') || (key === 'temp' && ['°c', 'c', '℃'].includes(unit))) return key;
+  }
+  return null;
+}
+
+function updateSensorCard(key, reading) {
+  const card = sensorCards[key];
+  if (key === 'water') {
+    const value = reading.value;
+    const hasWater = value === true || value === 1 || /^(1|true|yes|มีน้ำ|น้ำมี|wet|water)$/i.test(String(value).trim());
+    const noWater = value === false || value === 0 || /^(0|false|no|ไม่มีน้ำ|แห้ง|dry|empty)$/i.test(String(value).trim());
+    const display = $(card.value);
+    display.textContent = hasWater ? 'มีน้ำ' : noWater ? 'ไม่มีน้ำ' : 'ไม่ทราบสถานะ';
+    display.classList.toggle('has-water', hasWater);
+    display.classList.toggle('no-water', noWater);
+    display.classList.toggle('unknown', !hasWater && !noWater);
+    $(card.name).textContent = reading.sensor || 'Water Level';
+    $(card.time).textContent = formatTime(reading.timestamp);
+    return;
+  }
+  const unit = reading.unit || card.unit;
+  showWeight(card.value, Number(reading.value).toLocaleString(), unit);
+  $(card.name).textContent = reading.sensor || key.toUpperCase();
+  $(card.time).textContent = formatTime(reading.timestamp);
+}
+
 function render({ latest, count }) {
   $('device-count').innerHTML = `${latest ? '1' : '0'} <small>ตัว</small>`;
   $('reading-count').innerHTML = `${count} <small>ครั้ง</small>`;
@@ -17,9 +54,10 @@ function render({ latest, count }) {
     const value = Number(latest.value).toLocaleString();
     showWeight('dash-value', value, latest.unit);
     $('dash-time').textContent = `รับข้อมูล ${formatTime(latest.timestamp)}`;
-    showWeight('sensor-value', value, latest.unit);
-    $('sensor-name').textContent = latest.sensor;
-    $('sensor-time').textContent = formatTime(latest.timestamp);
+    const key = identifySensor(latest);
+    if (key) {
+      updateSensorCard(key, latest);
+    }
   }
 }
 const sensorEvents = new EventSource('/api/sensors/events');
