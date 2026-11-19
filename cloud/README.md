@@ -140,3 +140,29 @@ every two seconds and shows ESP32 clips newest first with Bangkok times.
 The admin-only history keeps the last 50 Typhoon attempts in memory until
 restart. Each entry includes the transcript or error, model, timestamp, and
 elapsed milliseconds including the provider network round trip.
+
+### Live dashboard sensors
+
+The dashboard uses authenticated `GET /api/telemetry/stream` SSE via streaming
+fetch with the admin Bearer header; tokens stay out of the URL. Each connection
+receives the newest 100 telemetry rows plus the latest gateway scale reading.
+The server checks committed data every 500 ms and sends a snapshot when either
+changes, including writes from other processes sharing the database. This adds
+up to about 500 ms plus database, network and rendering time after cloud ingestion;
+physical sampling and gateway upload rates still limit how fresh readings can be.
+
+The stream sends a heartbeat after 15 seconds of silence. The browser aborts a
+connection after 25 seconds without a complete event/heartbeat and retries after
+two seconds. Until the first snapshot and during failures, the existing five-second
+telemetry refresh and three-second scale refresh provide fallback. Other dashboard
+panels retain their five-second cadence. Scale readings expire after 10 seconds
+without a new measurement, including while SSE remains connected.
+
+Each open dashboard uses a handler thread, one read database connection and four
+SQL queries per second (two SELECTs per 500 ms check). This is intended for a small project dashboard. Keep
+proxy response buffering disabled for this route (`X-Accel-Buffering: no` is sent).
+Deploy backend and dashboard together and verify the hosting proxy delivers events
+without buffering; local tests do not prove hosted latency.
+
+Tests: `python3 -m unittest discover -s cloud/tests -t cloud -p 'test_realtime.py' -v`
+and `node --test cloud/tests/*.test.mjs` from the repository root.
