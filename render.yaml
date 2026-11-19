@@ -5,3 +5,8 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    envVars:
+      - key: TYPHOON_API_KEY
+        sync: false
+      - key: KAEW_DEVICE_TOKEN
+        sync: false

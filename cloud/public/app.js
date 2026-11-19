@@ -1,20 +1,49 @@
 const $ = (id) => document.getElementById(id);
 const formatTime = (value) => new Date(value).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'medium' });
-function showVoiceEmptyState() {
-  $('voice-count').textContent = '0';
-  const empty = document.createElement('div');
-  empty.className = 'voice-empty';
-  const icon = document.createElement('span');
-  icon.className = 'empty-wave';
-  icon.textContent = '〰';
-  const title = document.createElement('b');
-  title.textContent = 'ยังไม่มีข้อความถอดเสียง';
-  const hint = document.createElement('span');
-  hint.textContent = 'เมื่อได้รับเสียง ข้อความจะแสดงที่นี่';
-  empty.append(icon, title, hint);
-  $('transcript-list').replaceChildren(empty);
+function renderTranscripts(items = []) {
+  $('voice-count').textContent = String(items.length);
+  if (items.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'voice-empty';
+    const icon = document.createElement('span'); icon.className = 'empty-wave'; icon.textContent = '〰';
+    const title = document.createElement('b'); title.textContent = 'ยังไม่มีข้อความถอดเสียง';
+    const hint = document.createElement('span'); hint.textContent = 'เมื่อ Gateway ส่งเสียงมา ข้อความจะแสดงที่นี่';
+    empty.append(icon, title, hint);
+    $('transcript-list').replaceChildren(empty);
+    return;
+  }
+  const cards = items.map((item) => {
+    const card = document.createElement('article');
+    card.className = 'transcript-card';
+    const message = document.createElement('p');
+    message.className = 'transcript-text';
+    message.textContent = item.text;
+    const meta = document.createElement('div');
+    meta.className = 'transcript-meta';
+    const mark = document.createElement('span');
+    mark.className = 'transcript-mark';
+    mark.textContent = '◖';
+    const label = document.createElement('span');
+    label.textContent = formatTime(item.timestamp);
+    meta.append(mark, label);
+    card.append(message, meta);
+    return card;
+  });
+  $('transcript-list').replaceChildren(...cards);
 }
-showVoiceEmptyState();
+async function loadTranscripts() {
+  try {
+    const response = await fetch('/api/voice');
+    if (!response.ok) throw new Error('เชื่อมต่อไม่ได้');
+    const data = await response.json();
+    renderTranscripts(data.history || []);
+    $('voice-status').querySelector('span').textContent = data.history?.length ? 'รับข้อความจาก Gateway แล้ว' : 'รอรับเสียงจาก Gateway';
+  } catch { $('voice-status').querySelector('span').textContent = 'เชื่อมต่อไม่ได้'; }
+}
+if (location.pathname === '/voice') {
+  loadTranscripts();
+  setInterval(loadTranscripts, 2000);
+}
 function drawRows(target, rows, columns) {
   if (!rows.length) { target.innerHTML = `<tr><td colspan="${columns}" class="empty">ยังไม่มีข้อมูลจากเซนเซอร์</td></tr>`; return; }
   target.innerHTML = rows.map((r, i) => `<tr>${columns === 4 ? `<td>${r.sensor}</td><td><b>${Number(r.value).toLocaleString()}</b></td><td>${r.unit}</td><td>${formatTime(r.timestamp)}</td>` : `<td>${rows.length - i}</td><td>${r.sensor}</td><td><b>${Number(r.value).toLocaleString()}</b></td><td>${r.unit}</td><td>${formatTime(r.timestamp)}</td>`}</tr>`).join('');
@@ -85,6 +114,7 @@ function navigate(view) {
   $('crumb').textContent = current[0].toUpperCase() + current.slice(1);
   document.querySelectorAll('.nav-link').forEach((link) => link.classList.toggle('active', link.dataset.view === current));
 }
-document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); navigate(link.dataset.view); history.replaceState(null, '', `#${link.dataset.view}`); }));
-document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => { navigate(button.dataset.go); history.replaceState(null, '', `#${button.dataset.go}`); }));
-navigate(location.hash.slice(1));
+document.querySelectorAll('[data-view]').forEach((link) => link.addEventListener('click', (event) => { event.preventDefault(); navigate(link.dataset.view); history.replaceState(null, '', link.dataset.view === 'voice' ? '/voice' : `/#${link.dataset.view}`); }));
+document.querySelectorAll('[data-go]').forEach((button) => button.addEventListener('click', () => { navigate(button.dataset.go); history.replaceState(null, '', `/#${button.dataset.go}`); }));
+navigate(location.pathname === '/voice' ? 'voice' : location.hash.slice(1));
+window.addEventListener('popstate', () => navigate(location.pathname === '/voice' ? 'voice' : location.hash.slice(1)));
